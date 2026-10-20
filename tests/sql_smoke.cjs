@@ -98,6 +98,42 @@ await db.exec('reset role');
 await db.exec("set request.jwt.claim.sub='00000000-0000-0000-0000-000000000000'");
 let noPermission=false;try{await db.query('select public.data_transactions()')}catch(e){noPermission=e.code==='42501'}
 assert.ok(noPermission,'unassigned users cannot read transaction identities');
+await db.exec('reset role');
+await db.exec(fs.readFileSync('supabase/migrations/20261020162717_gate_out_iso_length_check.sql','utf8'));
+await db.exec("set request.jwt.claim.sub='11111111-1111-4111-8111-111111111111'");
+const iso20Visit=(await db.query("select public.enter_truck('ISO20','AB12345','empty',null,'BOOK20','22G1','MAE') id")).rows[0].id;
+const snapshotIsoState=async()=>JSON.stringify((await db.query(`select
+  (select to_jsonb(v) from public.truck_visits v where id='${iso20Visit}') as visit,
+  (select jsonb_agg(to_jsonb(c) order by c.number) from public.containers c) as containers,
+  (select jsonb_agg(to_jsonb(s) order by s.id) from public.container_stock_intervals s) as stock,
+  (select count(*) from public.visit_events) as events,
+  (select count(*) from public.audit_logs) as audit,
+  (select count(*) from public.generated_documents) as documents`)).rows);
+const isoBefore=await snapshotIsoState();
+const expectIsoDenied=async(sql,args)=>{
+  let error;try{await db.query(sql,args)}catch(e){error=e}
+  assert.ok(error && error.code==='23514','size mismatch must be rejected, got '+error?.message);
+};
+await expectIsoDenied('select public.exit_truck_with_details($1,$2,$3)',[iso20Visit,directCont.rows[0].number,'45G1']);
+await expectIsoDenied('select public.exit_truck_with_details($1,$2,$3)',[iso20Visit,directCont.rows[0].number,'22G1']);
+await expectIsoDenied('select public.exit_truck($1)',[iso20Visit]);
+assert.equal(await snapshotIsoState(),isoBefore,'failed exits leave visit, stock, master, audit and documents unchanged');
+const iso40Visit=(await db.query("select public.enter_truck('ISO40','AB12345','empty',null,'BOOK40','45G1','MAE') id")).rows[0].id;
+await expectIsoDenied('select public.exit_truck_with_details($1,$2,$3)',[iso40Visit,twinC1.rows[0].number,'22G1']);
+await expectIsoDenied('select public.exit_truck_with_details($1,$2,$3)',[iso40Visit,twinC1.rows[0].number,'45G1']);
+await expectIsoDenied('select public.exit_truck_with_details($1,$2,$3,null,true,$4,$5)',[iso20Visit,twinC1.rows[0].number,'22G1',directCont.rows[0].number,'22G1']);
+await expectIsoDenied('select public.exit_truck_with_details($1,$2,$3,null,true,$4,$5)',[iso40Visit,directCont.rows[0].number,'45G1',twinC1.rows[0].number,'22G1']);
+// Same length with a different height remains allowed: 42G1 and 45G1 are both 40-foot.
+await db.query('select public.exit_truck_with_details($1,$2,$3)',[iso40Visit,directCont.rows[0].number,'42G1']);
+assert.ok((await db.query('select exited_at from public.truck_visits where id=$1',[iso40Visit])).rows[0].exited_at);
+// Both 20-foot containers succeed in twin mode.
+await db.query('select public.exit_truck_with_details($1,$2,$3,null,true,$4,$5)',[iso20Visit,twinC1.rows[0].number,'22G1',twinC2.rows[0].number,'22G1']);
+assert.ok((await db.query('select exited_at from public.truck_visits where id=$1',[iso20Visit])).rows[0].exited_at);
+const isoCancel=(await db.query("select public.enter_truck('ISOCANCEL','AB12345','empty',null,'BOOKCANCEL','22G1','MAE') id")).rows[0].id;
+await db.query('select public.exit_truck_with_details($1,null,null,null,false,null,null,null,true)',[isoCancel]);
+assert.ok((await db.query('select canceled_at from public.truck_visits where id=$1',[isoCancel])).rows[0].canceled_at);
+console.log('PASS: gate-out size mismatch both ways, spoofed ISO, second twin, missing pickup, atomic failures, same-length acceptance, valid twin and empty cancellation');
+
 console.log('PASS: transaction number stability, creator, last changer, agent access, profile isolation and unauthorized denial');
 console.log('PASS: migrations, 95 operators, checksum, lifecycle, stock, audit, documents, forced pickup/reconciliation, direct exit, twin 2-company, empty exit cancel, role denial and RLS role');
 }catch(e){console.error('ERROR',e);process.exitCode=1}finally{await db.close()}})();

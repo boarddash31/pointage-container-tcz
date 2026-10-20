@@ -84,3 +84,9 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 
 - Rebuilt the web release with the TCZ publishable configuration and copied it to site/. Verified local HTTP 200 for the page and compiled bundle; the bundle contains the transaction-summary endpoint. Opened the app at http://localhost:8787/.
 - GitHub release marker: annotated tag v3. The Android APK is unchanged because this machine has no release signing configuration.
+
+## Gate-out ISO length validation (2026-10-20)
+
+- Added migration 20261020162717_gate_out_iso_length_check to TCZ through ZENATA. Pickup checks compare the original visit length code against submitted ISO, registered container ISO and open stock ISO before any upsert or movement. Twin pickups require two 20-foot containers; missing pickup details are rejected unless a previous Engin movement already completed. Empty cancellation and loaded deposit remain available.
+- Added matching Flutter validation and reserved-ISO guidance. This checks container length, allowing different heights/types of the same length (for example 42G1 and 45G1 are both 40-foot).
+- Eleven Flutter tests pass. Extended isolated database tests cover both mismatch directions, false ISO declarations, second twin mismatch, missing pickup, unchanged records after failure, valid same-length pickups, valid twins and empty cancellation. A live rolled-back authenticated test confirmed that a 20-foot visit rejects a 40-foot pickup.

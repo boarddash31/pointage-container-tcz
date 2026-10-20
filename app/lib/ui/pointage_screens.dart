@@ -8,6 +8,7 @@ import '../data/document_service.dart';
 import '../data/freepool_export.dart';
 import '../data/pointage_repository.dart';
 import '../domain/container_number.dart';
+import '../domain/container_iso.dart';
 
 void message(BuildContext context,String text) => ScaffoldMessenger.of(context)
   ..hideCurrentSnackBar()..showSnackBar(SnackBar(content:Text(text)));
@@ -863,6 +864,12 @@ class _ExitScreenState extends State<ExitScreen> {
   }
 
   Future<void> exitTruckWithPickup(TruckVisit visit) async {
+    final isoError = ContainerIso.pickupError(expected: visit.iso, actual: iso1,
+      expectedSecond: visit.iso2, actualSecond: iso2, twin: isTwin);
+    if (isoError != null) {
+      message(context, isoError);
+      return;
+    }
     final c1 = number1;
     if (c1.length < 11 || !ContainerNumber.isValid(c1)) {
       final expected = ContainerNumber.expectedCheckDigit(c1);
@@ -1853,10 +1860,10 @@ class _ExitScreenState extends State<ExitScreen> {
                                   TextFormField(
                                     key: ValueKey('iso1-$iso1'),
                                     initialValue: iso1,
-                                    decoration: const InputDecoration(
+                                    decoration: InputDecoration(
                                       labelText: 'Code ISO Conteneur 1 *',
-                                      helperText: 'Ex: 22G1, 45G1',
-                                      prefixIcon: Icon(Icons.qr_code, size: 20),
+                                      helperText: 'ISO réservé : ${activeVisit.iso} · même longueur requise',
+                                      prefixIcon: const Icon(Icons.qr_code, size: 20),
                                     ),
                                     maxLength: 4,
                                     textCapitalization: TextCapitalization.characters,
