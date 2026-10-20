@@ -534,9 +534,9 @@ class VisitActionSheet extends StatefulWidget {
   @override State<VisitActionSheet> createState()=>_VisitActionSheetState();
 }
 class _VisitActionSheetState extends State<VisitActionSheet> {
-  final container=TextEditingController(),position=TextEditingController(),reason=TextEditingController();
+  final container=TextEditingController(),reason=TextEditingController();
   bool busy=false,completedMissing=false;
-  @override void dispose(){container.dispose();position.dispose();reason.dispose();super.dispose();}
+  @override void dispose(){container.dispose();reason.dispose();super.dispose();}
   Future<void> run(Future<void> Function() action,String success) async {
     setState(()=>busy=true);
     try{await action();if(!mounted)return;message(context,success);Navigator.pop(context);}
@@ -553,11 +553,9 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
       }
       return;
     }
-    if(widget.visit.entryKind=='loaded'&&position.text.trim().isEmpty){
-      message(context,'Position de dépose requise.');return;}
     await run(()async {await widget.repository.engin(widget.visit.id,
       containerNumber:widget.visit.entryKind=='empty'?ContainerNumber.normalize(container.text):null,
-      position:widget.visit.entryKind=='loaded'?position.text.trim():null);
+      position:null);
       try{final documents=DocumentService(widget.repository.client);
         final kind=widget.visit.entryKind=='loaded'?'DEPOSE':'PRISE';
         await documents.finalizeLatest(widget.visit.id,kind);
@@ -601,8 +599,6 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
       if(pending && v.entryKind=='empty') TextField(controller:container,
         inputFormatters:[UpperCaseFormatter()],maxLength:11,
         decoration:const InputDecoration(labelText:'Numéro du conteneur pris *')),
-      if(pending && v.entryKind=='loaded') TextField(controller:position,
-        decoration:const InputDecoration(labelText:'Position réelle de dépose *')),
       if(pending)FilledButton.icon(onPressed:busy?null:engin,icon:const Icon(Icons.check),
         label:Text(v.entryKind=='loaded'?'Valider la dépose':'Valider la prise')),
       if(widget.exitMode) ...[
