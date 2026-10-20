@@ -314,52 +314,117 @@ class _EntryScreenState extends State<EntryScreen> {
         const Text('4 lettres + 7 chiffres, avec chiffre de contrôle',style:TextStyle(fontSize:11, color: Colors.grey)),
     ]);
   }
-  @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.all(16),children:[
-    Text('Enregistrement de l’entrée',style:Theme.of(context).textTheme.headlineSmall),
-    const SizedBox(height:8),const Text('Un formulaire · ordre des champs conforme au poste Entrée'),
-    const SizedBox(height:16),Card(child:Padding(padding:const EdgeInsets.all(16),child:Form(key:form,
-      child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
-        TextFormField(controller:plate,textCapitalization:TextCapitalization.characters,
-          decoration:const InputDecoration(labelText:'1. Plaque camion *'),
-          validator:(v)=>(v?.trim().length??0)<2?'Plaque requise':null),
-        const SizedBox(height:14),
-        TextFormField(controller:cin,textCapitalization:TextCapitalization.characters,
-          decoration:const InputDecoration(labelText:'2. CIN chauffeur *'),
-          validator:(v)=>(v?.trim().length??0)<2?'CIN requis':null),
-        const SizedBox(height:17),
-        if(kind=='loaded')containerBoxes() else TextFormField(controller:booking,
-          decoration:const InputDecoration(labelText:'3. Booking / ordre libre *',
-            helperText:'Le booking n’est pas un numéro ISO de conteneur'),
-          validator:(v)=>v==null||v.trim().isEmpty?'Booking requis':null),
-        if(lookupHint!=null)Padding(padding:const EdgeInsets.only(top:7),child:Text(lookupHint!,
-          style:TextStyle(color:Theme.of(context).colorScheme.primary))),
-        const SizedBox(height:18),const Text('4. État du camion à l’entrée',style:TextStyle(fontWeight:FontWeight.w700)),
-        const SizedBox(height:8),Row(children:[for(final value in ['loaded','empty'])
-          Expanded(child:Padding(padding:const EdgeInsets.all(4),child:InkWell(
-            borderRadius:BorderRadius.circular(13),onTap:()=>setState(()=>kind=value),
-            child:Container(decoration:BoxDecoration(color:kind==value?const Color(0xffe7f3ff):Colors.white,
-              border:Border.all(color:kind==value?Theme.of(context).colorScheme.primary:Colors.grey.shade300),
-              borderRadius:BorderRadius.circular(13)),padding:const EdgeInsets.all(8),
-              child:Column(children:[TruckScene(kind:value,height:88),
-                Text(value=='loaded'?'Avec conteneur':'Sans conteneur'),
-                if(kind==value)const Icon(Icons.check_circle,color:Color(0xff075a8d))]))))),]),
-        const SizedBox(height:18),TextFormField(key:ValueKey(iso),initialValue:iso,
-          decoration:const InputDecoration(labelText:'5. Code ISO *',
-            helperText:'4 caractères alphanumériques, ex. 22G1 ou 45R1'),
-          maxLength:4,textCapitalization:TextCapitalization.characters,
-          inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')),
-            UpperCaseFormatter()],
-          readOnly:!widget.canCorrect&&lookupHint=='ISO et armateur repris du référentiel.',
-          onChanged:(v)=>iso=v.toUpperCase(),
-          validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
-        const SizedBox(height:16),OutlinedButton.icon(
-          onPressed:widget.canCorrect||lookupHint!='ISO et armateur repris du référentiel.'?pickOperator:null,
-          icon:const Icon(Icons.search),label:Text(operator==null?'6. Choisir armateur *':
-            '6. ${operator!.name} (${operator!.id})')),
-        const SizedBox(height:16),FilledButton.icon(onPressed:busy?null:submit,
-          icon:const Icon(Icons.save),label:Text(busy?'Enregistrement…':'Enregistrer l’entrée')),
-      ]))))
-  ]);
+  @override Widget build(BuildContext context)=>ListView(
+    padding:const EdgeInsets.symmetric(horizontal:12, vertical:8),
+    children:[
+      Padding(
+        padding:const EdgeInsets.only(left:4, bottom:6),
+        child:Row(children:[
+          Icon(Icons.login, size:20, color:Theme.of(context).colorScheme.primary),
+          const SizedBox(width:8),
+          const Text('Enregistrement de l’entrée',
+            style:TextStyle(fontWeight:FontWeight.bold, fontSize:16)),
+        ]),
+      ),
+      Card(
+        elevation:1,
+        margin:EdgeInsets.zero,
+        child:Padding(
+          padding:const EdgeInsets.all(14),
+          child:Form(
+            key:form,
+            child:Column(
+              crossAxisAlignment:CrossAxisAlignment.stretch,
+              children:[
+                // 1. État du camion (images & icônes en premier)
+                Row(children:[for(final value in ['loaded','empty'])
+                  Expanded(child:Padding(padding:const EdgeInsets.all(4),child:InkWell(
+                    borderRadius:BorderRadius.circular(12),onTap:()=>setState(()=>kind=value),
+                    child:Container(decoration:BoxDecoration(color:kind==value?const Color(0xffe7f3ff):Colors.white,
+                      border:Border.all(color:kind==value?Theme.of(context).colorScheme.primary:Colors.grey.shade300, width:kind==value?2:1),
+                      borderRadius:BorderRadius.circular(12)),padding:const EdgeInsets.symmetric(horizontal:6, vertical:6),
+                      child:Column(children:[
+                        TruckScene(kind:value, height:65),
+                        const SizedBox(height:4),
+                        Row(mainAxisAlignment:MainAxisAlignment.center, children:[
+                          Icon(kind==value?Icons.check_circle:Icons.radio_button_unchecked,
+                            size:16, color:kind==value?Theme.of(context).colorScheme.primary:Colors.grey),
+                          const SizedBox(width:5),
+                          Text(value=='loaded'?'Avec conteneur':'Sans conteneur',
+                            style:TextStyle(fontWeight:kind==value?FontWeight.bold:FontWeight.w500, fontSize:13)),
+                        ]),
+                      ]))))),]),
+                const SizedBox(height:14),
+                // 2. Plaque camion
+                TextFormField(controller:plate, textCapitalization:TextCapitalization.characters,
+                  decoration:const InputDecoration(
+                    labelText:'Plaque camion *',
+                    hintText:'Ex: 12345-A-1',
+                    prefixIcon:Icon(Icons.pin, size:20),
+                  ),
+                  validator:(v)=>(v?.trim().length??0)<2?'Plaque requise':null),
+                const SizedBox(height:12),
+                // 3. CIN chauffeur
+                TextFormField(controller:cin, textCapitalization:TextCapitalization.characters,
+                  decoration:const InputDecoration(
+                    labelText:'CIN chauffeur *',
+                    hintText:'Ex: AB123456',
+                    prefixIcon:Icon(Icons.badge_outlined, size:20),
+                  ),
+                  validator:(v)=>(v?.trim().length??0)<2?'CIN requis':null),
+                const SizedBox(height:14),
+                // 4. Numéro de conteneur ou Booking
+                if(kind=='loaded') containerBoxes() else TextFormField(
+                  controller:booking,
+                  textCapitalization:TextCapitalization.characters,
+                  decoration:const InputDecoration(
+                    labelText:'Booking / ordre libre *',
+                    helperText:'Le booking n’est pas un numéro ISO de conteneur',
+                    prefixIcon:Icon(Icons.receipt_long, size:20),
+                  ),
+                  validator:(v)=>v==null||v.trim().isEmpty?'Booking requis':null),
+                if(lookupHint!=null) Padding(padding:const EdgeInsets.only(top:7),
+                  child:Text(lookupHint!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
+                const SizedBox(height:14),
+                // 5. Code ISO
+                TextFormField(key:ValueKey(iso), initialValue:iso,
+                  decoration:const InputDecoration(
+                    labelText:'Code ISO *',
+                    helperText:'4 caractères alphanumériques (ex: 22G1, 45G1, 45R1)',
+                    prefixIcon:Icon(Icons.qr_code, size:20),
+                  ),
+                  maxLength:4, textCapitalization:TextCapitalization.characters,
+                  inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')),
+                    UpperCaseFormatter()],
+                  readOnly:!widget.canCorrect&&lookupHint=='ISO et armateur repris du référentiel.',
+                  onChanged:(v)=>iso=v.toUpperCase(),
+                  validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
+                const SizedBox(height:12),
+                // 6. Armateur
+                OutlinedButton.icon(
+                  style:OutlinedButton.styleFrom(
+                    padding:const EdgeInsets.symmetric(horizontal:14, vertical:14),
+                    alignment:Alignment.centerLeft),
+                  onPressed:widget.canCorrect||lookupHint!='ISO et armateur repris du référentiel.'?pickOperator:null,
+                  icon:const Icon(Icons.business, size:20),
+                  label:Text(operator==null?'Choisir armateur *':
+                    '${operator!.name} (${operator!.id})',
+                    style:const TextStyle(fontWeight:FontWeight.w600))),
+                const SizedBox(height:16),
+                // 7. Bouton enregistrer
+                FilledButton.icon(
+                  style:FilledButton.styleFrom(padding:const EdgeInsets.symmetric(vertical:14)),
+                  onPressed:busy?null:submit,
+                  icon:const Icon(Icons.save),
+                  label:Text(busy?'Enregistrement…':'Enregistrer l’entrée',
+                    style:const TextStyle(fontSize:15, fontWeight:FontWeight.bold))),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
 }
 
 class UpperCaseFormatter extends TextInputFormatter {
@@ -414,20 +479,40 @@ class VisitQueue extends StatelessWidget {
       }
       if(!snapshot.hasData)return const Center(child:CircularProgressIndicator());
       if(visits.isEmpty) {
-        return ListView(padding:const EdgeInsets.all(16),children:[
-          Text(title,style:Theme.of(context).textTheme.headlineSmall),
-          const Text('FIFO · du plus ancien au plus récent'),
-          const SizedBox(height:90),
+        return ListView(padding:const EdgeInsets.symmetric(horizontal:12, vertical:8),children:[
+          Padding(
+            padding:const EdgeInsets.only(left:4, bottom:4),
+            child:Row(children:[
+              Icon(exitMode?Icons.exit_to_app:Icons.precision_manufacturing, size:20, color:Theme.of(context).colorScheme.primary),
+              const SizedBox(width:8),
+              Text(title, style:const TextStyle(fontWeight:FontWeight.bold, fontSize:16)),
+            ]),
+          ),
+          const Padding(
+            padding:EdgeInsets.only(left:4),
+            child:Text('FIFO · du plus ancien au plus récent', style:TextStyle(fontSize:12, color:Colors.grey)),
+          ),
+          const SizedBox(height:60),
           const Center(child:Text('Aucun camion dans la file.')),
         ]);
       }
-      return ListView(padding:const EdgeInsets.all(16),children:[
-        Text(title,style:Theme.of(context).textTheme.headlineSmall),
-        const Text('FIFO · du plus ancien au plus récent'),const SizedBox(height:12),
+      return ListView(padding:const EdgeInsets.symmetric(horizontal:12, vertical:8),children:[
+        Padding(
+          padding:const EdgeInsets.only(left:4, bottom:2),
+          child:Row(children:[
+            Icon(exitMode?Icons.exit_to_app:Icons.precision_manufacturing, size:20, color:Theme.of(context).colorScheme.primary),
+            const SizedBox(width:8),
+            Text(title, style:const TextStyle(fontWeight:FontWeight.bold, fontSize:16)),
+          ]),
+        ),
+        const Padding(
+          padding:EdgeInsets.only(left:4, bottom:8),
+          child:Text('FIFO · du plus ancien au plus récent', style:TextStyle(fontSize:12, color:Colors.grey)),
+        ),
         for(final v in visits)Card(child:InkWell(onTap:()=>open(context,v),
           child:Padding(padding:const EdgeInsets.all(12),child:Row(children:[
             TruckScene(kind:v.needsEngin?(v.entryKind=='loaded'?'loaded':'empty'):
-              (v.entryKind=='loaded'?'empty':'loaded'),height:75),
+              (v.entryKind=='loaded'?'empty':'loaded'),height:70),
             const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,
               children:[Text(v.plate,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16)),
                 Text(v.container??v.booking??'—',maxLines:1,overflow:TextOverflow.ellipsis),

@@ -281,24 +281,50 @@ class _PointageShellState extends State<PointageShell> {
         DataScreen(repository:repo),
         BonsScreen(repository:repo),
       ];
-      final body=SafeArea(child:Column(children:[
-        if(section==0) Material(color:Colors.white,child:Row(children:[
-          for(var i=0;i<3;i++) Expanded(child:Padding(padding:const EdgeInsets.all(5),
-            child:ChoiceChip(label:Text(['1 · Entrée','2 · Engin','3 · Sortie'][i]),
-              selected:process==i,onSelected:(_)=>setState(()=>process=i)))),
-        ])),
-        Expanded(child:KeyedSubtree(key:ValueKey('$section-$process'),child:screens[section])),
-      ]));
+      final body=SafeArea(child:KeyedSubtree(
+        key:ValueKey('$section-$process'),
+        child:screens[section]));
       final destinations=const [NavigationDestination(icon:Icon(Icons.rule),label:'Pointage'),
         NavigationDestination(icon:Icon(Icons.dataset),label:'Data'),
         NavigationDestination(icon:Icon(Icons.description),label:'Bons')];
-      return Scaffold(appBar:AppBar(title:const Text('Pointage Container · TCZ'),
-        backgroundColor:const Color(0xff063e66),foregroundColor:Colors.white,
-        actions:[IconButton(tooltip:'Déconnexion',icon:const Icon(Icons.logout),
-          onPressed:()=>Supabase.instance.client.auth.signOut()),
-          if(admin)IconButton(tooltip:'Administration',icon:const Icon(Icons.admin_panel_settings),
-            onPressed:()=>Navigator.push(context,MaterialPageRoute(
-              builder:(_)=>AdminScreen(repository:repo))))]),
+      return Scaffold(
+        appBar:AppBar(
+          titleSpacing:8,
+          centerTitle:true,
+          title:section==0
+            ? Container(
+                height:38,
+                constraints:const BoxConstraints(maxWidth:340),
+                padding:const EdgeInsets.all(3),
+                decoration:BoxDecoration(
+                  color:Colors.black.withValues(alpha:0.25),
+                  borderRadius:BorderRadius.circular(9)),
+                child:Row(children:[
+                  for(var i=0;i<3;i++)
+                    Expanded(child:InkWell(
+                      borderRadius:BorderRadius.circular(7),
+                      onTap:()=>setState(()=>process=i),
+                      child:Container(
+                        alignment:Alignment.center,
+                        decoration:BoxDecoration(
+                          color:process==i?Colors.white:Colors.transparent,
+                          borderRadius:BorderRadius.circular(7)),
+                        child:Text(['Entrée','Engin','Sortie'][i],
+                          style:TextStyle(
+                            fontSize:13,
+                            fontWeight:process==i?FontWeight.bold:FontWeight.w500,
+                            color:process==i?const Color(0xff063e66):Colors.white)),
+                      ))),
+                ]))
+            : Text(section==1?'Data · Référentiel':'Bons · Documents'),
+          backgroundColor:const Color(0xff063e66),foregroundColor:Colors.white,
+          actions:[
+            if(admin)IconButton(tooltip:'Administration',icon:const Icon(Icons.admin_panel_settings),
+              onPressed:()=>Navigator.push(context,MaterialPageRoute(
+                builder:(_)=>AdminScreen(repository:repo)))),
+            IconButton(tooltip:'Déconnexion',icon:const Icon(Icons.logout),
+              onPressed:()=>Supabase.instance.client.auth.signOut()),
+          ]),
         body:LayoutBuilder(builder:(context,c)=>c.maxWidth>900?
           Row(children:[NavigationRail(selectedIndex:section,
             onDestinationSelected:(i)=>setState(()=>section=i),labelType:NavigationRailLabelType.all,

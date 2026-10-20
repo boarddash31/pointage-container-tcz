@@ -26,11 +26,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sans conteneur'));
     await tester.pumpAndSettle();
-    expect(find.text('3. Booking / ordre libre *'), findsOneWidget);
-    await tester.tap(find.text('2 · Engin'));
+    expect(find.text('Booking / ordre libre *'), findsOneWidget);
+    await tester.tap(find.text('Engin'));
     await tester.pumpAndSettle();
     expect(find.text('Engin · dépose / prise'), findsOneWidget);
-    await tester.tap(find.text('3 · Sortie'));
+    await tester.tap(find.text('Sortie'));
     await tester.pumpAndSettle();
     expect(find.text('Sortie · tous les camions présents'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
