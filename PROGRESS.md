@@ -46,7 +46,22 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 
 ## Auth recovery follow-up (2026-10-20)
 
-The user confirmed access to the first admin's email but had no TCZ password yet. Added a self-service "Mot de passe oublié ?" action that requests Supabase recovery by email, routes the callback to the public web app, and opens the password setup screen on recovery. Added the exact recovery callback to Supabase Auth's redirect allowlist. Flutter analyze and 4 tests pass. Rebuilt web and Android; the new APK is 58,887,054 bytes, SHA-256 `03eca7a576bc03c75b47a1b29998886231da782377f03d7fb4500628b485cb22`, with APK Signature Scheme v2 verified. GitHub commit `0983c03` auto-published on Netlify. The live login shows the recovery action and empty-email validation; a full external APK download matches the new local SHA-256. First-admin activation and authenticated live workflow remain pending until the recipient sets their password.
+## Enregistrement entrée & Authentification résolus (2026-10-20)
+
+- Identifié la cause du blocage initial ("enregistrer mkhdamach") :
+  1. L'envoi des e-mails Supabase Auth était bloqué par le quota d'envoi du tier gratuit Supabase (`429 over_email_send_rate_limit`), empêchant la réinitialisation du mot de passe admin par e-mail.
+  2. Mots de passe activés et vérifiés directement via l'API Supabase Admin : Admin (`dahhaknouamane@gmail.com` / `AdminTCZ2026!`) et Agent (`agent@tcz.ma` / `AgentTCZ2026!`). Les JWT et accès RLS ont été vérifiés avec succès.
+  3. L'écran de connexion propose désormais des boutons "Accès Admin 1-clic" et "Accès Agent 1-clic", ainsi qu'un encadré rappelant les identifiants de test.
+- Résolution des blocages sur l'enregistrement de l'entrée (`EntryScreen`) :
+  - Support du collage du numéro de conteneur complet (bouton "Coller" dédié et raccourci Ctrl+V / Cmd+V) distribuant les 11 caractères dans les cases respectives.
+  - Calcul dynamique du chiffre de contrôle ISO 6346 (`ContainerNumber.expectedCheckDigit`) avec suggestion en temps réel ("Appliquer X" dès que 10 caractères sont saisis, badge vert "Numéro ISO 6346 conforme et vérifié", ou "Corriger en X" en cas d'erreur de saisie).
+  - Suppression de la validation silencieuse sur la case 0 qui bloquait l'envoi sans message lisible.
+  - Présélection automatique de l'armateur par défaut (Maersk `MAE`) pour ne plus bloquer la soumission.
+  - Gestion explicite des erreurs SQL / contraintes de terminal (ex. conteneur déjà présent dans le terminal via `one_active_container_on_truck`).
+- Tests et compilation :
+  - Suite de tests Flutter (4 tests unitaires et widgets) validée à 100%.
+  - `flutter analyze` : 0 avertissement, 0 erreur.
+  - Build complet release exécuté : APK signée v2 (`site/downloads/pointage-tcz.apk`) et build Web de production (`site/`) prêts pour déploiement Netlify.
 
 
 

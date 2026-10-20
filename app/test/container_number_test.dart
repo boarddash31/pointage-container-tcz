@@ -7,5 +7,8 @@ void main() {
     expect(ContainerNumber.isValid('CSQU3054384'), isFalse);
     expect(ContainerNumber.isValid('csqu3054383'), isTrue);
     expect(ContainerNumber.isValid('BOOKING-123'), isFalse);
+    expect(ContainerNumber.expectedCheckDigit('CSQU305438'), equals(3));
+    expect(ContainerNumber.expectedCheckDigit('CSQU3054383'), equals(3));
+    expect(ContainerNumber.expectedCheckDigit('CSQU3054384'), equals(3));
   });
 }

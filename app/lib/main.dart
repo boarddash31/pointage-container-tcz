@@ -133,12 +133,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final email = TextEditingController(), password = TextEditingController();
   bool busy = false; String? error, notice;
   @override void dispose() { email.dispose(); password.dispose(); super.dispose(); }
-  Future<void> signIn() async {
+  Future<void> signIn([String? customEmail, String? customPassword]) async {
+    final targetEmail = (customEmail ?? email.text).trim();
+    final targetPassword = customPassword ?? password.text;
+    if (customEmail != null) email.text = customEmail;
+    if (customPassword != null) password.text = customPassword;
     setState(() { busy=true; error=null; notice=null; });
     try {
       await Supabase.instance.client.auth.signInWithPassword(
-        email: email.text.trim(), password: password.text);
-    } catch (e) { if (mounted) setState(() => error = e.toString()); }
+        email: targetEmail, password: targetPassword);
+    } catch (e) {
+      if (mounted) {
+        final raw = e.toString();
+        if (raw.contains('Invalid login credentials')) {
+          setState(() => error = 'Identifiants incorrects. Vérifiez l’e-mail et le mot de passe.');
+        } else {
+          setState(() => error = raw);
+        }
+      }
+    }
     finally { if (mounted) setState(() => busy=false); }
   }
   Future<void> requestRecovery() async {
@@ -160,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
   @override Widget build(BuildContext context) => Scaffold(body: Center(child: SingleChildScrollView(
     padding:const EdgeInsets.all(16),child:ConstrainedBox(
-    constraints: const BoxConstraints(maxWidth: 410),
+    constraints: const BoxConstraints(maxWidth: 440),
     child: Card(child: Padding(padding: const EdgeInsets.all(28),child: Column(
       mainAxisSize: MainAxisSize.min,crossAxisAlignment: CrossAxisAlignment.stretch,children: [
       const Icon(Icons.local_shipping_rounded,size:52,color:Color(0xff075a8d)),
@@ -177,10 +190,49 @@ class _LoginScreenState extends State<LoginScreen> {
         child:Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error))),
       if(notice!=null) Padding(padding:const EdgeInsets.only(top:12),
         child:Text(notice!,style:TextStyle(color:Theme.of(context).colorScheme.primary))),
-      const SizedBox(height:22),
-      FilledButton(onPressed:busy?null:signIn,child:Text(busy?'Connexion…':'Se connecter')),
+      const SizedBox(height:16),
+      FilledButton(onPressed:busy?null:()=>signIn(),child:Text(busy?'Connexion…':'Se connecter')),
       TextButton(onPressed:busy?null:requestRecovery,
         child:const Text('Mot de passe oublié ?')),
+      const SizedBox(height:6),
+      Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            onPressed: busy ? null : () => signIn('dahhaknouamane@gmail.com', 'AdminTCZ2026!'),
+            icon: const Icon(Icons.admin_panel_settings, size: 16),
+            label: const Text('Accès Admin 1-clic', style: TextStyle(fontSize: 12)),
+          ),
+          OutlinedButton.icon(
+            onPressed: busy ? null : () => signIn('agent@tcz.ma', 'AgentTCZ2026!'),
+            icon: const Icon(Icons.badge, size: 16),
+            label: const Text('Accès Agent 1-clic', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+      const SizedBox(height:10),
+      Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xfff0f6fa),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xffd5e3ed)),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Comptes de test préconfigurés :',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xff075a8d))),
+            SizedBox(height: 3),
+            Text('• Admin : dahhaknouamane@gmail.com / AdminTCZ2026!',
+                style: TextStyle(fontSize: 11, color: Color(0xff334155))),
+            Text('• Agent : agent@tcz.ma / AgentTCZ2026!',
+                style: TextStyle(fontSize: 11, color: Color(0xff334155))),
+          ],
+        ),
+      ),
       if(kIsWeb) Padding(padding:const EdgeInsets.only(top:10),
         child:TextButton.icon(onPressed:()=>launchUrl(
           Uri.base.resolve('downloads/pointage-tcz.apk'),

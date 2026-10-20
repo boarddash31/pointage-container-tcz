@@ -38,13 +38,25 @@ class _EntryScreenState extends State<EntryScreen> {
   Future<void> loadOperators() async {
     try{
       final records=await widget.repository.operators();
-      if(mounted)setState(()=>operators=records);
+      if(mounted){
+        setState((){
+          operators=records;
+          if(operator==null&&records.isNotEmpty){
+            operator=records.where((o)=>o.id=='MAE').firstOrNull??records.first;
+          }
+        });
+      }
     }catch(_){
       try{
         final raw=await rootBundle.loadString('assets/operators.json');
         if(mounted) {
-          setState(()=>operators=(jsonDecode(raw) as List)
-          .map((x)=>OperatorRecord.fromJson(x)).toList());
+          final list=(jsonDecode(raw) as List).map((x)=>OperatorRecord.fromJson(x)).toList();
+          setState((){
+            operators=list;
+            if(operator==null&&list.isNotEmpty){
+              operator=list.where((o)=>o.id=='MAE').firstOrNull??list.first;
+            }
+          });
         }
       }catch(_){ if(mounted)message(context,'Catalogue des armateurs indisponible.'); }
     }
@@ -61,10 +73,47 @@ class _EntryScreenState extends State<EntryScreen> {
       if(row==null){if(mounted)setState(()=>lookupHint='Conteneur absent du référentiel : vérification en zone requise.');return;}
       setState((){
         iso=row['iso_code'] as String;
-        operator=operators.where((o)=>o.id==row['armateur_id']).firstOrNull;
+        operator=operators.where((o)=>o.id==row['armateur_id']).firstOrNull??operator;
         lookupHint='ISO et armateur repris du référentiel.';
       });
     }catch(e){if(mounted)setState(()=>lookupHint='Recherche indisponible : $e');}
+  }
+  Future<void> pasteFromClipboard() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text?.trim() ?? '';
+      if (text.isEmpty) {
+        if (mounted) message(context, 'Presse-papier vide.');
+        return;
+      }
+      setContainerText(text);
+    } catch (_) {
+      if (mounted) message(context, 'Impossible d’accéder au presse-papier.');
+    }
+  }
+  void setContainerText(String text) {
+    final cleaned = text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    for (var i = 0; i < 11; i++) {
+      if (i < cleaned.length) {
+        boxes[i].text = cleaned[i];
+      } else {
+        boxes[i].clear();
+      }
+    }
+    setState(() {});
+    if (number.length == 11) {
+      FocusScope.of(context).unfocus();
+      lookup();
+    } else if (cleaned.isNotEmpty && cleaned.length < 11) {
+      focus[cleaned.length].requestFocus();
+    }
+  }
+  void clearBoxes() {
+    for (final b in boxes) {
+      b.clear();
+    }
+    setState(() => lookupHint = null);
+    focus[0].requestFocus();
   }
   Future<void> pickOperator() async {
     var query='';
@@ -86,8 +135,21 @@ class _EntryScreenState extends State<EntryScreen> {
   Future<void> submit() async {
     if(!form.currentState!.validate())return;
     if(operator==null){message(context,'Choisissez un armateur.');return;}
-    if(kind=='loaded'&&!ContainerNumber.isValid(number)){
-      message(context,'Numéro de conteneur ISO 6346 invalide.');return;}
+    if(kind=='loaded'){
+      if(number.length < 11){
+        message(context,'Veuillez saisir les 11 caractères du numéro de conteneur.');
+        return;
+      }
+      if(!ContainerNumber.isValid(number)){
+        final expected = ContainerNumber.expectedCheckDigit(number);
+        if(expected != null){
+          message(context,'Chiffre de contrôle ISO 6346 invalide. Le chiffre attendu est $expected.');
+        } else {
+          message(context,'Numéro de conteneur ISO 6346 invalide (4 lettres + 7 chiffres requis).');
+        }
+        return;
+      }
+    }
     setState(()=>busy=true);
     try{
       final visitId=await widget.repository.enter(plate:plate.text.trim(),cin:cin.text.trim(),kind:kind,
@@ -105,32 +167,153 @@ class _EntryScreenState extends State<EntryScreen> {
         if(mounted)message(context,'Entrée enregistrée. Bon PDF à réessayer dans Bons : $error');
       }
       form.currentState!.reset();for(final c in [plate,cin,booking,...boxes]){c.clear();}
-      setState((){operator=null;lookupHint=null;kind='loaded';iso='45G1';});
-    }catch(e){if(mounted)message(context,'Entrée refusée : $e');}
+      setState((){
+        operator=operators.where((o)=>o.id=='MAE').firstOrNull??operators.firstOrNull;
+        lookupHint=null;kind='loaded';iso='45G1';
+      });
+    }catch(e){
+      if(mounted){
+        final raw = e.toString();
+        String msg = 'Entrée refusée : $raw';
+        if(raw.contains('one_active_container_on_truck')){
+          msg = 'Le conteneur $number est déjà sur un camion actif dans le terminal. Terminez sa sortie ou son opération d’abord.';
+        } else if(raw.contains('plate')){
+          msg = 'Plaque d’immatriculation non valide ou déjà active.';
+        }
+        message(context, msg);
+      }
+    }
     finally{if(mounted)setState(()=>busy=false);}
   }
-  Widget containerBoxes()=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-    const Text('Numéro du conteneur · ISO 6346',style:TextStyle(fontWeight:FontWeight.w700)),
-    const SizedBox(height:8),SingleChildScrollView(scrollDirection:Axis.horizontal,
-      child:Row(children:List.generate(11,(i)=>Padding(padding:const EdgeInsets.only(right:3),
-        child:SizedBox(width:30,child:TextFormField(controller:boxes[i],focusNode:focus[i],
-          textAlign:TextAlign.center,maxLength:1,
-          inputFormatters:[i<4?FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')):
-            FilteringTextInputFormatter.digitsOnly,UpperCaseFormatter()],
-          keyboardType:i<4?TextInputType.text:TextInputType.number,
-          decoration:InputDecoration(counterText:'',contentPadding:const EdgeInsets.symmetric(vertical:12),
-            filled:true,fillColor:i<4?const Color(0xffe9f3fa):Colors.white),
-          onChanged:(v){if(lookupHint!=null){setState(()=>lookupHint=null);}
-            if(v.isNotEmpty){if(i<10) {
-            focus[i+1].requestFocus();
-          } else {
-            FocusScope.of(context).unfocus();
-          }}
-            if(i==10)lookup();},
-          validator:i==0?(_)=>ContainerNumber.isValid(number)?null:'Numéro ou chiffre de contrôle invalide':null,
-        ))))),),
-    const Text('4 lettres + 7 chiffres, avec chiffre de contrôle',style:TextStyle(fontSize:11)),
-  ]);
+  Widget containerBoxes(){
+    final currentNumber = number;
+    final isValid = currentNumber.length == 11 && ContainerNumber.isValid(currentNumber);
+    final expected = currentNumber.length >= 10 ? ContainerNumber.expectedCheckDigit(currentNumber) : null;
+    final has11 = currentNumber.length == 11;
+    final checkDigitMismatch = has11 && !isValid && expected != null;
+
+    return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('Numéro du conteneur · ISO 6346 *', style: TextStyle(fontWeight: FontWeight.w700)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton.icon(
+                style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                onPressed: pasteFromClipboard,
+                icon: const Icon(Icons.paste_rounded, size: 16),
+                label: const Text('Coller', style: TextStyle(fontSize: 12)),
+              ),
+              if (currentNumber.isNotEmpty)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.clear, size: 16),
+                  tooltip: 'Effacer',
+                  onPressed: clearBoxes,
+                ),
+            ],
+          ),
+        ],
+      ),
+      const SizedBox(height:6),
+      CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyV, control: true): pasteFromClipboard,
+          const SingleActivator(LogicalKeyboardKey.keyV, meta: true): pasteFromClipboard,
+        },
+        child: SingleChildScrollView(scrollDirection:Axis.horizontal,
+          child:Row(children:List.generate(11,(i){
+            final isLetter = i < 4;
+            final isCheckDigit = i == 10;
+            return Padding(
+              padding: EdgeInsets.only(right: isLetter && i == 3 ? 10 : (isCheckDigit ? 0 : 3)),
+              child: SizedBox(width:32, child: TextFormField(controller:boxes[i],focusNode:focus[i],
+                textAlign:TextAlign.center,maxLength:1,
+                inputFormatters:[isLetter?FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')):
+                  FilteringTextInputFormatter.digitsOnly,UpperCaseFormatter()],
+                keyboardType:isLetter?TextInputType.text:TextInputType.number,
+                decoration:InputDecoration(counterText:'',contentPadding:const EdgeInsets.symmetric(vertical:12),
+                  filled:true,
+                  fillColor:isLetter
+                    ? const Color(0xffe9f3fa)
+                    : (isCheckDigit ? const Color(0xfffff8e1) : Colors.white),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(
+                      color: isCheckDigit ? Colors.amber.shade700 : Colors.grey.shade400,
+                      width: isCheckDigit ? 1.5 : 1.0,
+                    ),
+                  ),
+                ),
+                onChanged:(v){
+                  if(lookupHint!=null){setState(()=>lookupHint=null);}
+                  setState((){});
+                  if(v.isNotEmpty){if(i<10) {
+                    focus[i+1].requestFocus();
+                  } else {
+                    FocusScope.of(context).unfocus();
+                    lookup();
+                  }}
+                },
+              )),
+            );
+          })),
+        ),
+      ),
+      const SizedBox(height:6),
+      if (isValid)
+        const Row(
+          children: [
+            Icon(Icons.check_circle, color: Color(0xff168846), size: 16),
+            SizedBox(width: 6),
+            Text('Numéro ISO 6346 conforme et vérifié',
+                style: TextStyle(fontSize: 12, color: Color(0xff168846), fontWeight: FontWeight.w600)),
+          ],
+        )
+      else if (checkDigitMismatch)
+        Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
+            const SizedBox(width: 6),
+            Text('Chiffre calculé : $expected (saisi : ${boxes[10].text})',
+                style: const TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+            ActionChip(
+              visualDensity: VisualDensity.compact,
+              label: Text('Corriger en $expected', style: const TextStyle(fontSize: 11)),
+              onPressed: () {
+                boxes[10].text = expected.toString();
+                setState(() {});
+                lookup();
+              },
+            ),
+          ],
+        )
+      else if (currentNumber.length == 10 && expected != null)
+        Row(
+          children: [
+            Icon(Icons.info_outline, color: Color(0xff075a8d), size: 16),
+            const SizedBox(width: 6),
+            Text('Chiffre de contrôle attendu : $expected',
+                style: const TextStyle(fontSize: 12, color: Color(0xff075a8d), fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+            ActionChip(
+              visualDensity: VisualDensity.compact,
+              label: Text('Appliquer $expected', style: const TextStyle(fontSize: 11)),
+              onPressed: () {
+                boxes[10].text = expected.toString();
+                setState(() {});
+                lookup();
+              },
+            ),
+          ],
+        )
+      else
+        const Text('4 lettres + 7 chiffres, avec chiffre de contrôle',style:TextStyle(fontSize:11, color: Colors.grey)),
+    ]);
+  }
   @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.all(16),children:[
     Text('Enregistrement de l’entrée',style:Theme.of(context).textTheme.headlineSmall),
     const SizedBox(height:8),const Text('Un formulaire · ordre des champs conforme au poste Entrée'),
@@ -277,7 +460,14 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
   }
   Future<void> engin() async {
     if(widget.visit.entryKind=='empty'&&!ContainerNumber.isValid(container.text)){
-      message(context,'Numéro de conteneur ISO 6346 requis.');return;}
+      final expected = ContainerNumber.expectedCheckDigit(container.text);
+      if (expected != null) {
+        message(context, 'Chiffre de contrôle ISO 6346 invalide. Le chiffre attendu est $expected.');
+      } else {
+        message(context, 'Numéro de conteneur ISO 6346 invalide (4 lettres + 7 chiffres requis).');
+      }
+      return;
+    }
     if(widget.visit.entryKind=='loaded'&&position.text.trim().isEmpty){
       message(context,'Position de dépose requise.');return;}
     await run(()async {await widget.repository.engin(widget.visit.id,
@@ -291,7 +481,13 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
   }
   Future<void> forcePickup() async {
     if(!ContainerNumber.isValid(container.text)){
-      message(context,'Numéro de conteneur ISO 6346 requis.');return;
+      final expected = ContainerNumber.expectedCheckDigit(container.text);
+      if (expected != null) {
+        message(context, 'Chiffre de contrôle ISO 6346 invalide. Le chiffre attendu est $expected.');
+      } else {
+        message(context, 'Numéro de conteneur ISO 6346 invalide (4 lettres + 7 chiffres requis).');
+      }
+      return;
     }
     if(reason.text.trim().length<10){
       message(context,'Motif détaillé de 10 caractères minimum requis.');return;
