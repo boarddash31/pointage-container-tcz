@@ -2,6 +2,8 @@
 
 Flutter mobile/web application backed by Supabase Auth, PostgreSQL, private PDF Storage and Edge Functions. The Node bridge is optional for archiving PDFs to a Windows network share and submitting print jobs to a Windows printer.
 
+The current web release is [Pointage Container TCZ](https://stalwart-travesseiro-1e8045.netlify.app/), with a [signed Android APK](https://stalwart-travesseiro-1e8045.netlify.app/downloads/pointage-tcz.apk) and [SHA-256 checksum](https://stalwart-travesseiro-1e8045.netlify.app/downloads/SHA256SUMS.txt). The source is in the private GitHub repository `boarddash31/pointage-container-tcz`. The first admin must complete the Supabase password-recovery email sent after the Auth URL was configured; never share that link or password in this repository.
+
 ## Repository layout
 
 - `app/`: Flutter client for Android, iOS and web.
