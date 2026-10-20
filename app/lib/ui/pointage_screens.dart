@@ -23,6 +23,59 @@ class TruckScene extends StatelessWidget {
     child:Image.asset('assets/truck-$kind.png',height:height,fit:BoxFit.contain));
 }
 
+Future<OperatorRecord?> showOperatorPicker(BuildContext context, List<OperatorRecord> operators) async {
+  var query = '';
+  return showModalBottomSheet<OperatorRecord>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (sheet) => StatefulBuilder(
+      builder: (sheet, update) {
+        final filtered = operators
+            .where((o) => '${o.name} ${o.id} ${o.bic}'.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheet).bottom),
+            child: SizedBox(
+              height: 500,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Rechercher parmi 95 armateurs',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      onChanged: (v) => update(() => query = v),
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, i) {
+                        final o = filtered[i];
+                        return ListTile(
+                          title: Text(o.name),
+                          subtitle: Text('${o.id} · ${o.bic}'),
+                          leading: CircleAvatar(child: Text(o.name.isEmpty ? '?' : o.name[0])),
+                          onTap: () => Navigator.pop(sheet, o),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ),
+  );
+}
+
 class EntryScreen extends StatefulWidget {
   const EntryScreen({super.key,required this.repository,required this.canCorrect});
   final PointageRepository repository;final bool canCorrect;
@@ -31,10 +84,16 @@ class EntryScreen extends StatefulWidget {
 class _EntryScreenState extends State<EntryScreen> {
   final form=GlobalKey<FormState>();
   final plate=TextEditingController(),cin=TextEditingController(),booking=TextEditingController();
+  final booking2=TextEditingController();
   final boxes=List.generate(11,(_)=>TextEditingController());
   final focus=List.generate(11,(_)=>FocusNode());
-  List<OperatorRecord> operators=[];OperatorRecord? operator;
-  String iso='45G1',kind='loaded';bool busy=false;String? lookupHint;
+  final boxes2=List.generate(11,(_)=>TextEditingController());
+  final focus2=List.generate(11,(_)=>FocusNode());
+  List<OperatorRecord> operators=[];
+  OperatorRecord? operator, operator2;
+  String iso='45G1', iso2='22G1', kind='loaded';
+  bool isTwin=false, busy=false;
+  String? lookupHint, lookupHint2;
   @override void initState(){super.initState();loadOperators();}
   Future<void> loadOperators() async {
     try{
@@ -44,6 +103,7 @@ class _EntryScreenState extends State<EntryScreen> {
           operators=records;
           if(operator==null&&records.isNotEmpty){
             operator=records.where((o)=>o.id=='MAE').firstOrNull??records.first;
+            operator2=operator;
           }
         });
       }
@@ -56,15 +116,17 @@ class _EntryScreenState extends State<EntryScreen> {
             operators=list;
             if(operator==null&&list.isNotEmpty){
               operator=list.where((o)=>o.id=='MAE').firstOrNull??list.first;
+              operator2=operator;
             }
           });
         }
       }catch(_){ if(mounted)message(context,'Catalogue des armateurs indisponible.'); }
     }
   }
-  @override void dispose(){for(final c in [plate,cin,booking,...boxes]){c.dispose();}
-    for(final f in focus){f.dispose();}super.dispose();}
+  @override void dispose(){for(final c in [plate,cin,booking,booking2,...boxes,...boxes2]){c.dispose();}
+    for(final f in [...focus,...focus2]){f.dispose();}super.dispose();}
   String get number=>boxes.map((x)=>x.text).join().toUpperCase();
+  String get number2=>boxes2.map((x)=>x.text).join().toUpperCase();
   Future<void> lookup() async {
     final requestedNumber=number;
     if(requestedNumber.length!=11||!ContainerNumber.isValid(requestedNumber))return;
@@ -79,7 +141,21 @@ class _EntryScreenState extends State<EntryScreen> {
       });
     }catch(e){if(mounted)setState(()=>lookupHint='Recherche indisponible : $e');}
   }
-  Future<void> pasteFromClipboard() async {
+  Future<void> lookup2() async {
+    final requestedNumber=number2;
+    if(requestedNumber.length!=11||!ContainerNumber.isValid(requestedNumber))return;
+    try{
+      final row=await widget.repository.container(requestedNumber);
+      if(!mounted||number2!=requestedNumber)return;
+      if(row==null){if(mounted)setState(()=>lookupHint2='Conteneur absent du référentiel : vérification en zone requise.');return;}
+      setState((){
+        iso2=row['iso_code'] as String;
+        operator2=operators.where((o)=>o.id==row['armateur_id']).firstOrNull??operator2;
+        lookupHint2='ISO et armateur repris du référentiel.';
+      });
+    }catch(e){if(mounted)setState(()=>lookupHint2='Recherche indisponible : $e');}
+  }
+  Future<void> pasteFromClipboard({bool second = false}) async {
     try {
       final data = await Clipboard.getData(Clipboard.kTextPlain);
       final text = data?.text?.trim() ?? '';
@@ -87,7 +163,11 @@ class _EntryScreenState extends State<EntryScreen> {
         if (mounted) message(context, 'Presse-papier vide.');
         return;
       }
-      setContainerText(text);
+      if (second) {
+        setContainerText2(text);
+      } else {
+        setContainerText(text);
+      }
     } catch (_) {
       if (mounted) message(context, 'Impossible d’accéder au presse-papier.');
     }
@@ -109,6 +189,23 @@ class _EntryScreenState extends State<EntryScreen> {
       focus[cleaned.length].requestFocus();
     }
   }
+  void setContainerText2(String text) {
+    final cleaned = text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    for (var i = 0; i < 11; i++) {
+      if (i < cleaned.length) {
+        boxes2[i].text = cleaned[i];
+      } else {
+        boxes2[i].clear();
+      }
+    }
+    setState(() {});
+    if (number2.length == 11) {
+      FocusScope.of(context).unfocus();
+      lookup2();
+    } else if (cleaned.isNotEmpty && cleaned.length < 11) {
+      focus2[cleaned.length].requestFocus();
+    }
+  }
   void clearBoxes() {
     for (final b in boxes) {
       b.clear();
@@ -116,22 +213,18 @@ class _EntryScreenState extends State<EntryScreen> {
     setState(() => lookupHint = null);
     focus[0].requestFocus();
   }
-  Future<void> pickOperator() async {
-    var query='';
-    final chosen=await showModalBottomSheet<OperatorRecord>(context:context,isScrollControlled:true,
-      showDragHandle:true,builder:(sheet)=>StatefulBuilder(builder:(sheet,update){
-        final filtered=operators.where((o)=>'${o.name} ${o.id} ${o.bic}'
-          .toLowerCase().contains(query.toLowerCase())).toList();
-        return SafeArea(child:Padding(padding:EdgeInsets.only(
-          bottom:MediaQuery.viewInsetsOf(sheet).bottom),child:SizedBox(height:500,
-            child:Column(children:[Padding(padding:const EdgeInsets.all(16),child:TextField(
-              autofocus:true,decoration:const InputDecoration(labelText:'Rechercher parmi 95 armateurs',
-                prefixIcon:Icon(Icons.search)),onChanged:(v)=>update(()=>query=v))),
-              Expanded(child:ListView.builder(itemCount:filtered.length,itemBuilder:(ctx,i){
-                final o=filtered[i];return ListTile(title:Text(o.name),subtitle:Text('${o.id} · ${o.bic}'),
-                  leading:CircleAvatar(child:Text(o.name.isEmpty?'?':o.name[0])),
-                  onTap:()=>Navigator.pop(sheet,o));}))]))));}));
-    if(chosen!=null&&mounted)setState(()=>operator=chosen);
+  void clearBoxes2() {
+    for (final b in boxes2) {
+      b.clear();
+    }
+    setState(() => lookupHint2 = null);
+    focus2[0].requestFocus();
+  }
+  Future<void> pickOperator({bool forSecond = false}) async {
+    final chosen = await showOperatorPicker(context, operators);
+    if(chosen!=null&&mounted) {
+      setState(() => forSecond ? operator2 = chosen : operator = chosen);
+    }
   }
   Future<void> submit() async {
     if(!form.currentState!.validate())return;
@@ -150,12 +243,39 @@ class _EntryScreenState extends State<EntryScreen> {
         }
         return;
       }
+      if(isTwin){
+        if(number2.length < 11){
+          message(context,'Veuillez saisir les 11 caractères du 2ème conteneur Twin.');
+          return;
+        }
+        if(!ContainerNumber.isValid(number2)){
+          final expected2 = ContainerNumber.expectedCheckDigit(number2);
+          if(expected2 != null){
+            message(context,'Chiffre de contrôle du 2ème conteneur invalide. Attendu : $expected2.');
+          } else {
+            message(context,'Numéro du 2ème conteneur ISO 6346 invalide (4 lettres + 7 chiffres requis).');
+          }
+          return;
+        }
+        if(operator2==null){
+          message(context,'Choisissez l’armateur du 2ème conteneur Twin.');
+          return;
+        }
+      }
     }
     setState(()=>busy=true);
     try{
-      final visitId=await widget.repository.enter(plate:plate.text.trim(),cin:cin.text.trim(),kind:kind,
-        iso:iso,armateur:operator!.id,containerNumber:kind=='loaded'?number:null,
-        booking:kind=='empty'?booking.text.trim():null);
+      final visitId=await widget.repository.enter(
+        plate:plate.text.trim(),cin:cin.text.trim(),kind:kind,
+        iso:iso,armateur:operator!.id,
+        containerNumber:kind=='loaded'?number:null,
+        booking:kind=='empty'?booking.text.trim():null,
+        isTwin:isTwin,
+        containerNumber2:(isTwin&&kind=='loaded')?number2:null,
+        iso2:isTwin?iso2:null,
+        armateur2:isTwin?(operator2?.id??operator!.id):null,
+        booking2:(isTwin&&kind=='empty')?booking2.text.trim():null,
+      );
       if(!mounted)return;
       DocumentOutcome? outcome;
       try{
@@ -164,14 +284,15 @@ class _EntryScreenState extends State<EntryScreen> {
         if(mounted){message(context,outcome.warning!=null?
           'Entrée enregistrée et bon cloud archivé. ${outcome.warning}':(outcome.printed?
           'Entrée enregistrée, bon archivé et impression demandée.':
-          'Entrée enregistrée, bon archivé. Le camion apparaît dans Engin.'));}
+          'Entrée enregistrée avec succès.'));}
       }catch(error){
         if(mounted)message(context,'Entrée enregistrée. Bon PDF à réessayer dans Bons : $error');
       }
-      form.currentState!.reset();for(final c in [plate,cin,booking,...boxes]){c.clear();}
+      form.currentState!.reset();for(final c in [plate,cin,booking,booking2,...boxes,...boxes2]){c.clear();}
       setState((){
         operator=operators.where((o)=>o.id=='MAE').firstOrNull??operators.firstOrNull;
-        lookupHint=null;kind='loaded';iso='45G1';
+        operator2=operator;
+        lookupHint=null;lookupHint2=null;kind='loaded';isTwin=false;iso='45G1';iso2='22G1';
       });
       if(mounted && outcome?.bytes != null){
         await Navigator.push(context, MaterialPageRoute(
@@ -186,8 +307,8 @@ class _EntryScreenState extends State<EntryScreen> {
       if(mounted){
         final raw = e.toString();
         String msg = 'Entrée refusée : $raw';
-        if(raw.contains('one_active_container_on_truck')){
-          msg = 'Le conteneur $number est déjà sur un camion actif dans le terminal. Terminez sa sortie ou son opération d’abord.';
+        if(raw.contains('one_active_container_on_truck') || raw.contains('one_active_container_2_on_truck')){
+          msg = 'Un des conteneurs est déjà sur un camion actif dans le terminal. Terminez sa sortie d’abord.';
         } else if(raw.contains('plate')){
           msg = 'Plaque d’immatriculation non valide ou déjà active.';
         }
@@ -196,8 +317,11 @@ class _EntryScreenState extends State<EntryScreen> {
     }
     finally{if(mounted)setState(()=>busy=false);}
   }
-  Widget containerBoxes(){
-    final currentNumber = number;
+
+  Widget containerBoxes({bool second = false}){
+    final currentNumber = second ? number2 : number;
+    final b = second ? boxes2 : boxes;
+    final f = second ? focus2 : focus;
     final isValid = currentNumber.length == 11 && ContainerNumber.isValid(currentNumber);
     final expected = currentNumber.length >= 10 ? ContainerNumber.expectedCheckDigit(currentNumber) : null;
     final has11 = currentNumber.length == 11;
@@ -207,13 +331,14 @@ class _EntryScreenState extends State<EntryScreen> {
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text('Numéro du conteneur · ISO 6346 *', style: TextStyle(fontWeight: FontWeight.w700)),
+          Text(second ? '2ème Conteneur (20\') · ISO 6346 *' : (isTwin ? '1er Conteneur (20\') · ISO 6346 *' : 'Numéro du conteneur · ISO 6346 *'),
+            style: const TextStyle(fontWeight: FontWeight.w700)),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextButton.icon(
                 style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 8)),
-                onPressed: pasteFromClipboard,
+                onPressed: () => pasteFromClipboard(second: second),
                 icon: const Icon(Icons.paste_rounded, size: 16),
                 label: const Text('Coller', style: TextStyle(fontSize: 12)),
               ),
@@ -222,7 +347,7 @@ class _EntryScreenState extends State<EntryScreen> {
                   visualDensity: VisualDensity.compact,
                   icon: const Icon(Icons.clear, size: 16),
                   tooltip: 'Effacer',
-                  onPressed: clearBoxes,
+                  onPressed: second ? clearBoxes2 : clearBoxes,
                 ),
             ],
           ),
@@ -231,8 +356,8 @@ class _EntryScreenState extends State<EntryScreen> {
       const SizedBox(height:6),
       CallbackShortcuts(
         bindings: {
-          const SingleActivator(LogicalKeyboardKey.keyV, control: true): pasteFromClipboard,
-          const SingleActivator(LogicalKeyboardKey.keyV, meta: true): pasteFromClipboard,
+          const SingleActivator(LogicalKeyboardKey.keyV, control: true): () => pasteFromClipboard(second: second),
+          const SingleActivator(LogicalKeyboardKey.keyV, meta: true): () => pasteFromClipboard(second: second),
         },
         child: SingleChildScrollView(scrollDirection:Axis.horizontal,
           child:Row(children:List.generate(11,(i){
@@ -240,7 +365,7 @@ class _EntryScreenState extends State<EntryScreen> {
             final isCheckDigit = i == 10;
             return Padding(
               padding: EdgeInsets.only(right: isLetter && i == 3 ? 10 : (isCheckDigit ? 0 : 3)),
-              child: SizedBox(width:32, child: TextFormField(controller:boxes[i],focusNode:focus[i],
+              child: SizedBox(width:32, child: TextFormField(controller:b[i],focusNode:f[i],
                 textAlign:TextAlign.center,maxLength:1,
                 inputFormatters:[isLetter?FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')):
                   FilteringTextInputFormatter.digitsOnly,UpperCaseFormatter()],
@@ -259,13 +384,15 @@ class _EntryScreenState extends State<EntryScreen> {
                   ),
                 ),
                 onChanged:(v){
-                  if(lookupHint!=null){setState(()=>lookupHint=null);}
+                  if(second ? (lookupHint2!=null) : (lookupHint!=null)){
+                    setState(() => second ? lookupHint2=null : lookupHint=null);
+                  }
                   setState((){});
                   if(v.isNotEmpty){if(i<10) {
-                    focus[i+1].requestFocus();
+                    f[i+1].requestFocus();
                   } else {
                     FocusScope.of(context).unfocus();
-                    lookup();
+                    if(second) lookup2(); else lookup();
                   }}
                 },
               )),
@@ -288,16 +415,16 @@ class _EntryScreenState extends State<EntryScreen> {
           children: [
             const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
             const SizedBox(width: 6),
-            Text('Chiffre calculé : $expected (saisi : ${boxes[10].text})',
+            Text('Chiffre calculé : $expected (saisi : ${b[10].text})',
                 style: const TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w600)),
             const SizedBox(width: 8),
             ActionChip(
               visualDensity: VisualDensity.compact,
               label: Text('Corriger en $expected', style: const TextStyle(fontSize: 11)),
               onPressed: () {
-                boxes[10].text = expected.toString();
+                b[10].text = expected.toString();
                 setState(() {});
-                lookup();
+                if(second) lookup2(); else lookup();
               },
             ),
           ],
@@ -314,9 +441,9 @@ class _EntryScreenState extends State<EntryScreen> {
               visualDensity: VisualDensity.compact,
               label: Text('Appliquer $expected', style: const TextStyle(fontSize: 11)),
               onPressed: () {
-                boxes[10].text = expected.toString();
+                b[10].text = expected.toString();
                 setState(() {});
-                lookup();
+                if(second) lookup2(); else lookup();
               },
             ),
           ],
@@ -325,6 +452,7 @@ class _EntryScreenState extends State<EntryScreen> {
         const Text('4 lettres + 7 chiffres, avec chiffre de contrôle',style:TextStyle(fontSize:11, color: Colors.grey)),
     ]);
   }
+
   @override Widget build(BuildContext context)=>ListView(
     padding:const EdgeInsets.symmetric(horizontal:12, vertical:8),
     children:[
@@ -365,7 +493,35 @@ class _EntryScreenState extends State<EntryScreen> {
                             style:TextStyle(fontWeight:kind==value?FontWeight.bold:FontWeight.w500, fontSize:13)),
                         ]),
                       ]))))),]),
+                const SizedBox(height:12),
+
+                // 1b. Mode Conteneur (Mono 1 conteneur vs Twin 2x20')
+                Row(children: [
+                  Expanded(child: ChoiceChip(
+                    avatar: Icon(!isTwin ? Icons.check_circle : Icons.circle_outlined, size: 16),
+                    label: const Text('1 Conteneur (Mono)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    selected: !isTwin,
+                    onSelected: (sel) { if (sel) setState(() => isTwin = false); },
+                  )),
+                  const SizedBox(width: 8),
+                  Expanded(child: ChoiceChip(
+                    avatar: Icon(isTwin ? Icons.check_circle : Icons.circle_outlined, size: 16),
+                    label: const Text('Twin (2 x 20\')', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    selected: isTwin,
+                    onSelected: (sel) {
+                      if (sel) {
+                        setState(() {
+                          isTwin = true;
+                          iso = '22G1';
+                          iso2 = '22G1';
+                          operator2 ??= operator;
+                        });
+                      }
+                    },
+                  )),
+                ]),
                 const SizedBox(height:14),
+
                 // 2. Plaque camion
                 TextFormField(controller:plate, textCapitalization:TextCapitalization.characters,
                   decoration:const InputDecoration(
@@ -375,6 +531,7 @@ class _EntryScreenState extends State<EntryScreen> {
                   ),
                   validator:(v)=>(v?.trim().length??0)<2?'Plaque requise':null),
                 const SizedBox(height:12),
+
                 // 3. CIN chauffeur
                 TextFormField(controller:cin, textCapitalization:TextCapitalization.characters,
                   decoration:const InputDecoration(
@@ -384,44 +541,134 @@ class _EntryScreenState extends State<EntryScreen> {
                   ),
                   validator:(v)=>(v?.trim().length??0)<2?'CIN requis':null),
                 const SizedBox(height:14),
-                // 4. Numéro de conteneur ou Booking
-                if(kind=='loaded') containerBoxes() else TextFormField(
-                  controller:booking,
-                  textCapitalization:TextCapitalization.characters,
-                  decoration:const InputDecoration(
-                    labelText:'Booking / ordre libre *',
-                    helperText:'Le booking n’est pas un numéro ISO de conteneur',
-                    prefixIcon:Icon(Icons.receipt_long, size:20),
+
+                // 4. Conteneur 1 (ou Mono)
+                if (isTwin) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xfff8fafc),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blueGrey.shade200),
+                    ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      const Text('Premier Conteneur (20\')',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d))),
+                      const SizedBox(height: 8),
+                      if(kind=='loaded') containerBoxes() else TextFormField(
+                        controller:booking,
+                        textCapitalization:TextCapitalization.characters,
+                        decoration:const InputDecoration(
+                          labelText:'Booking Conteneur 1 *',
+                          prefixIcon:Icon(Icons.receipt_long, size:20),
+                        ),
+                        validator:(v)=>v==null||v.trim().isEmpty?'Booking requis':null),
+                      if(lookupHint!=null) Padding(padding:const EdgeInsets.only(top:6),
+                        child:Text(lookupHint!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
+                      const SizedBox(height:10),
+                      TextFormField(key:ValueKey('iso1-$iso'), initialValue:iso,
+                        decoration:const InputDecoration(
+                          labelText:'Code ISO Conteneur 1 *',
+                          helperText:'Ex: 22G1',
+                          prefixIcon:Icon(Icons.qr_code, size:20),
+                        ),
+                        maxLength:4, textCapitalization:TextCapitalization.characters,
+                        inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                        onChanged:(v)=>iso=v.toUpperCase(),
+                        validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
+                      const SizedBox(height:8),
+                      OutlinedButton.icon(
+                        style:OutlinedButton.styleFrom(padding:const EdgeInsets.symmetric(horizontal:12, vertical:12), alignment:Alignment.centerLeft),
+                        onPressed:() => pickOperator(forSecond: false),
+                        icon:const Icon(Icons.business, size:20),
+                        label:Text(operator==null?'Armateur Conteneur 1 *':'${operator!.name} (${operator!.id})',
+                          style:const TextStyle(fontWeight:FontWeight.w600))),
+                    ]),
                   ),
-                  validator:(v)=>v==null||v.trim().isEmpty?'Booking requis':null),
-                if(lookupHint!=null) Padding(padding:const EdgeInsets.only(top:7),
-                  child:Text(lookupHint!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
-                const SizedBox(height:14),
-                // 5. Code ISO
-                TextFormField(key:ValueKey(iso), initialValue:iso,
-                  decoration:const InputDecoration(
-                    labelText:'Code ISO *',
-                    helperText:'4 caractères alphanumériques (ex: 22G1, 45G1, 45R1)',
-                    prefixIcon:Icon(Icons.qr_code, size:20),
+                  const SizedBox(height:14),
+
+                  // Conteneur 2 (Twin)
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xfff8fafc),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blueGrey.shade200),
+                    ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      const Text('Deuxième Conteneur (20\') · Compagnie différente autorisée',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d))),
+                      const SizedBox(height: 8),
+                      if(kind=='loaded') containerBoxes(second: true) else TextFormField(
+                        controller:booking2,
+                        textCapitalization:TextCapitalization.characters,
+                        decoration:const InputDecoration(
+                          labelText:'Booking Conteneur 2 *',
+                          prefixIcon:Icon(Icons.receipt_long, size:20),
+                        ),
+                        validator:(v)=>v==null||v.trim().isEmpty?'Booking requis':null),
+                      if(lookupHint2!=null) Padding(padding:const EdgeInsets.only(top:6),
+                        child:Text(lookupHint2!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
+                      const SizedBox(height:10),
+                      TextFormField(key:ValueKey('iso2-$iso2'), initialValue:iso2,
+                        decoration:const InputDecoration(
+                          labelText:'Code ISO Conteneur 2 *',
+                          helperText:'Ex: 22G1',
+                          prefixIcon:Icon(Icons.qr_code, size:20),
+                        ),
+                        maxLength:4, textCapitalization:TextCapitalization.characters,
+                        inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                        onChanged:(v)=>iso2=v.toUpperCase(),
+                        validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
+                      const SizedBox(height:8),
+                      OutlinedButton.icon(
+                        style:OutlinedButton.styleFrom(padding:const EdgeInsets.symmetric(horizontal:12, vertical:12), alignment:Alignment.centerLeft),
+                        onPressed:() => pickOperator(forSecond: true),
+                        icon:const Icon(Icons.business, size:20),
+                        label:Text(operator2==null?'Armateur Conteneur 2 *':'${operator2!.name} (${operator2!.id})',
+                          style:const TextStyle(fontWeight:FontWeight.w600))),
+                    ]),
                   ),
-                  maxLength:4, textCapitalization:TextCapitalization.characters,
-                  inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')),
-                    UpperCaseFormatter()],
-                  readOnly:!widget.canCorrect&&lookupHint=='ISO et armateur repris du référentiel.',
-                  onChanged:(v)=>iso=v.toUpperCase(),
-                  validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
-                const SizedBox(height:12),
-                // 6. Armateur
-                OutlinedButton.icon(
-                  style:OutlinedButton.styleFrom(
-                    padding:const EdgeInsets.symmetric(horizontal:14, vertical:14),
-                    alignment:Alignment.centerLeft),
-                  onPressed:widget.canCorrect||lookupHint!='ISO et armateur repris du référentiel.'?pickOperator:null,
-                  icon:const Icon(Icons.business, size:20),
-                  label:Text(operator==null?'Choisir armateur *':
-                    '${operator!.name} (${operator!.id})',
-                    style:const TextStyle(fontWeight:FontWeight.w600))),
-                const SizedBox(height:16),
+                ] else ...[
+                  // 4. Numéro de conteneur ou Booking (Mono)
+                  if(kind=='loaded') containerBoxes() else TextFormField(
+                    controller:booking,
+                    textCapitalization:TextCapitalization.characters,
+                    decoration:const InputDecoration(
+                      labelText:'Booking / ordre libre *',
+                      helperText:'Le booking n’est pas un numéro ISO de conteneur',
+                      prefixIcon:Icon(Icons.receipt_long, size:20),
+                    ),
+                    validator:(v)=>v==null||v.trim().isEmpty?'Booking requis':null),
+                  if(lookupHint!=null) Padding(padding:const EdgeInsets.only(top:7),
+                    child:Text(lookupHint!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
+                  const SizedBox(height:14),
+                  // 5. Code ISO
+                  TextFormField(key:ValueKey(iso), initialValue:iso,
+                    decoration:const InputDecoration(
+                      labelText:'Code ISO *',
+                      helperText:'4 caractères alphanumériques (ex: 22G1, 45G1, 45R1)',
+                      prefixIcon:Icon(Icons.qr_code, size:20),
+                    ),
+                    maxLength:4, textCapitalization:TextCapitalization.characters,
+                    inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                    readOnly:!widget.canCorrect&&lookupHint=='ISO et armateur repris du référentiel.',
+                    onChanged:(v)=>iso=v.toUpperCase(),
+                    validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
+                  const SizedBox(height:12),
+                  // 6. Armateur
+                  OutlinedButton.icon(
+                    style:OutlinedButton.styleFrom(
+                      padding:const EdgeInsets.symmetric(horizontal:14, vertical:14),
+                      alignment:Alignment.centerLeft),
+                    onPressed:widget.canCorrect||lookupHint!='ISO et armateur repris du référentiel.'?()=>pickOperator(forSecond: false):null,
+                    icon:const Icon(Icons.business, size:20),
+                    label:Text(operator==null?'Choisir armateur *':
+                      '${operator!.name} (${operator!.id})',
+                      style:const TextStyle(fontWeight:FontWeight.w600))),
+                ],
+                const SizedBox(height:18),
+
                 // 7. Bouton enregistrer
                 FilledButton.icon(
                   style:FilledButton.styleFrom(padding:const EdgeInsets.symmetric(vertical:14)),
@@ -470,24 +717,107 @@ class _ExitScreenState extends State<ExitScreen> {
   late Future<List<TruckVisit>> visitsFuture;
   TruckVisit? selectedVisit;
   bool busy = false;
+  List<OperatorRecord> operators = [];
+
+  // Active visit inspection & pickup state
+  String? currentVisitId;
+  bool isDeposited = true; // For loaded: container deposited in yard
+  bool isPickedUp = true;  // For empty: container picked up on chassis
+  bool isTwin = false;     // For empty pickup: Mono vs Twin (2x20')
+
+  // Pickup container 1
+  final List<TextEditingController> boxes1 = List.generate(11, (_) => TextEditingController());
+  final List<FocusNode> focus1 = List.generate(11, (_) => FocusNode());
+  String iso1 = '45G1';
+  OperatorRecord? operator1;
+
+  // Pickup container 2 (Twin)
+  final List<TextEditingController> boxes2 = List.generate(11, (_) => TextEditingController());
+  final List<FocusNode> focus2 = List.generate(11, (_) => FocusNode());
+  String iso2 = '22G1';
+  OperatorRecord? operator2;
+
+  String get number1 => boxes1.map((c) => c.text).join().toUpperCase();
+  String get number2 => boxes2.map((c) => c.text).join().toUpperCase();
 
   @override
   void initState() {
     super.initState();
     loadVisits();
+    loadOperators();
   }
 
   @override
   void dispose() {
     searchController.dispose();
     reasonController.dispose();
+    for (final c in [...boxes1, ...boxes2]) {
+      c.dispose();
+    }
+    for (final f in [...focus1, ...focus2]) {
+      f.dispose();
+    }
     super.dispose();
+  }
+
+  Future<void> loadOperators() async {
+    try {
+      final list = await widget.repository.operators();
+      if (mounted) setState(() => operators = list);
+    } catch (_) {}
   }
 
   void loadVisits() {
     setState(() {
       visitsFuture = widget.repository.visits(insideOnly: true);
     });
+  }
+
+  void syncVisitState(TruckVisit visit) {
+    if (currentVisitId == visit.id) return;
+    currentVisitId = visit.id;
+    isDeposited = true;
+    isPickedUp = true;
+    isTwin = false;
+    iso1 = visit.iso.isNotEmpty ? visit.iso : '45G1';
+    iso2 = '22G1';
+    operator1 = operators.where((o) => o.id == visit.armateur).firstOrNull ?? (operators.isNotEmpty ? operators.first : null);
+    operator2 = operator1;
+    for (final b in [...boxes1, ...boxes2]) {
+      b.clear();
+    }
+  }
+
+  Future<void> pickOperator({bool forSecond = false}) async {
+    final chosen = await showOperatorPicker(context, operators);
+    if (chosen != null) {
+      setState(() {
+        if (forSecond) {
+          operator2 = chosen;
+        } else {
+          operator1 = chosen;
+          operator2 ??= chosen;
+        }
+      });
+    }
+  }
+
+  Future<void> pasteFromClipboard({bool second = false}) async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (!mounted) return;
+    final text = data?.text?.replaceAll(RegExp(r'\s+'), '').toUpperCase() ?? '';
+    if (text.isEmpty) return;
+    final b = second ? boxes2 : boxes1;
+    final f = second ? focus2 : focus1;
+    for (int i = 0; i < 11 && i < text.length; i++) {
+      b[i].text = text[i];
+    }
+    setState(() {});
+    if (text.length >= 11) {
+      FocusScope.of(context).unfocus();
+    } else {
+      f[text.length].requestFocus();
+    }
   }
 
   Future<void> exitTruck(TruckVisit visit) async {
@@ -507,6 +837,7 @@ class _ExitScreenState extends State<ExitScreen> {
       final pdfBytes = outcome?.bytes;
       setState(() {
         selectedVisit = null;
+        currentVisitId = null;
         searchController.clear();
       });
       loadVisits();
@@ -531,6 +862,128 @@ class _ExitScreenState extends State<ExitScreen> {
     }
   }
 
+  Future<void> exitTruckWithPickup(TruckVisit visit) async {
+    final c1 = number1;
+    if (c1.length < 11 || !ContainerNumber.isValid(c1)) {
+      final expected = ContainerNumber.expectedCheckDigit(c1);
+      if (expected != null && c1.length == 11) {
+        message(context, 'Chiffre de contrôle ISO invalide pour le conteneur 1 (attendu: $expected).');
+      } else {
+        message(context, 'Numéro de conteneur 1 ISO 6346 invalide (4 lettres + 7 chiffres requis).');
+      }
+      return;
+    }
+    final c2 = number2;
+    if (isTwin) {
+      if (c2.length < 11 || !ContainerNumber.isValid(c2)) {
+        final expected2 = ContainerNumber.expectedCheckDigit(c2);
+        if (expected2 != null && c2.length == 11) {
+          message(context, 'Chiffre de contrôle ISO invalide pour le 2ème conteneur (attendu: $expected2).');
+        } else {
+          message(context, 'Numéro du 2ème conteneur Twin ISO 6346 invalide (4 lettres + 7 chiffres requis).');
+        }
+        return;
+      }
+      if (operator2 == null) {
+        message(context, 'Choisissez l’armateur du 2ème conteneur Twin.');
+        return;
+      }
+    }
+
+    setState(() => busy = true);
+    DocumentOutcome? outcome;
+    try {
+      await widget.repository.exitWithDetails(
+        visit.id,
+        pickupContainer: c1,
+        pickupIso: iso1,
+        pickupArmateur: operator1?.id ?? visit.armateur,
+        isTwin: isTwin,
+        pickupContainer2: isTwin ? c2 : null,
+        pickupIso2: isTwin ? iso2 : null,
+        pickupArmateur2: isTwin ? (operator2?.id ?? operator1?.id ?? visit.armateur) : null,
+      );
+      try {
+        final documents = DocumentService(widget.repository.client);
+        outcome = await documents.finalizeLatest(visit.id, 'SORTIE');
+      } catch (_) {
+        /* Retry in Bons. */
+      }
+      if (!mounted) return;
+      message(context, 'Sortie et prise conteneur confirmées pour le camion ${visit.plate}.');
+      final visitId = visit.id;
+      final pdfBytes = outcome?.bytes;
+      setState(() {
+        selectedVisit = null;
+        currentVisitId = null;
+        searchController.clear();
+      });
+      loadVisits();
+
+      if (mounted && pdfBytes != null) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BonPdfScreen(
+              bytes: pdfBytes,
+              kind: 'SORTIE',
+              visitId: visitId,
+              autoPrint: true,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) message(context, 'Sortie refusée : $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> exitEmptyWithoutPickup(TruckVisit visit) async {
+    setState(() => busy = true);
+    try {
+      await widget.repository.exitWithDetails(
+        visit.id,
+        emptyExitWithoutPickup: true,
+      );
+      if (!mounted) return;
+      message(context, 'Sortie à vide confirmée pour le camion ${visit.plate} (visite clôturée sans conteneur).');
+      setState(() {
+        selectedVisit = null;
+        currentVisitId = null;
+        searchController.clear();
+      });
+      loadVisits();
+    } catch (e) {
+      if (mounted) message(context, 'Erreur lors de la clôture à vide : $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> cancelTruckWithoutDeposit(TruckVisit visit) async {
+    setState(() => busy = true);
+    try {
+      await widget.repository.cancel(
+        visit.id,
+        'Sortie sans décharge de conteneur (ressorti avec son chargement)',
+      );
+      if (!mounted) return;
+      message(context, 'Sortie sans dépose enregistrée pour le camion ${visit.plate} (visite annulée).');
+      setState(() {
+        selectedVisit = null;
+        currentVisitId = null;
+        searchController.clear();
+      });
+      loadVisits();
+    } catch (e) {
+      if (mounted) message(context, 'Erreur lors de l’annulation : $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> cancelTruck(TruckVisit visit) async {
     if (reasonController.text.trim().length < 5) {
       message(context, 'Motif d’annulation de 5 caractères minimum requis.');
@@ -543,6 +996,7 @@ class _ExitScreenState extends State<ExitScreen> {
       message(context, 'Visite annulée avec trace.');
       setState(() {
         selectedVisit = null;
+        currentVisitId = null;
         searchController.clear();
         reasonController.clear();
       });
@@ -616,6 +1070,157 @@ class _ExitScreenState extends State<ExitScreen> {
     );
   }
 
+  Widget exitContainerBoxes({bool second = false}) {
+    final currentNumber = second ? number2 : number1;
+    final b = second ? boxes2 : boxes1;
+    final f = second ? focus2 : focus1;
+    final isValid = currentNumber.length == 11 && ContainerNumber.isValid(currentNumber);
+    final expected = currentNumber.length >= 10 ? ContainerNumber.expectedCheckDigit(currentNumber) : null;
+    final has11 = currentNumber.length == 11;
+    final checkDigitMismatch = has11 && !isValid && expected != null;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            second ? '2ème Conteneur (20\') · ISO 6346 *' : (isTwin ? '1er Conteneur (20\') · ISO 6346 *' : 'Numéro du conteneur · ISO 6346 *'),
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton.icon(
+                style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                onPressed: () => pasteFromClipboard(second: second),
+                icon: const Icon(Icons.paste_rounded, size: 16),
+                label: const Text('Coller', style: TextStyle(fontSize: 12)),
+              ),
+              if (currentNumber.isNotEmpty)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.clear, size: 16),
+                  tooltip: 'Effacer',
+                  onPressed: () {
+                    for (final c in b) {
+                      c.clear();
+                    }
+                    setState(() {});
+                  },
+                ),
+            ],
+          ),
+        ],
+      ),
+      const SizedBox(height: 6),
+      CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyV, control: true): () => pasteFromClipboard(second: second),
+          const SingleActivator(LogicalKeyboardKey.keyV, meta: true): () => pasteFromClipboard(second: second),
+        },
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: List.generate(11, (i) {
+              final isLetter = i < 4;
+              final isCheckDigit = i == 10;
+              return Padding(
+                padding: EdgeInsets.only(right: isLetter && i == 3 ? 10 : (isCheckDigit ? 0 : 3)),
+                child: SizedBox(
+                  width: 32,
+                  child: TextFormField(
+                    controller: b[i],
+                    focusNode: f[i],
+                    textAlign: TextAlign.center,
+                    maxLength: 1,
+                    inputFormatters: [
+                      isLetter ? FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')) : FilteringTextInputFormatter.digitsOnly,
+                      UpperCaseFormatter(),
+                    ],
+                    keyboardType: isLetter ? TextInputType.text : TextInputType.number,
+                    decoration: InputDecoration(
+                      counterText: '',
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      filled: true,
+                      fillColor: isLetter
+                          ? const Color(0xffe9f3fa)
+                          : (isCheckDigit ? const Color(0xfffff8e1) : Colors.white),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(
+                          color: isCheckDigit ? Colors.amber.shade700 : Colors.grey.shade400,
+                          width: isCheckDigit ? 1.5 : 1.0,
+                        ),
+                      ),
+                    ),
+                    onChanged: (v) {
+                      setState(() {});
+                      if (v.isNotEmpty) {
+                        if (i < 10) {
+                          f[i + 1].requestFocus();
+                        } else {
+                          FocusScope.of(context).unfocus();
+                        }
+                      }
+                    },
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+      const SizedBox(height: 6),
+      if (isValid)
+        const Row(
+          children: [
+            Icon(Icons.check_circle, color: Color(0xff168846), size: 16),
+            SizedBox(width: 6),
+            Text('Numéro ISO 6346 conforme et vérifié',
+                style: TextStyle(fontSize: 12, color: Color(0xff168846), fontWeight: FontWeight.w600)),
+          ],
+        )
+      else if (checkDigitMismatch)
+        Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
+            const SizedBox(width: 6),
+            Text('Chiffre calculé : $expected (saisi : ${b[10].text})',
+                style: const TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+            ActionChip(
+              visualDensity: VisualDensity.compact,
+              label: Text('Corriger en $expected', style: const TextStyle(fontSize: 11)),
+              onPressed: () {
+                b[10].text = expected.toString();
+                setState(() {});
+              },
+            ),
+          ],
+        )
+      else if (currentNumber.length == 10 && expected != null)
+        Row(
+          children: [
+            const Icon(Icons.info_outline, color: Color(0xff075a8d), size: 16),
+            const SizedBox(width: 6),
+            Text('Chiffre de contrôle attendu : $expected',
+                style: const TextStyle(fontSize: 12, color: Color(0xff075a8d), fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+            ActionChip(
+              visualDensity: VisualDensity.compact,
+              label: Text('Appliquer $expected', style: const TextStyle(fontSize: 11)),
+              onPressed: () {
+                b[10].text = expected.toString();
+                setState(() {});
+              },
+            ),
+          ],
+        )
+      else
+        const Text('4 lettres + 7 chiffres, avec chiffre de contrôle', style: TextStyle(fontSize: 11, color: Colors.grey)),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -649,8 +1254,9 @@ class _ExitScreenState extends State<ExitScreen> {
             matches = insideVisits.where((v) {
               final plate = v.plate.toUpperCase();
               final cont = v.container?.toUpperCase() ?? '';
+              final cont2 = v.container2?.toUpperCase() ?? '';
               final book = v.booking?.toUpperCase() ?? '';
-              return plate.contains(query) || cont.contains(query) || book.contains(query);
+              return plate.contains(query) || cont.contains(query) || cont2.contains(query) || book.contains(query);
             }).toList();
           }
 
@@ -660,6 +1266,9 @@ class _ExitScreenState extends State<ExitScreen> {
           }
           if (activeVisit == null && matches.length == 1) {
             activeVisit = matches.first;
+          }
+          if (activeVisit != null) {
+            syncVisitState(activeVisit);
           }
 
           return ListView(
@@ -806,7 +1415,7 @@ class _ExitScreenState extends State<ExitScreen> {
                         child: ListTile(
                           leading: const Icon(Icons.local_shipping, color: Color(0xff075a8d)),
                           title: Text(v.plate, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('${v.container ?? v.booking ?? 'Sans conteneur'} · ${v.armateur} · ${v.iso}'),
+                          subtitle: Text('${v.container ?? v.booking ?? 'Sans conteneur'}${v.isTwin ? ' + ${v.container2 ?? 'Twin'}' : ''} · ${v.armateur} · ${v.iso}'),
                           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                           onTap: () => setState(() => selectedVisit = v),
                         ),
@@ -814,7 +1423,7 @@ class _ExitScreenState extends State<ExitScreen> {
                   ],
                 )
 
-              // State 4: Truck matched or selected -> Full verification card & exit action
+              // State 4: Truck matched or selected -> Full verification & action form (styled like Entrée)
               else if (activeVisit != null)
                 Card(
                   elevation: 2,
@@ -860,7 +1469,7 @@ class _ExitScreenState extends State<ExitScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // 1. Truck visual & status (like Entrée)
+                        // 1. Truck visual scene
                         Container(
                           decoration: BoxDecoration(
                             color: const Color(0xfff8fafc),
@@ -872,7 +1481,9 @@ class _ExitScreenState extends State<ExitScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               TruckScene(
-                                kind: activeVisit.entryKind == 'loaded' ? 'loaded' : 'empty',
+                                kind: activeVisit.entryKind == 'loaded'
+                                    ? (isDeposited ? 'empty' : 'loaded')
+                                    : (isPickedUp ? 'loaded' : 'empty'),
                                 height: 65,
                               ),
                               const SizedBox(width: 14),
@@ -881,7 +1492,9 @@ class _ExitScreenState extends State<ExitScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      activeVisit.entryKind == 'loaded' ? 'Camion avec conteneur' : 'Camion sans conteneur (Vide)',
+                                      activeVisit.entryKind == 'loaded'
+                                          ? (isDeposited ? 'Camion entré chargé · Sort VIDE' : 'Camion entré chargé · Ressort AVEC conteneur')
+                                          : (isPickedUp ? 'Camion entré vide · Sort CHARGÉ' : 'Camion entré vide · Ressort VIDE (ki dkhal ki khraj)'),
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                     ),
                                     const SizedBox(height: 2),
@@ -897,7 +1510,7 @@ class _ExitScreenState extends State<ExitScreen> {
                         ),
                         const SizedBox(height: 14),
 
-                        // 2. Plaque d'immatriculation
+                        // 2. Plaque d'immatriculation (pre-filled)
                         infoTile(
                           icon: Icons.pin_outlined,
                           label: 'Plaque d’immatriculation',
@@ -906,7 +1519,7 @@ class _ExitScreenState extends State<ExitScreen> {
                         ),
                         const Divider(height: 16),
 
-                        // 3. CIN Chauffeur
+                        // 3. CIN Chauffeur (pre-filled)
                         infoTile(
                           icon: Icons.badge_outlined,
                           label: 'CIN chauffeur',
@@ -914,56 +1527,463 @@ class _ExitScreenState extends State<ExitScreen> {
                         ),
                         const Divider(height: 16),
 
-                        // 4. Numéro de Conteneur ou Booking
-                        infoTile(
-                          icon: activeVisit.container != null ? Icons.inventory_2_outlined : Icons.receipt_long,
-                          label: activeVisit.container != null ? 'Numéro de conteneur' : 'Booking / Ordre libre',
-                          value: activeVisit.container ?? activeVisit.booking ?? '—',
-                          isHighlighted: activeVisit.container != null,
-                        ),
-                        const Divider(height: 16),
-
-                        // 5. Code ISO & Armateur
-                        Row(
-                          children: [
-                            Expanded(
-                              child: infoTile(
-                                icon: Icons.qr_code,
-                                label: 'Code ISO',
-                                value: activeVisit.iso,
+                        // 4. Données d'arrivée (Conteneur / Booking / Armateur / ISO)
+                        if (activeVisit.entryKind == 'loaded') ...[
+                          infoTile(
+                            icon: Icons.inventory_2_outlined,
+                            label: activeVisit.isTwin ? 'Premier Conteneur (d’entrée)' : 'Conteneur (d’entrée)',
+                            value: activeVisit.container ?? '—',
+                            isHighlighted: true,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: infoTile(
+                                  icon: Icons.qr_code,
+                                  label: 'Code ISO',
+                                  value: activeVisit.iso,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: infoTile(
-                                icon: Icons.business,
-                                label: 'Armateur',
-                                value: activeVisit.armateur,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: infoTile(
+                                  icon: Icons.business,
+                                  label: 'Armateur',
+                                  value: activeVisit.armateur,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (activeVisit.isTwin && activeVisit.container2 != null) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xfff8fafc),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blueGrey.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  infoTile(
+                                    icon: Icons.inventory_2_outlined,
+                                    label: 'Deuxième Conteneur (Twin)',
+                                    value: activeVisit.container2!,
+                                    isHighlighted: true,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: infoTile(
+                                          icon: Icons.qr_code,
+                                          label: 'Code ISO 2',
+                                          value: activeVisit.iso2 ?? '22G1',
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: infoTile(
+                                          icon: Icons.business,
+                                          label: 'Armateur 2',
+                                          value: activeVisit.armateur2 ?? activeVisit.armateur,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // 6. Action Button: Valider la sortie du camion
-                        FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xff168846),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ] else ...[
+                          infoTile(
+                            icon: Icons.receipt_long,
+                            label: 'Booking d’entrée (chargement prévu)',
+                            value: activeVisit.booking ?? '—',
+                            isHighlighted: true,
                           ),
-                          onPressed: busy ? null : () => exitTruck(activeVisit!),
-                          icon: busy
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.exit_to_app, size: 22),
-                          label: Text(
-                            busy ? 'Validation de la sortie…' : 'Valider la sortie du camion',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: infoTile(
+                                  icon: Icons.qr_code,
+                                  label: 'Code ISO prévu',
+                                  value: activeVisit.iso,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: infoTile(
+                                  icon: Icons.business,
+                                  label: 'Armateur prévu',
+                                  value: activeVisit.armateur,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
+                        ],
+                        const SizedBox(height: 16),
 
-                        // 7. Option Annulation (Admin)
+                        // 5. INSPECTION & CONTROLE CHECK ("7ato ola la" / "haz conatiner ola la")
+                        if (activeVisit.entryKind == 'loaded') ...[
+                          // Case A: Entered LOADED -> Check if deposited or not
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDeposited ? const Color(0xfff0fdf4) : const Color(0xfffffbeb),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDeposited ? Colors.green.shade300 : Colors.amber.shade300,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      isDeposited ? Icons.task_alt : Icons.help_outline,
+                                      size: 20,
+                                      color: isDeposited ? const Color(0xff168846) : Colors.amber.shade900,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Expanded(
+                                      child: Text(
+                                        'Contrôle décharge : Conteneur déposé au terminal ?',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ChoiceChip(
+                                        avatar: Icon(isDeposited ? Icons.check_circle : Icons.circle_outlined, size: 16),
+                                        label: const Text('OUI · Conteneur déposé', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        selected: isDeposited,
+                                        selectedColor: const Color(0xffdcfce7),
+                                        onSelected: (sel) {
+                                          if (sel) setState(() => isDeposited = true);
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ChoiceChip(
+                                        avatar: Icon(!isDeposited ? Icons.cancel : Icons.circle_outlined, size: 16),
+                                        label: const Text('NON · Non déposé', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        selected: !isDeposited,
+                                        selectedColor: const Color(0xfffef3c7),
+                                        onSelected: (sel) {
+                                          if (sel) setState(() => isDeposited = false);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                if (isDeposited)
+                                  const Text(
+                                    '✓ Le conteneur est enregistré en stock du parc. Le camion ressort vide.',
+                                    style: TextStyle(fontSize: 12, color: Color(0xff168846), fontWeight: FontWeight.w500),
+                                  )
+                                else
+                                  const Text(
+                                    '⚠ Le camion quitte le terminal sans avoir déchargé son conteneur. La visite sera annulée.',
+                                    style: TextStyle(fontSize: 12, color: Color(0xff92400e), fontWeight: FontWeight.w500),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Action button for loaded truck
+                          if (isDeposited)
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xff168846),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: busy ? null : () => exitTruck(activeVisit!),
+                              icon: busy
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.exit_to_app, size: 22),
+                              label: Text(
+                                busy ? 'Validation de la sortie…' : 'Valider la sortie du camion',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            )
+                          else
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.orange.shade800,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: busy ? null : () => cancelTruckWithoutDeposit(activeVisit!),
+                              icon: const Icon(Icons.cancel_outlined, size: 22),
+                              label: Text(
+                                busy ? 'Annulation en cours…' : 'Confirmer la sortie sans dépose (Annuler la visite)',
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                        ] else ...[
+                          // Case B: Entered EMPTY -> Check if loaded on chassis
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isPickedUp ? const Color(0xfff0fdf4) : const Color(0xfffffbeb),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isPickedUp ? Colors.green.shade300 : Colors.amber.shade300,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      isPickedUp ? Icons.local_shipping : Icons.help_outline,
+                                      size: 20,
+                                      color: isPickedUp ? const Color(0xff168846) : Colors.amber.shade900,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Expanded(
+                                      child: Text(
+                                        'Contrôle châssis : Le camion a-t-il chargé un conteneur ?',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ChoiceChip(
+                                        avatar: Icon(isPickedUp ? Icons.check_circle : Icons.circle_outlined, size: 16),
+                                        label: const Text('OUI · Conteneur chargé', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        selected: isPickedUp,
+                                        selectedColor: const Color(0xffdcfce7),
+                                        onSelected: (sel) {
+                                          if (sel) setState(() => isPickedUp = true);
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ChoiceChip(
+                                        avatar: Icon(!isPickedUp ? Icons.cancel : Icons.circle_outlined, size: 16),
+                                        label: const Text('NON · Sortie à vide', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        selected: !isPickedUp,
+                                        selectedColor: const Color(0xfffef3c7),
+                                        onSelected: (sel) {
+                                          if (sel) setState(() => isPickedUp = false);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          if (isPickedUp) ...[
+                            // Mode Mono vs Twin 2x20'
+                            Row(children: [
+                              Expanded(
+                                child: ChoiceChip(
+                                  avatar: Icon(!isTwin ? Icons.check_circle : Icons.circle_outlined, size: 16),
+                                  label: const Text('1 Conteneur (Mono)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  selected: !isTwin,
+                                  onSelected: (sel) {
+                                    if (sel) setState(() => isTwin = false);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ChoiceChip(
+                                  avatar: Icon(isTwin ? Icons.check_circle : Icons.circle_outlined, size: 16),
+                                  label: const Text('Twin (2 x 20\')', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  selected: isTwin,
+                                  onSelected: (sel) {
+                                    if (sel) {
+                                      setState(() {
+                                        isTwin = true;
+                                        iso1 = '22G1';
+                                        iso2 = '22G1';
+                                        operator2 ??= operator1;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                            ]),
+                            const SizedBox(height: 14),
+
+                            // Conteneur 1 (Prise)
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xfff8fafc),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blueGrey.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    isTwin ? 'Premier Conteneur (20\') chargé *' : 'Conteneur chargé *',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d)),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  exitContainerBoxes(second: false),
+                                  const SizedBox(height: 10),
+                                  TextFormField(
+                                    key: ValueKey('iso1-$iso1'),
+                                    initialValue: iso1,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Code ISO Conteneur 1 *',
+                                      helperText: 'Ex: 22G1, 45G1',
+                                      prefixIcon: Icon(Icons.qr_code, size: 20),
+                                    ),
+                                    maxLength: 4,
+                                    textCapitalization: TextCapitalization.characters,
+                                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                                    onChanged: (v) => iso1 = v.toUpperCase(),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                      alignment: Alignment.centerLeft,
+                                    ),
+                                    onPressed: () => pickOperator(forSecond: false),
+                                    icon: const Icon(Icons.business, size: 20),
+                                    label: Text(
+                                      operator1 == null ? 'Armateur Conteneur 1 *' : '${operator1!.name} (${operator1!.id})',
+                                      style: const TextStyle(fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Conteneur 2 (Twin - Prise)
+                            if (isTwin) ...[
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xfff8fafc),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.blueGrey.shade200),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    const Text(
+                                      'Deuxième Conteneur (20\') · Compagnie différente autorisée *',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d)),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    exitContainerBoxes(second: true),
+                                    const SizedBox(height: 10),
+                                    TextFormField(
+                                      key: ValueKey('iso2-$iso2'),
+                                      initialValue: iso2,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Code ISO Conteneur 2 *',
+                                        helperText: 'Ex: 22G1',
+                                        prefixIcon: Icon(Icons.qr_code, size: 20),
+                                      ),
+                                      maxLength: 4,
+                                      textCapitalization: TextCapitalization.characters,
+                                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                                      onChanged: (v) => iso2 = v.toUpperCase(),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                        alignment: Alignment.centerLeft,
+                                      ),
+                                      onPressed: () => pickOperator(forSecond: true),
+                                      icon: const Icon(Icons.business, size: 20),
+                                      label: Text(
+                                        operator2 == null ? 'Armateur Conteneur 2 *' : '${operator2!.name} (${operator2!.id})',
+                                        style: const TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                            ],
+
+                            // Action button: Confirmer chargement et valider sortie
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xff168846),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: busy ? null : () => exitTruckWithPickup(activeVisit!),
+                              icon: busy
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.check_circle, size: 22),
+                              label: Text(
+                                busy ? 'Validation de la prise…' : 'Valider la sortie du camion',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ] else ...[
+                            // Empty exit without pickup ("ki dkhal ki khraj")
+                            Card(
+                              color: const Color(0xfffffbeb),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: BorderSide(color: Colors.amber.shade300),
+                              ),
+                              child: const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: Text(
+                                  'Le camion quitte le terminal à vide sans avoir chargé de conteneur (ki dkhal ki khraj). La visite sera clôturée/annulée sans mouvement de stock.',
+                                  style: TextStyle(fontSize: 13, color: Color(0xff92400e), fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.amber.shade900,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: busy ? null : () => exitEmptyWithoutPickup(activeVisit!),
+                              icon: const Icon(Icons.exit_to_app, size: 22),
+                              label: Text(
+                                busy ? 'Clôture en cours…' : 'Confirmer la sortie à vide (Annuler la visite)',
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ],
+
+                        // Option Annulation (Admin)
                         if (widget.canCancel) ...[
                           const SizedBox(height: 10),
                           TextButton.icon(

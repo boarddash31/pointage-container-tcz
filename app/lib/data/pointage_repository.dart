@@ -16,10 +16,13 @@ class TruckVisit {
   const TruckVisit({required this.id, required this.plate, required this.cin,
     required this.entryKind, required this.iso, required this.armateur,
     required this.enteredAt, this.container, this.booking, this.enginAt,
-    this.exitedAt, this.canceledAt});
+    this.exitedAt, this.canceledAt, this.isTwin = false,
+    this.container2, this.iso2, this.armateur2, this.booking2});
   final String id, plate, cin, entryKind, iso, armateur;
   final String? container, booking, enginAt, exitedAt, canceledAt;
   final DateTime enteredAt;
+  final bool isTwin;
+  final String? container2, iso2, armateur2, booking2;
   bool get needsEngin => enginAt == null;
   bool get isInside => exitedAt == null && canceledAt == null;
 
@@ -36,6 +39,11 @@ class TruckVisit {
     enginAt: j['engin_at'] as String?,
     exitedAt: j['exited_at'] as String?,
     canceledAt: j['canceled_at'] as String?,
+    isTwin: (j['is_twin'] as bool?) ?? false,
+    container2: j['container_number_2'] as String?,
+    iso2: j['iso_code_2'] as String?,
+    armateur2: j['armateur_id_2'] as String?,
+    booking2: j['booking_reference_2'] as String?,
   );
 }
 
@@ -64,11 +72,17 @@ class PointageRepository {
 
   Future<String> enter({required String plate, required String cin,
       required String kind, required String iso, required String armateur,
-      String? containerNumber, String? booking}) async {
+      String? containerNumber, String? booking, bool isTwin = false,
+      String? containerNumber2, String? iso2, String? armateur2, String? booking2}) async {
     final result = await client.rpc('enter_truck', params: {
       'p_plate': plate, 'p_cin': cin, 'p_entry_kind': kind,
       'p_container': containerNumber, 'p_booking': booking,
       'p_iso': iso, 'p_armateur': armateur,
+      'p_is_twin': isTwin,
+      'p_container_2': containerNumber2,
+      'p_iso_2': iso2,
+      'p_armateur_2': armateur2,
+      'p_booking_2': booking2,
     });
     return result as String;
   }
@@ -76,7 +90,8 @@ class PointageRepository {
   Future<List<TruckVisit>> visits({bool insideOnly = true}) async {
     var query = client.from('truck_visits').select(
       'id,plate,driver_cin,entry_kind,container_number,iso_code,armateur_id,'
-      'entered_at,engin_at,exited_at,canceled_at,bookings(reference)',
+      'entered_at,engin_at,exited_at,canceled_at,is_twin,container_number_2,'
+      'iso_code_2,armateur_id_2,booking_reference_2,bookings(reference)',
     );
     if (insideOnly) query = query.isFilter('exited_at', null).isFilter('canceled_at', null);
     final rows = await query.order('entered_at', ascending: true).limit(500);
@@ -126,6 +141,30 @@ class PointageRepository {
   Future<void> exit(String visitId) async {
     await client.rpc('exit_truck', params: {'p_visit': visitId});
   }
+
+  Future<void> exitWithDetails(String visitId, {
+    String? pickupContainer,
+    String? pickupIso,
+    String? pickupArmateur,
+    bool isTwin = false,
+    String? pickupContainer2,
+    String? pickupIso2,
+    String? pickupArmateur2,
+    bool emptyExitWithoutPickup = false,
+  }) async {
+    await client.rpc('exit_truck_with_details', params: {
+      'p_visit': visitId,
+      'p_pickup_container': pickupContainer,
+      'p_pickup_iso': pickupIso,
+      'p_pickup_armateur': pickupArmateur,
+      'p_is_twin': isTwin,
+      'p_pickup_container_2': pickupContainer2,
+      'p_pickup_iso_2': pickupIso2,
+      'p_pickup_armateur_2': pickupArmateur2,
+      'p_empty_exit_without_pickup': emptyExitWithoutPickup,
+    });
+  }
+
   Future<void> cancel(String visitId, String reason) async {
     await client.rpc('cancel_visit', params: {
       'p_visit': visitId, 'p_reason': reason,

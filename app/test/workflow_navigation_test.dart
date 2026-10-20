@@ -108,6 +108,75 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('EntryScreen supports Twin 2x20 mode with two container inputs', (tester) async {
+    final repository = QueueFixture();
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: EntryScreen(
+      repository: repository,
+      canCorrect: false,
+    ))));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 Conteneur (Mono)'), findsOneWidget);
+    expect(find.text('Twin (2 x 20\')'), findsOneWidget);
+
+    // Switch to Twin mode
+    await tester.tap(find.text('Twin (2 x 20\')'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Premier Conteneur (20\')'), findsOneWidget);
+    expect(find.text('Deuxième Conteneur (20\') · Compagnie différente autorisée'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Sortie handles empty-entered truck with chassis check and ki dkhal ki khraj option', (tester) async {
+    final emptyVisit = TruckVisit(
+      id: 'visit-empty-1',
+      plate: '99999-B-01',
+      cin: 'CD987654',
+      entryKind: 'empty',
+      container: null,
+      booking: 'BOOK-7788',
+      iso: '22G1',
+      armateur: 'MAE',
+      enteredAt: DateTime.now(),
+      enginAt: null,
+      exitedAt: null,
+      canceledAt: null,
+    );
+    final repository = QueueFixtureWithTrucks([emptyVisit]);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ExitScreen(
+      repository: repository,
+      canCancel: false,
+    ))));
+    await tester.pumpAndSettle();
+
+    // Search empty truck
+    await tester.enterText(find.widgetWithText(TextFormField, 'Plaque ou Conteneur *'), '99999');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Données du camion à vérifier'), findsOneWidget);
+    expect(find.text('99999-B-01'), findsOneWidget);
+    expect(find.text('CD987654'), findsOneWidget);
+    expect(find.text('BOOK-7788'), findsOneWidget);
+    expect(find.text('Contrôle châssis : Le camion a-t-il chargé un conteneur ?'), findsOneWidget);
+    expect(find.text('OUI · Conteneur chargé'), findsOneWidget);
+    expect(find.text('NON · Sortie à vide'), findsOneWidget);
+
+    // Default is OUI -> Mono / Twin options
+    expect(find.text('1 Conteneur (Mono)'), findsOneWidget);
+    expect(find.text('Twin (2 x 20\')'), findsOneWidget);
+
+    // Switch to NON (ki dkhal ki khraj)
+    await tester.ensureVisible(find.text('NON · Sortie à vide'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('NON · Sortie à vide'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('ki dkhal ki khraj'), findsWidgets);
+    expect(find.text('Confirmer la sortie à vide (Annuler la visite)'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('BonPdfScreen displays PDF preview with print action', (tester) async {
     final samplePdf = Uint8List.fromList([0x25, 0x50, 0x44, 0x46]); // %PDF
     await tester.pumpWidget(MaterialApp(

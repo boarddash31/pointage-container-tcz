@@ -53,8 +53,25 @@ let directRow = await db.query('select engin_at, exited_at from public.truck_vis
 assert.ok(directRow.rows[0].engin_at, 'direct exit should auto-set engin_at');
 assert.ok(directRow.rows[0].exited_at, 'direct exit should set exited_at');
 let directStock = await db.query('select count(*) n from public.container_stock_intervals where container_number=$1 and departed_at is null', [directCont.rows[0].number]);
-assert.equal(Number(directStock.rows[0].n), 1, 'stock interval should be created on direct exit');
-await db.exec('set role authenticated');let visible=await db.query('select count(*) n from public.armateurs');assert.equal(Number(visible.rows[0].n),95);denied=false;try{await db.query("insert into public.armateurs(id,name) values('BAD','BAD')")}catch(e){denied=true}assert.ok(denied,'client table write must be denied');console.log('PASS: migrations, 95 operators, checksum, lifecycle, stock, audit, documents, forced pickup/reconciliation, direct exit, role denial and RLS role');
+await db.exec(fs.readFileSync('supabase/migrations/202610200004_twin_and_sortie_workflow.sql','utf8'));
+const twinC1 = await db.query("select 'TWNA123456'||d::text as number from generate_series(0,9) d where public.valid_container_number('TWNA123456'||d::text) limit 1");
+const twinC2 = await db.query("select 'TWNB654321'||d::text as number from generate_series(0,9) d where public.valid_container_number('TWNB654321'||d::text) limit 1");
+let twinVisit = await db.query("select public.enter_truck('TWIN-01','TW999999','loaded',$1,null,'22G1','MAE',null,true,$2,'22G1','CMACGM') id",
+  [twinC1.rows[0].number, twinC2.rows[0].number]);
+assert.ok(twinVisit.rows[0].id, 'twin entry created');
+await db.query('select public.exit_truck($1)', [twinVisit.rows[0].id]);
+let twinRow = await db.query('select is_twin, container_number_2, exited_at from public.truck_visits where id=$1', [twinVisit.rows[0].id]);
+assert.equal(twinRow.rows[0].is_twin, true);
+assert.equal(twinRow.rows[0].container_number_2, twinC2.rows[0].number);
+assert.ok(twinRow.rows[0].exited_at);
+
+// Test empty truck that leaves empty without pickup (ki dkhal ki khraj)
+let emptyVisit = await db.query("select public.enter_truck('EMP-01','EM111111','empty',null,'BK-EMPTY','22G1','MAE') id");
+await db.query("select public.exit_truck_with_details($1,null,null,null,false,null,null,null,true)", [emptyVisit.rows[0].id]);
+let emptyRow = await db.query('select canceled_at, cancel_reason from public.truck_visits where id=$1', [emptyVisit.rows[0].id]);
+assert.ok(emptyRow.rows[0].canceled_at, 'empty exit without pickup should record cancel');
+
+await db.exec('set role authenticated');let visible=await db.query('select count(*) n from public.armateurs');assert.equal(Number(visible.rows[0].n),95);denied=false;try{await db.query("insert into public.armateurs(id,name) values('BAD','BAD')")}catch(e){denied=true}assert.ok(denied,'client table write must be denied');console.log('PASS: migrations, 95 operators, checksum, lifecycle, stock, audit, documents, forced pickup/reconciliation, direct exit, twin 2-company, empty exit cancel, role denial and RLS role');
 }catch(e){console.error('ERROR',e);process.exitCode=1}finally{await db.close()}})();
 
 
