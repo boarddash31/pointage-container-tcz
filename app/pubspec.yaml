@@ -1,0 +1,30 @@
+name: pointage_container
+description: TCZ Pointage Container mobile and web application
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: '>=3.12.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  supabase_flutter: ^2.18.3
+  pdf: ^3.11.3
+  printing: ^5.14.3
+  excel: ^4.0.6
+  share_plus: ^13.3.1
+  shared_preferences: ^2.5.6
+  http: ^1.6.0
+  url_launcher: ^6.3.3
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/truck-loaded.png
+    - assets/truck-empty.png
+    - assets/truck-depose.png
+    - assets/truck-prise.png
+    - assets/operators.json
+

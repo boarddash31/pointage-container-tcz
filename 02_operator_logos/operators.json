@@ -1,0 +1,477 @@
+[
+  {
+    "id": "002016",
+    "name": "NAXCO MAROC SARL",
+    "bic": "NAX"
+  },
+  {
+    "id": "ACACIA",
+    "name": "ACACIA MARITIME",
+    "bic": "ACAC"
+  },
+  {
+    "id": "ACOMAR",
+    "name": "ACOMAR",
+    "bic": "ACMR"
+  },
+  {
+    "id": "ADMIRAL",
+    "name": "ADMIRAL LINES CONTAINERS",
+    "bic": "ADMI"
+  },
+  {
+    "id": "AGEM",
+    "name": "AGEMAFRIC",
+    "bic": "AGE"
+  },
+  {
+    "id": "AGTT",
+    "name": "A.G.T.T",
+    "bic": "AGT"
+  },
+  {
+    "id": "AKKON",
+    "name": "AKKON SHIPPING MAROC",
+    "bic": "AKKO"
+  },
+  {
+    "id": "ANP",
+    "name": "ANP",
+    "bic": ""
+  },
+  {
+    "id": "ARGUIT",
+    "name": "ARGUI TRANS",
+    "bic": "ARG"
+  },
+  {
+    "id": "ARK",
+    "name": "ARKAS MAROC S.A",
+    "bic": "ARK"
+  },
+  {
+    "id": "BABMARS",
+    "name": "BABMARSA",
+    "bic": ""
+  },
+  {
+    "id": "BCMC",
+    "name": "BUSINESS COMMERCIAL MARITIME & CHARTERING",
+    "bic": "BCMC"
+  },
+  {
+    "id": "BORCHAR",
+    "name": "BORCHARD",
+    "bic": "BORC"
+  },
+  {
+    "id": "BTL",
+    "name": "BOLLORE TRANSPORT   LOGISTICS",
+    "bic": "BTL"
+  },
+  {
+    "id": "CCCM",
+    "name": "C C C M",
+    "bic": "CCCM"
+  },
+  {
+    "id": "CHINA",
+    "name": "COSMO",
+    "bic": "CHIN"
+  },
+  {
+    "id": "CMACGM",
+    "name": "CMA CGM MAROC",
+    "bic": "CMA"
+  },
+  {
+    "id": "COMANAV",
+    "name": "COMANAV",
+    "bic": "CNV"
+  },
+  {
+    "id": "COMARIN",
+    "name": "COMARINE",
+    "bic": "CMR"
+  },
+  {
+    "id": "COMARSH",
+    "name": "COMARSH",
+    "bic": ""
+  },
+  {
+    "id": "CONVERS",
+    "name": "CONVERS",
+    "bic": "CVR"
+  },
+  {
+    "id": "COSCO",
+    "name": "COSCO",
+    "bic": "COSC"
+  },
+  {
+    "id": "DAL",
+    "name": "Deutch African Line",
+    "bic": "DAL"
+  },
+  {
+    "id": "DEFAULT_MACAS",
+    "name": "",
+    "bic": ""
+  },
+  {
+    "id": "DPW",
+    "name": "DP WORD",
+    "bic": "DPW"
+  },
+  {
+    "id": "ELERMAN",
+    "name": "ELERMAN",
+    "bic": "ELR"
+  },
+  {
+    "id": "EVER",
+    "name": "EVERGREEN",
+    "bic": "EVER"
+  },
+  {
+    "id": "GCL",
+    "name": "GLOBAL CARGO LEADER",
+    "bic": "GCL"
+  },
+  {
+    "id": "GLOBCA",
+    "name": "GLOBAL CA",
+    "bic": "GLOB"
+  },
+  {
+    "id": "GLOBEMA",
+    "name": "GLOBE MARINE",
+    "bic": "GLOB"
+  },
+  {
+    "id": "GRIMALD",
+    "name": "Grimaldi Lines",
+    "bic": "GRIM"
+  },
+  {
+    "id": "GSL",
+    "name": "GOLD STAR LINE",
+    "bic": "GSL"
+  },
+  {
+    "id": "HAMAG",
+    "name": "HAMAG",
+    "bic": "HAMG"
+  },
+  {
+    "id": "HAMBURG",
+    "name": "HAMBURG SUD",
+    "bic": "HAMB"
+  },
+  {
+    "id": "HANJIN",
+    "name": "HANJIN",
+    "bic": "HANJ"
+  },
+  {
+    "id": "HAPAG",
+    "name": "HAPAG LLOYDS",
+    "bic": "HLC"
+  },
+  {
+    "id": "HATRANS",
+    "name": "HA TRANS",
+    "bic": "HATR"
+  },
+  {
+    "id": "HMM",
+    "name": "Hyundai Merchant Marine",
+    "bic": "HMM"
+  },
+  {
+    "id": "IDEAMA",
+    "name": "IDEA MAROC",
+    "bic": "IDEA"
+  },
+  {
+    "id": "IMAGESA",
+    "name": "IMAGESA MAROC",
+    "bic": "IMAG"
+  },
+  {
+    "id": "LASRI",
+    "name": "LASRY MAROC",
+    "bic": ""
+  },
+  {
+    "id": "MAE",
+    "name": "MAERSK",
+    "bic": "MAE"
+  },
+  {
+    "id": "MARBAR",
+    "name": "MARBAR MARITIME S.A",
+    "bic": "MRB"
+  },
+  {
+    "id": "MARGUIS",
+    "name": "MARGUIS",
+    "bic": "MARG"
+  },
+  {
+    "id": "MARMEDS",
+    "name": "MARMEDSA",
+    "bic": "MARM"
+  },
+  {
+    "id": "MCI",
+    "name": "MCI",
+    "bic": "MCI"
+  },
+  {
+    "id": "MEDISHI",
+    "name": "MEDISHIP S.A.R.L",
+    "bic": "MEDI"
+  },
+  {
+    "id": "MESSINA",
+    "name": "MESSINA",
+    "bic": "MSA"
+  },
+  {
+    "id": "MLINE",
+    "name": "MLINE",
+    "bic": "MLIN"
+  },
+  {
+    "id": "MSAC",
+    "name": "MORROCCAN SHIPPING AGENCY COMPANY",
+    "bic": "MSAC"
+  },
+  {
+    "id": "MSC",
+    "name": "MSC MAROC",
+    "bic": "MSCM"
+  },
+  {
+    "id": "MSNC",
+    "name": "MESSINIAN SPIRE NAVIGATION  CO.S.A",
+    "bic": "MSN"
+  },
+  {
+    "id": "MTL",
+    "name": "Maritime Tunisienne Lines",
+    "bic": "MTL"
+  },
+  {
+    "id": "NALMAROC",
+    "name": "Nal Maroc",
+    "bic": "NALM"
+  },
+  {
+    "id": "NAVIGHR",
+    "name": "NAVIGHR",
+    "bic": "NAV"
+  },
+  {
+    "id": "NAXCO",
+    "name": "NAXCO",
+    "bic": ""
+  },
+  {
+    "id": "NILEDUT",
+    "name": "",
+    "bic": ""
+  },
+  {
+    "id": "O7319",
+    "name": "PEREZ Y CIA MAROC",
+    "bic": ""
+  },
+  {
+    "id": "ONE",
+    "name": "Ocean Network Express",
+    "bic": "ONE"
+  },
+  {
+    "id": "OOCL",
+    "name": "OOCL",
+    "bic": "OOCL"
+  },
+  {
+    "id": "OSL",
+    "name": "OSL",
+    "bic": "OSL"
+  },
+  {
+    "id": "OVP",
+    "name": "OVP",
+    "bic": "OVP"
+  },
+  {
+    "id": "PACOCEAN",
+    "name": "PACOCEAN MAGHREB S.A.R.L",
+    "bic": "PACO"
+  },
+  {
+    "id": "PCT",
+    "name": "PLANET COM TRANS",
+    "bic": "PCT"
+  },
+  {
+    "id": "PEREZ",
+    "name": "PEREZ Y CIA MAROC",
+    "bic": "PERE"
+  },
+  {
+    "id": "PLAN",
+    "name": "PLANET-COM-TRANS",
+    "bic": ""
+  },
+  {
+    "id": "PORTNET",
+    "name": "PORTNET",
+    "bic": ""
+  },
+  {
+    "id": "REEL",
+    "name": "REEL Shipping",
+    "bic": "REL"
+  },
+  {
+    "id": "ROMO",
+    "name": "ROMOCEAN",
+    "bic": "ROM"
+  },
+  {
+    "id": "ROMOCEAN",
+    "name": "ROMOCEAN",
+    "bic": "ROMU"
+  },
+  {
+    "id": "SEATRADE",
+    "name": "SEA TRADE",
+    "bic": ""
+  },
+  {
+    "id": "SEJ",
+    "name": "SEJ",
+    "bic": "SEJ"
+  },
+  {
+    "id": "SHARAF",
+    "name": "SHARAF SHIPPING AGENCY",
+    "bic": "SHAR"
+  },
+  {
+    "id": "SIG",
+    "name": "SIGMA SHIPPING",
+    "bic": "SIG"
+  },
+  {
+    "id": "SIGMASH",
+    "name": "SIGMASH",
+    "bic": ""
+  },
+  {
+    "id": "SLS",
+    "name": "SEA LEAD SHIPING",
+    "bic": "SLS"
+  },
+  {
+    "id": "SOMASHI",
+    "name": "SOMA SHIP",
+    "bic": "SOMA"
+  },
+  {
+    "id": "SSA",
+    "name": "SHARAF SHIPPING AGENCY",
+    "bic": "SSA"
+  },
+  {
+    "id": "TAR",
+    "name": "TARROS",
+    "bic": "TAR"
+  },
+  {
+    "id": "TATRANS",
+    "name": "T-A TRANS",
+    "bic": "TATR"
+  },
+  {
+    "id": "TRADE",
+    "name": "TRADE NAV",
+    "bic": "TRAD"
+  },
+  {
+    "id": "TRAFIMAR",
+    "name": "T R A F I M A R",
+    "bic": "TRAF"
+  },
+  {
+    "id": "TRANSPO",
+    "name": "TRANSPORT MAROCAIN",
+    "bic": "TRAN"
+  },
+  {
+    "id": "TRS",
+    "name": "TRANSINSULAR",
+    "bic": "TRS"
+  },
+  {
+    "id": "TSH",
+    "name": "TSH",
+    "bic": "TSH"
+  },
+  {
+    "id": "TURKON",
+    "name": "TURKON",
+    "bic": "TURK"
+  },
+  {
+    "id": "UASC",
+    "name": "UASC",
+    "bic": "UAS"
+  },
+  {
+    "id": "U-M-M",
+    "name": "U-M-M",
+    "bic": "UMM"
+  },
+  {
+    "id": "UNIVERS",
+    "name": "UNIVERSAL SHIPPING",
+    "bic": ""
+  },
+  {
+    "id": "UNK",
+    "name": "",
+    "bic": ""
+  },
+  {
+    "id": "USS",
+    "name": "HFA logistisue",
+    "bic": "USS"
+  },
+  {
+    "id": "WAFASHP",
+    "name": "WAFA SHIPPING",
+    "bic": "WAFA"
+  },
+  {
+    "id": "WECLINE",
+    "name": "WECLINE",
+    "bic": "WECL"
+  },
+  {
+    "id": "YANGMIN",
+    "name": "YANGMIN",
+    "bic": "YANG"
+  },
+  {
+    "id": "ZIMAG",
+    "name": "ZIMAG",
+    "bic": "ZIM"
+  }
+]

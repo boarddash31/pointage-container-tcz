@@ -1,0 +1,7 @@
+{
+  "name": "pointage-container-checks",
+  "private": true,
+  "scripts": {"test:db": "node tests/sql_smoke.cjs", "test:bridge": "node --test bridge/test/*.test.mjs"},
+  "devDependencies": {"@electric-sql/pglite": "^0.3.10"}
+}
+
