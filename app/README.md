@@ -10,7 +10,7 @@ Install Flutter 3.47.2 or compatible stable SDK. From this directory:
 flutter pub get
 flutter analyze
 flutter test
-flutter run -d chrome --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
+flutter run -d chrome --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY --dart-define=AUTH_SITE_URL=https://YOUR_PUBLIC_SITE.example
 ```
 
 For shared-folder archiving add `--dart-define=PDF_BRIDGE_URL=https://HOST:8848` after configuring `bridge/`; set `PDF_BRIDGE_AUTO_PRINT=true` only after a real printer test. Use the project URL and **publishable** key only. Never pass a service-role key to Flutter. On this Windows machine, SDK and project paths with spaces cause Dart native-assets hooks to fail; run through no-space directory junctions or place both in paths without spaces.

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'data/pointage_repository.dart';
@@ -9,6 +10,7 @@ import 'ui/admin_screen.dart';
 
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const supabasePublishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
+const authSiteUrl = String.fromEnvironment('AUTH_SITE_URL');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,25 +52,36 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   late final StreamSubscription<AuthState> _subscription;
+  bool recoveryFlow = kIsWeb && Uri.base.queryParameters['auth'] == 'recovery';
   @override void initState() {
     super.initState();
-    _subscription = Supabase.instance.client.auth.onAuthStateChange.listen((_) {
-      if (mounted) setState(() {});
+    _subscription = Supabase.instance.client.auth.onAuthStateChange.listen((state) {
+      if (mounted) {
+        setState(() {
+          if (state.event == AuthChangeEvent.passwordRecovery) {
+            recoveryFlow = true;
+          }
+          if (state.event == AuthChangeEvent.signedOut) {
+            recoveryFlow = false;
+          }
+        });
+      }
     });
   }
   @override void dispose() { _subscription.cancel(); super.dispose(); }
   @override Widget build(BuildContext context) {
     final auth=Supabase.instance.client.auth;
     if(auth.currentSession==null)return const LoginScreen();
-    if(auth.currentUser?.userMetadata?['must_set_password']==true){
-      return const PasswordSetupScreen();
+    if(recoveryFlow || auth.currentUser?.userMetadata?['must_set_password']==true){
+      return PasswordSetupScreen(onComplete: () => setState(() => recoveryFlow = false));
     }
     return PointageShell(repository: PointageRepository(Supabase.instance.client));
   }
 }
 
 class PasswordSetupScreen extends StatefulWidget {
-  const PasswordSetupScreen({super.key});
+  const PasswordSetupScreen({super.key,required this.onComplete});
+  final VoidCallback onComplete;
   @override State<PasswordSetupScreen> createState()=>_PasswordSetupScreenState();
 }
 class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
@@ -83,7 +96,10 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
     try{
       await Supabase.instance.client.auth.updateUser(UserAttributes(
         password:password.text,data:{'must_set_password':false}));
-      if(mounted)setState((){});
+      if(kIsWeb && Uri.base.queryParameters['auth']=='recovery') {
+        await SystemNavigator.routeInformationUpdated(uri:Uri(path:'/'),replace:true);
+      }
+      if(mounted) widget.onComplete();
     }catch(e){if(mounted)setState(()=>error='Mot de passe refusé : $e');}
     finally{if(mounted)setState(()=>busy=false);}
   }
@@ -115,15 +131,32 @@ class LoginScreen extends StatefulWidget {
 }
 class _LoginScreenState extends State<LoginScreen> {
   final email = TextEditingController(), password = TextEditingController();
-  bool busy = false; String? error;
+  bool busy = false; String? error, notice;
   @override void dispose() { email.dispose(); password.dispose(); super.dispose(); }
   Future<void> signIn() async {
-    setState(() { busy=true; error=null; });
+    setState(() { busy=true; error=null; notice=null; });
     try {
       await Supabase.instance.client.auth.signInWithPassword(
         email: email.text.trim(), password: password.text);
     } catch (e) { if (mounted) setState(() => error = e.toString()); }
     finally { if (mounted) setState(() => busy=false); }
+  }
+  Future<void> requestRecovery() async {
+    final address=email.text.trim();
+    if(!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(address)) {
+      setState(()=>error='Saisissez votre e-mail professionnel pour recevoir le lien.');
+      return;
+    }
+    setState(() { busy=true; error=null; notice=null; });
+    try {
+      final base=authSiteUrl.isNotEmpty ? Uri.parse(authSiteUrl) : (kIsWeb ? Uri.base : null);
+      final redirect=base?.replace(path:'/',queryParameters:{'auth':'recovery'},fragment:'');
+      await Supabase.instance.client.auth.resetPasswordForEmail(address,
+        redirectTo:redirect?.toString());
+      if(mounted) setState(()=>notice='Si ce compte existe, un lien de réinitialisation a été envoyé. Vérifiez votre boîte e-mail.');
+    } catch (_) {
+      if(mounted) setState(()=>error='Envoi impossible pour le moment. Réessayez plus tard.');
+    } finally { if(mounted) setState(()=>busy=false); }
   }
   @override Widget build(BuildContext context) => Scaffold(body: Center(child: SingleChildScrollView(
     padding:const EdgeInsets.all(16),child:ConstrainedBox(
@@ -142,8 +175,12 @@ class _LoginScreenState extends State<LoginScreen> {
         decoration:const InputDecoration(labelText:'Mot de passe')),
       if(error!=null) Padding(padding:const EdgeInsets.only(top:12),
         child:Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error))),
+      if(notice!=null) Padding(padding:const EdgeInsets.only(top:12),
+        child:Text(notice!,style:TextStyle(color:Theme.of(context).colorScheme.primary))),
       const SizedBox(height:22),
       FilledButton(onPressed:busy?null:signIn,child:Text(busy?'Connexion…':'Se connecter')),
+      TextButton(onPressed:busy?null:requestRecovery,
+        child:const Text('Mot de passe oublié ?')),
       if(kIsWeb) Padding(padding:const EdgeInsets.only(top:10),
         child:TextButton.icon(onPressed:()=>launchUrl(
           Uri.base.resolve('downloads/pointage-tcz.apk'),

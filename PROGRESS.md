@@ -44,6 +44,10 @@ Release work on 2026-10-20: created an ignored release keystore outside Git, rep
 
 Have the first admin open the recovery email within 60 minutes and set a password, then verify authenticated workflows, private PDF Storage, print bridge and Freepool reconciliation. Flutter tests (3), analyze, SQL smoke and bridge tests (2) passed again on 2026-10-20. Do not label this production-ready before these checks pass.
 
+## Auth recovery follow-up (2026-10-20)
+
+The user confirmed access to the first admin's email but had no TCZ password yet. Added a self-service "Mot de passe oublié ?" action that requests Supabase recovery by email, routes the callback to the public web app, and opens the password setup screen on recovery. Added the exact recovery callback to Supabase Auth's redirect allowlist. Flutter analyze and 4 tests pass. Rebuilt web and Android; the new APK is 58,887,054 bytes, SHA-256 `03eca7a576bc03c75b47a1b29998886231da782377f03d7fb4500628b485cb22`, with APK Signature Scheme v2 verified. First-admin activation and authenticated live workflow remain pending until the recipient sets their password. The new build still needs GitHub push and Netlify verification.
+
 
 
 

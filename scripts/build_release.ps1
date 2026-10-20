@@ -13,8 +13,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $repo 'app/android/key.properties'))
   throw 'A release signing configuration is required at app/android/key.properties.'
 }
 $settings = Get-Content -LiteralPath $settingsFile | ConvertFrom-StringData
-if (-not $settings.SUPABASE_URL -or -not $settings.SUPABASE_PUBLISHABLE_KEY) {
-  throw 'Supabase URL and publishable key are required.'
+if (-not $settings.SUPABASE_URL -or -not $settings.SUPABASE_PUBLISHABLE_KEY -or -not $settings.AUTH_SITE_URL) {
+  throw 'Supabase URL, publishable key and public Auth site URL are required.'
 }
 if (-not (Test-Path -LiteralPath $FlutterExe) -or -not (Test-Path -LiteralPath $AppPath)) {
   throw 'Flutter SDK or app path unavailable.'
@@ -35,7 +35,8 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Flutter tests failed' }
   $defines = @(
     '--dart-define', "SUPABASE_URL=$($settings.SUPABASE_URL)",
-    '--dart-define', "SUPABASE_PUBLISHABLE_KEY=$($settings.SUPABASE_PUBLISHABLE_KEY)"
+    '--dart-define', "SUPABASE_PUBLISHABLE_KEY=$($settings.SUPABASE_PUBLISHABLE_KEY)",
+    '--dart-define', "AUTH_SITE_URL=$($settings.AUTH_SITE_URL)"
   )
   & $FlutterExe build apk --release @defines
   if ($LASTEXITCODE -ne 0) { throw 'Signed APK build failed' }
