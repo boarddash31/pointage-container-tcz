@@ -19,7 +19,7 @@ For shared-folder archiving add `--dart-define=PDF_BRIDGE_URL=https://HOST:8848`
 
 Read root `PROGRESS.md` before deployment. Apply the six migrations in `supabase/migrations/` in filename order to a clean project. They were applied to the initially empty TCZ project on 2026-10-20; new environments still need their own acceptance tests. Deploy `supabase/functions/generate-bon` and `supabase/functions/invite-user` with JWT verification enabled. Configure service-role secrets server-side only. The private Storage bucket is created by SQL.
 
-The first admin was invited in the TCZ Supabase project and given the `admin` role. The invitation has not been accepted; a new recovery link must be sent now that Supabase Auth points to the Netlify site. An active admin can invite further users with a role (`entree`, `engin`, `sortie`, `viewer`, or `admin`) from the web UI. A profile is created by trigger; public sign-up does not grant roles. Verify Auth, RLS, PDF Storage and workflows on actual devices before production use.
+The first admin was invited in the TCZ Supabase project and given the `admin` role. A password-recovery email was sent after Supabase Auth was pointed to the public Netlify site; the recipient must accept it before the first authenticated acceptance test. An active admin can invite further users with a role (`entree`, `engin`, `sortie`, `viewer`, or `admin`) from the web UI. A profile is created by trigger; public sign-up does not grant roles. Verify Auth, RLS, PDF Storage and workflows on actual devices before production use.
 
 ## Current limitations
 
