@@ -19,7 +19,7 @@ Updated: 2026-10-20 (Africa/Casablanca)
 | M3 | Data, Bons PDF + private Storage and safe print flow | Partial | `generate-bon` deployed and anonymous calls denied. UI, Flutter-to-Node authenticated bridge, preferred-printer direct-print path and document-action audit present; two bridge tests pass. Authenticated PDF generation/share/printer verification pending |
 | M4 | Web admin, clients, RBAC, assignments, analytics | Partial | Admin UI can invite agents with initial role through deployed `invite-user` Edge Function; first admin invitation and role created. Role matrix and browser acceptance pending |
 | M5 | Freepool historical stock and Excel export | Partial | SQL report and workbook source present; synthetic XLSX round-trip test passes. Historical opening stock and source-report reconciliation pending |
-| M6 | Deployment hardening and end-to-end acceptance | Pending | Live schema review, staging deployment, devices and printer required |
+| M6 | Deployment hardening and end-to-end acceptance | Partial | Private GitHub `main` commit `fd5aa27` deployed successfully to Netlify. Supabase Auth Site URL and redirect allowlist point to Netlify. Public distribution, admin activation, authenticated device and printer acceptance remain open |
 
 ## Architecture and implementation
 
@@ -38,11 +38,11 @@ Release work on 2026-10-20: created an ignored release keystore outside Git, rep
 - TCR/port versus departed external lifecycle states and synchronization with the other operational database are not implemented; the current stock model tracks TCZ yard presence and truck visits. The exact event mapping and write authority need confirmation against Navis/other system before adding transitions.
 - Freepool workbook has not been reconciled to supplied source figures. Unknown historical opening stock, EVP/billing policy, legal PDF footer, actual booking authority, and licensed logos require domain validation.
 - iOS build needs macOS/Xcode; Android SDK and real devices are not configured here. Flutter web build succeeded with a non-blocking Wasm dry-run warning in a transitive `image` package; JS output was built.
-- Private GitHub repository `boarddash31/pointage-container-tcz` has source on `main`. The configured web build and signed APK are staged under `site/` for Netlify; deployment is in progress.
+- Private GitHub repository `boarddash31/pointage-container-tcz` has source on `main`. Netlify published commit `fd5aa27` at `https://stalwart-travesseiro-1e8045.netlify.app/`, but project access protection blocks public site/APK requests (unauthenticated APK HEAD returned HTTP 401). Supabase Auth Site URL and the `/**` redirect are configured. The first admin invitation is unconfirmed and must be followed by a password-recovery email because the invite preceded that URL change.
 
 ## Next action
 
-Complete the signed APK and web builds, publish the private source repository and Netlify site, set Supabase Auth redirects, and verify invitation acceptance, authenticated workflows, private PDF Storage, print bridge and Freepool reconciliation. Do not label this production-ready before these checks pass.
+Resolve Netlify public access, send the first admin recovery email, verify invitation acceptance and authenticated workflows, then verify private PDF Storage, print bridge and Freepool reconciliation. Flutter tests (3), analyze, SQL smoke and bridge tests (2) passed again on 2026-10-20. Do not label this production-ready before these checks pass.
 
 
 
