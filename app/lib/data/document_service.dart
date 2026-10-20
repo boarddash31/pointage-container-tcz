@@ -35,7 +35,7 @@ class DocumentService {
   Future<DocumentOutcome> finalizeLatest(String visitId,String kind) async {
     final document=await latest(visitId,kind);
     if(document==null)throw StateError('Bon $kind absent après pointage.');
-    await prepare(document);
+    final bytes=await prepare(document);
     var shareReady=false,printed=false;
     String? warning;
     if(bridgeUrl.isNotEmpty){
@@ -52,7 +52,13 @@ class DocumentService {
       try{printed=await printPreferredLatest(visitId,kind);}
       catch(e){warning='Impression locale à réessayer dans Bons : $e';}
     }
-    return DocumentOutcome(shareReady:shareReady,printed:printed,warning:warning);
+    return DocumentOutcome(
+      shareReady:shareReady,
+      printed:printed,
+      warning:warning,
+      bytes:bytes,
+      documentId:document['id'] as String?,
+    );
   }
 
   Future<Map<String,dynamic>?> latest(String visitId,String kind) async =>
@@ -130,7 +136,15 @@ class DocumentService {
 }
 
 class DocumentOutcome {
-  const DocumentOutcome({required this.shareReady,required this.printed,this.warning});
-  final bool shareReady,printed;
+  const DocumentOutcome({
+    required this.shareReady,
+    required this.printed,
+    this.warning,
+    this.bytes,
+    this.documentId,
+  });
+  final bool shareReady, printed;
   final String? warning;
+  final Uint8List? bytes;
+  final String? documentId;
 }

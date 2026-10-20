@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pointage_container/data/pointage_repository.dart';
@@ -62,6 +63,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Position réelle de dépose *'), findsNothing);
     expect(find.text('Valider la dépose'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('BonPdfScreen displays PDF preview with print action', (tester) async {
+    final samplePdf = Uint8List.fromList([0x25, 0x50, 0x44, 0x46]); // %PDF
+    await tester.pumpWidget(MaterialApp(
+      home: BonPdfScreen(
+        bytes: samplePdf,
+        kind: 'ENTRÉE',
+        visitId: 'test-visit-1',
+        autoPrint: false,
+      ),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Bon ENTRÉE'), findsOneWidget);
+    expect(find.byIcon(Icons.print), findsWidgets);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

@@ -156,9 +156,10 @@ class _EntryScreenState extends State<EntryScreen> {
         iso:iso,armateur:operator!.id,containerNumber:kind=='loaded'?number:null,
         booking:kind=='empty'?booking.text.trim():null);
       if(!mounted)return;
+      DocumentOutcome? outcome;
       try{
         final documents=DocumentService(widget.repository.client);
-        final outcome=await documents.finalizeLatest(visitId,'ENTREE');
+        outcome=await documents.finalizeLatest(visitId,'ENTREE');
         if(mounted){message(context,outcome.warning!=null?
           'Entrée enregistrée et bon cloud archivé. ${outcome.warning}':(outcome.printed?
           'Entrée enregistrée, bon archivé et impression demandée.':
@@ -171,6 +172,15 @@ class _EntryScreenState extends State<EntryScreen> {
         operator=operators.where((o)=>o.id=='MAE').firstOrNull??operators.firstOrNull;
         lookupHint=null;kind='loaded';iso='45G1';
       });
+      if(mounted && outcome?.bytes != null){
+        await Navigator.push(context, MaterialPageRoute(
+          builder: (_) => BonPdfScreen(
+            bytes: outcome!.bytes!,
+            kind: 'ENTRÉE',
+            visitId: visitId,
+          ),
+        ));
+      }
     }catch(e){
       if(mounted){
         final raw = e.toString();
@@ -460,15 +470,86 @@ class _ExitScreenState extends State<ExitScreen> {
     canCancel:widget.canCancel,exitMode:true);
 }
 
+class BonPdfScreen extends StatefulWidget {
+  const BonPdfScreen({
+    super.key,
+    required this.bytes,
+    required this.kind,
+    required this.visitId,
+    this.autoPrint = true,
+  });
+  final Uint8List bytes;
+  final String kind, visitId;
+  final bool autoPrint;
+
+  @override
+  State<BonPdfScreen> createState() => _BonPdfScreenState();
+}
+
+class _BonPdfScreenState extends State<BonPdfScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoPrint) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _print();
+      });
+    }
+  }
+
+  void _print() {
+    Printing.layoutPdf(
+      onLayout: (_) => widget.bytes,
+      name: 'TCZ-${widget.kind}-${widget.visitId}',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Bon ${widget.kind}'),
+        backgroundColor: const Color(0xff063e66),
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print),
+            tooltip: 'Imprimer',
+            onPressed: _print,
+          ),
+        ],
+      ),
+      body: PdfPreview(
+        build: (_) => widget.bytes,
+        allowPrinting: true,
+        allowSharing: true,
+        canChangeOrientation: false,
+        canChangePageFormat: false,
+        pdfFileName: 'TCZ-${widget.kind}-${widget.visitId}.pdf',
+      ),
+    );
+  }
+}
+
 class VisitQueue extends StatelessWidget {
   const VisitQueue({super.key,required this.title,required this.repository,
     required this.queue,required this.onRefresh,required this.canCancel,required this.exitMode});
   final String title;final PointageRepository repository;final Future<List<TruckVisit>> queue;
   final VoidCallback onRefresh;final bool canCancel,exitMode;
   Future<void> open(BuildContext context,TruckVisit visit) async {
-    await showModalBottomSheet<void>(context:context,isScrollControlled:true,showDragHandle:true,
+    final outcome = await showModalBottomSheet<DocumentOutcome?>(
+      context:context,isScrollControlled:true,showDragHandle:true,
       builder:(_)=>VisitActionSheet(repository:repository,visit:visit,canCancel:canCancel,exitMode:exitMode));
     onRefresh();
+    if(context.mounted && outcome?.bytes != null){
+      await Navigator.push(context, MaterialPageRoute(
+        builder: (_) => BonPdfScreen(
+          bytes: outcome!.bytes!,
+          kind: 'SORTIE',
+          visitId: visit.id,
+        ),
+      ));
+    }
   }
   @override Widget build(BuildContext context)=>RefreshIndicator(onRefresh:()async {onRefresh();await queue;},
     child:FutureBuilder<List<TruckVisit>>(future:queue,builder:(context,snapshot){
@@ -583,6 +664,24 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
       catch(_){/* Retry in Bons. */}
     },'Prise forcée tracée pour rapprochement externe.');
   }
+  Future<void> exitTruck() async {
+    setState(()=>busy=true);
+    DocumentOutcome? outcome;
+    try {
+      await widget.repository.exit(widget.visit.id);
+      try {
+        final documents=DocumentService(widget.repository.client);
+        outcome=await documents.finalizeLatest(widget.visit.id,'SORTIE');
+      } catch(_) {/* Retry in Bons. */}
+      if(!mounted)return;
+      message(context,'Sortie confirmée.');
+      Navigator.pop(context, outcome);
+    } catch(e) {
+      if(mounted) message(context,'Opération refusée : $e');
+    } finally {
+      if(mounted) setState(()=>busy=false);
+    }
+  }
   @override Widget build(BuildContext context){
     final v=widget.visit,pending=v.needsEngin;
     return SafeArea(child:SingleChildScrollView(padding:EdgeInsets.fromLTRB(18,8,18,
@@ -604,11 +703,7 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
       if(widget.exitMode) ...[
         if(pending)const Padding(padding:EdgeInsets.symmetric(vertical:8),
           child:Text('Complétez Engin ici, puis rouvrez le camion pour valider la sortie.')),
-        FilledButton.icon(onPressed:pending||busy?null:()=>run(
-          ()async {await widget.repository.exit(v.id);
-            try{final documents=DocumentService(widget.repository.client);
-              await documents.finalizeLatest(v.id,'SORTIE');}
-            catch(_){/* Retry in Bons. */}},'Sortie confirmée.'),
+        FilledButton.icon(onPressed:pending||busy?null:exitTruck,
           icon:const Icon(Icons.exit_to_app),label:const Text('Valider la sortie')),
       ],
       if(widget.canCancel&&pending)...[
@@ -763,9 +858,12 @@ class _BonsScreenState extends State<BonsScreen> {
       final bytes=await service.prepare(doc);
       await service.recordAction(doc,'PREVIEW_REQUESTED');
       if(!mounted)return;
-      await Navigator.push(context,MaterialPageRoute(builder:(_)=>Scaffold(
-        appBar:AppBar(title:Text('Bon ${doc['kind']}')),
-        body:PdfPreview(build:(_)=>bytes,allowPrinting:true,allowSharing:true))));
+      await Navigator.push(context,MaterialPageRoute(builder:(_)=>BonPdfScreen(
+        bytes:bytes,
+        kind:doc['kind'] as String? ?? 'TCZ',
+        visitId:doc['visit_id'] as String? ?? '',
+        autoPrint:false,
+      )));
       refresh();
     }catch(e){if(mounted)message(context,'Aperçu impossible : $e');}
   }
