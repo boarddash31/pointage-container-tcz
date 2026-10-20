@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
@@ -1027,6 +1028,14 @@ class _BonPdfScreenState extends State<BonPdfScreen> {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
+            icon: const Icon(Icons.download),
+            tooltip: 'Télécharger le PDF',
+            onPressed: () => Printing.sharePdf(
+              bytes: widget.bytes,
+              filename: 'TCZ-${widget.kind}-${widget.visitId}.pdf',
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.print),
             tooltip: 'Imprimer',
             onPressed: _print,
@@ -1350,6 +1359,32 @@ class _BonsScreenState extends State<BonsScreen> {
     if(mounted)setState(()=>preferredPrinter=value);
   }
   Future<void> choosePrinter() async {
+    if (kIsWeb) {
+      showDialog(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Color(0xff075a8d)),
+              SizedBox(width: 8),
+              Text('Imprimantes sur le Web'),
+            ],
+          ),
+          content: const Text(
+            'Sur un navigateur Web (Chrome, Edge), les règles de sécurité Internet empêchent un site web de scanner directement la liste des imprimantes de votre appareil.\n\n'
+            '• Pour imprimer : Cliquez sur « Imprimer » pour ouvrir la boîte de dialogue de votre navigateur où toutes vos imprimantes sont accessibles.\n\n'
+            '• Pour une détection directe des imprimantes Bluetooth/WiFi/USB sans passer par le navigateur : Utilisez l’application Android (APK).',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('Fermer'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     try{
       final printers=await Printing.listPrinters();
       if(!mounted)return;
@@ -1389,10 +1424,15 @@ class _BonsScreenState extends State<BonsScreen> {
         Text('Bons',style:Theme.of(context).textTheme.headlineSmall),
         const Text('Documents privés · le PDF est conservé dans Supabase Storage'),
         ListTile(leading:const Icon(Icons.print),
-          title:Text(preferredPrinter.isEmpty?'Imprimante préférée : aucune':
-            'Imprimante préférée : $preferredPrinter'),
-          subtitle:const Text('Impression directe après pointage si disponible; sinon dialogue système.'),
-          trailing:const Icon(Icons.edit),onTap:choosePrinter),
+          title:Text(kIsWeb
+            ? 'Impression : Gérée par la boîte système du navigateur'
+            : (preferredPrinter.isEmpty?'Imprimante préférée : aucune':
+              'Imprimante préférée : $preferredPrinter')),
+          subtitle:Text(kIsWeb
+            ? 'Sur le web, choisissez votre imprimante dans la boîte d’impression Chrome/Edge.'
+            : 'Impression directe après pointage si disponible; sinon dialogue système.'),
+          trailing:Icon(kIsWeb ? Icons.info_outline : Icons.edit),
+          onTap:choosePrinter),
         Align(alignment:Alignment.centerRight,child:IconButton(onPressed:refresh,
           icon:const Icon(Icons.refresh),tooltip:'Actualiser')),
         const SizedBox(height:12),
