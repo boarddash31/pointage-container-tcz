@@ -71,7 +71,35 @@ await db.query("select public.exit_truck_with_details($1,null,null,null,false,nu
 let emptyRow = await db.query('select canceled_at, cancel_reason from public.truck_visits where id=$1', [emptyVisit.rows[0].id]);
 assert.ok(emptyRow.rows[0].canceled_at, 'empty exit without pickup should record cancel');
 
-await db.exec('set role authenticated');let visible=await db.query('select count(*) n from public.armateurs');assert.equal(Number(visible.rows[0].n),95);denied=false;try{await db.query("insert into public.armateurs(id,name) values('BAD','BAD')")}catch(e){denied=true}assert.ok(denied,'client table write must be denied');console.log('PASS: migrations, 95 operators, checksum, lifecycle, stock, audit, documents, forced pickup/reconciliation, direct exit, twin 2-company, empty exit cancel, role denial and RLS role');
+await db.exec('set role authenticated');let visible=await db.query('select count(*) n from public.armateurs');assert.equal(Number(visible.rows[0].n),95);denied=false;try{await db.query("insert into public.armateurs(id,name) values('BAD','BAD')")}catch(e){denied=true}assert.ok(denied,'client table write must be denied');
+await db.exec('reset role');
+await db.exec(fs.readFileSync('supabase/migrations/20261020155355_transaction_data.sql','utf8'));
+await db.exec("set request.jwt.claim.sub='11111111-1111-4111-8111-111111111111'");
+await db.query("update public.profiles set display_name='Entry Operator' where id=$1",[actor]);
+const editor='44444444-4444-4444-8444-444444444444';
+await db.query('insert into auth.users(id,raw_user_meta_data) values($1,$2)',[editor,JSON.stringify({name:'Exit Operator'})]);
+await db.query("insert into public.user_roles(user_id,role) values($1,'sortie')",[editor]);
+const beforeData=await db.query('select public.data_transactions() row');
+const beforeTx=beforeData.rows.map(x=>x.row).find(x=>x.id===twinVisit.rows[0].id);
+assert.equal(beforeTx.creator_name,'Entry Operator');
+assert.equal(beforeTx.changer_name,'Entry Operator');
+assert.ok(beforeTx.transaction_number);
+await db.query("insert into public.audit_logs(entity,entity_id,action,actor_id) values('truck_visit',$1,'TEST_UPDATE',$2)",[twinVisit.rows[0].id,editor]);
+await db.exec("set request.jwt.claim.sub='"+editor+"'");
+await db.exec('set role authenticated');
+const afterData=await db.query('select public.data_transactions() row');
+const afterTx=afterData.rows.map(x=>x.row).find(x=>x.id===twinVisit.rows[0].id);
+assert.equal(afterTx.creator_name,'Entry Operator','creator is preserved');
+assert.equal(afterTx.changer_name,'Exit Operator','last changer follows audit');
+assert.equal(afterTx.transaction_number,beforeTx.transaction_number,'transaction number is permanent');
+const privateProfiles=await db.query('select count(*) n from public.profiles');
+assert.equal(Number(privateProfiles.rows[0].n),1,'other profiles remain private outside transaction summary');
+await db.exec('reset role');
+await db.exec("set request.jwt.claim.sub='00000000-0000-0000-0000-000000000000'");
+let noPermission=false;try{await db.query('select public.data_transactions()')}catch(e){noPermission=e.code==='42501'}
+assert.ok(noPermission,'unassigned users cannot read transaction identities');
+console.log('PASS: transaction number stability, creator, last changer, agent access, profile isolation and unauthorized denial');
+console.log('PASS: migrations, 95 operators, checksum, lifecycle, stock, audit, documents, forced pickup/reconciliation, direct exit, twin 2-company, empty exit cancel, role denial and RLS role');
 }catch(e){console.error('ERROR',e);process.exitCode=1}finally{await db.close()}})();
 
 

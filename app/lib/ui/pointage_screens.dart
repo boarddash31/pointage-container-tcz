@@ -2274,28 +2274,59 @@ class DataScreen extends StatefulWidget {
   @override State<DataScreen> createState()=>_DataScreenState();
 }
 class _DataScreenState extends State<DataScreen> {
-  String query='';late Future<List<TruckVisit>> visits;
-  @override void initState(){super.initState();visits=widget.repository.visits(insideOnly:false);}
+  String query='';late Future<List<DataTransaction>> visits;
+  @override void initState(){super.initState();visits=widget.repository.transactions();}
+  void refresh() => setState(() => visits = widget.repository.transactions());
+  void details(DataTransaction row) => showDialog<void>(context:context,
+    builder:(context)=>AlertDialog(
+      title:Text('Transaction ${row.number} · ${row.visit.plate}'),
+      content:SizedBox(width:600,child:SingleChildScrollView(child:Column(
+        mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text('Créateur : ${row.creator}'),
+          Text('Dernier modificateur : ${row.changer}'),
+          if(row.visit.enginAt!=null)Text('Mouvement : ${DateTime.parse(row.visit.enginAt!).toLocal()}'),
+          if(row.visit.exitedAt!=null)Text('Durée : ${DateTime.parse(row.visit.exitedAt!).difference(row.visit.enteredAt).inMinutes} min'),
+          FutureBuilder<List<Map<String,dynamic>>>(future:widget.repository.events(row.visit.id),
+            builder:(context,snapshot){
+              if(snapshot.hasError)return Text('${snapshot.error}');
+              if(!snapshot.hasData)return const CircularProgressIndicator();
+              return Column(children:[for(final event in snapshot.data!)ListTile(
+                title:Text(event['action'].toString()),
+                subtitle:Text('${event['occurred_at']} · ${event['actor_id']}'))]);
+            }),
+        ]))),
+      actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Fermer'))],
+    ));
   @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.all(16),children:[
     Text('Data · visites & stock',style:Theme.of(context).textTheme.headlineSmall),
-    const SizedBox(height:12),TextField(decoration:const InputDecoration(labelText:'Rechercher camion, conteneur, booking, armateur',
+    Align(alignment:Alignment.centerRight,child:IconButton(
+      tooltip:'Actualiser',onPressed:refresh,icon:const Icon(Icons.refresh))),
+    const SizedBox(height:12),TextField(decoration:const InputDecoration(labelText:'Rechercher numéro, type, camion, conteneur, booking ou agent',
       prefixIcon:Icon(Icons.search)),onChanged:(x)=>setState(()=>query=x.toLowerCase())),
-    FutureBuilder<List<TruckVisit>>(future:visits,builder:(context,s){
+    FutureBuilder<List<DataTransaction>>(future:visits,builder:(context,s){
       if(s.hasError)return ListTile(title:Text('${s.error}'));
       if(!s.hasData)return const Center(child:CircularProgressIndicator());
-      final rows=s.data!.where((v)=>'${v.plate} ${v.container} ${v.booking} ${v.armateur}'
-        .toLowerCase().contains(query));
-      return Column(children:[for(final v in rows)Card(child:ExpansionTile(title:Text(v.plate),
-        subtitle:Text('${v.container??v.booking??'—'} · ${v.armateur} · ${v.exitedAt==null?'Présent':'Sorti'}'),
-        children:[ListTile(title:Text('Entrée : ${v.enteredAt.toLocal()}')),
-          if(v.enginAt!=null)ListTile(title:Text('Engin : ${DateTime.parse(v.enginAt!).toLocal()}')),
-          if(v.exitedAt!=null)ListTile(title:Text('Sortie : ${DateTime.parse(v.exitedAt!).toLocal()}'),
-            subtitle:Text('Durée : ${DateTime.parse(v.exitedAt!).difference(v.enteredAt).inMinutes} min')),
-          FutureBuilder<List<Map<String,dynamic>>>(future:widget.repository.events(v.id),
-            builder:(c,e)=>e.hasData?Column(children:[for(final x in e.data!)
-              ListTile(title:Text(x['action'].toString()),
-                subtitle:Text('${x['occurred_at']} · ${x['actor_id']}'))]):const SizedBox.shrink()),
-        ]))]);
+      final rows=s.data!.where((row)=>row.matches(query)).toList();
+      return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Padding(padding:const EdgeInsets.symmetric(vertical:12),child:Text(
+          '${rows.length} transaction(s) affichée(s) sur ${s.data!.length} chargée(s) · 500 dernières visites maximum')),
+        if(rows.isEmpty)const ListTile(title:Text('Aucune transaction trouvée')),
+        if(rows.isNotEmpty)SingleChildScrollView(scrollDirection:Axis.horizontal,
+          child:DataTable(columns:[
+            for(final label in ['Numéro','Type de transaction','Camion','Conteneur(s)',
+              'Booking / Order','Armateur(s)','Statut','Créateur','Dernier modificateur',
+              'Créée le','Modifiée le']) DataColumn(label:Text(label)),
+          ],rows:[for(final row in rows)DataRow(cells:[
+            DataCell(Text(row.number),onTap:()=>details(row)),DataCell(Text(row.type)),
+            DataCell(Text(row.visit.plate)),
+            DataCell(SelectableText(row.containers.isEmpty?'—':row.containers)),
+            DataCell(Text(row.bookings.isEmpty?'—':row.bookings)),
+            DataCell(Text([row.visit.armateur,row.visit.armateur2].whereType<String>().join(' / '))),
+            DataCell(Text(row.status)),DataCell(Text(row.creator)),DataCell(Text(row.changer)),
+            DataCell(Text(row.visit.enteredAt.toLocal().toString().split('.').first)),
+            DataCell(Text(row.changedAt.toLocal().toString().split('.').first)),
+          ])])),
+      ]);
     }),
     const SizedBox(height:18),Text('Conteneurs présents au yard',style:Theme.of(context).textTheme.titleLarge),
     ListTile(leading:const Icon(Icons.table_chart),title:const Text('Rapport Freepool'),

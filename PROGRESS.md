@@ -70,3 +70,17 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 
 
 
+
+## Data transaction traceability (2026-10-20)
+
+- Added a searchable Data table with transaction number, Reception/Livraison type, truck, both containers/bookings/armateurs, status, creator, last changer and creation/change timestamps. Clicking a transaction number opens the visit history. Counts describe the loaded window of the 500 newest visits.
+- Numbers reuse the permanent ENTREE event identity; visits without an entry event fall back to their UUID. Creator comes from entered_by; last changer and timestamp come from the latest truck_visit audit record, with creator/entry time as fallback. Missing display names fall back to user UUIDs.
+- Applied transaction_data to TCZ through ZENATA as migration 20261020155355. The guarded read-only RPC returns names only for readers authorized by can_do('read'); it does not grant general access to other profiles. Added a partial index for latest-visit audit lookup. Live authenticated summary returned seven rows with complete identity fields.
+- Nine Flutter tests and extended isolated SQL smoke tests pass. SQL checks verify stable numbers, preserved creators, updated changer identity, authorized agent access, profile isolation and denial for unassigned users. Dart analysis has no errors/warnings and the same six existing style notices.
+- Supabase Advisor flags data_transactions as an authenticated SECURITY DEFINER RPC; this is intentional for the limited profile-name lookup, with explicit read authorization and no anonymous execution. Existing unrelated advisor findings remain.
+- Source and backend updated; the web release and APK have not been rebuilt or published for this change.
+
+## v3 release (2026-10-20)
+
+- Rebuilt the web release with the TCZ publishable configuration and copied it to site/. Verified local HTTP 200 for the page and compiled bundle; the bundle contains the transaction-summary endpoint. Opened the app at http://localhost:8787/.
+- GitHub release marker: annotated tag v3. The Android APK is unchanged because this machine has no release signing configuration.

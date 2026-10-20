@@ -51,6 +51,12 @@ class PointageRepository {
   PointageRepository(this.client);
   final SupabaseClient client;
 
+  Future<List<DataTransaction>> transactions() async {
+    final rows = await client.rpc('data_transactions');
+    return [for (final row in rows as List)
+      DataTransaction.fromJson(Map<String, dynamic>.from(row as Map))];
+  }
+
   User? get user => client.auth.currentUser;
   Future<List<String>> roles() async {
     final id = user?.id;
@@ -180,4 +186,27 @@ class PointageRepository {
       List<Map<String, dynamic>>.from(await client.from('generated_documents')
           .select('id,visit_id,kind,status,storage_path,created_at,snapshot')
           .order('created_at', ascending: false).limit(200));
+}
+
+class DataTransaction {
+  DataTransaction.fromJson(Map<String, dynamic> json)
+      : visit = TruckVisit.fromJson(json),
+        number = json['transaction_number']?.toString() ?? json['id'] as String,
+        creator = json['creator_name'] as String,
+        changer = json['changer_name'] as String,
+        changedAt = DateTime.parse(json['changed_at'] as String);
+
+  final TruckVisit visit;
+  final String number, creator, changer;
+  final DateTime changedAt;
+  String get type => visit.entryKind == 'loaded' ? 'Réception' : 'Livraison';
+  String get status => visit.canceledAt != null ? 'Annulée'
+      : visit.exitedAt != null ? 'Sorti' : 'Présent';
+  String get containers => [visit.container, visit.container2]
+      .whereType<String>().where((s) => s.isNotEmpty).join(' / ');
+  String get bookings => [visit.booking, visit.booking2]
+      .whereType<String>().where((s) => s.isNotEmpty).join(' / ');
+  bool matches(String query) => [number, type, status, creator, changer,
+      visit.plate, containers, bookings, visit.armateur, visit.armateur2 ?? '']
+      .join(' ').toLowerCase().contains(query.trim().toLowerCase());
 }
