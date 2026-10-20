@@ -48,7 +48,10 @@ try {
   Copy-Item -LiteralPath $apk -Destination $publishedApk -Force
   $hash = (Get-FileHash -LiteralPath $publishedApk -Algorithm SHA256).Hash.ToLowerInvariant()
   Set-Content -LiteralPath (Join-Path $downloads 'SHA256SUMS.txt') -Value "$hash  pointage-tcz.apk" -Encoding ascii
-  [pscustomobject]@{ WebDirectory=(Join-Path $AppPath 'build/web'); Apk=$publishedApk; Sha256=$hash }
+  $site = Join-Path $repo 'site'
+  New-Item -ItemType Directory -Path $site -Force | Out-Null
+  Copy-Item -Path (Join-Path $AppPath 'build/web/*') -Destination $site -Recurse -Force
+  [pscustomobject]@{ WebDirectory=$site; Apk=(Join-Path $site 'downloads/pointage-tcz.apk'); Sha256=$hash }
 } finally {
   Pop-Location
 }

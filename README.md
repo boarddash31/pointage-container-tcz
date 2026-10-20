@@ -24,7 +24,7 @@ npm run test:bridge
 & 'scripts/build_release.ps1'
 ```
 
-For Netlify manual deployment, publish the generated `app/build/web` directory after the build. Its `downloads/pointage-tcz.apk` file is linked from the web login screen. Keep the Netlify site URL in Supabase Auth's Site URL and redirect allowlist so invitation and recovery links land on the web app.
+The release script copies the generated web app and APK into `site/`. Netlify publishes that directory from the private GitHub repository, so a commit of the verified release files triggers the web deployment without a Flutter SDK on Netlify. Its `downloads/pointage-tcz.apk` file is linked from the web login screen. Keep the Netlify site URL in Supabase Auth's Site URL and redirect allowlist so invitation and recovery links land on the web app.
 
 The bridge must run on a Windows machine that can reach the PDF folder and printer. `\\172.16.3.98\TCR PrintM` is a **printer share**, not a writable PDF directory. The archive folder is separately configured using `PDF_SHARE_PATH`. Read `bridge/README.md` for TLS, JWT validation, idempotency and printer configuration.
 
