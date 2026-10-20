@@ -457,17 +457,531 @@ class _EnginScreenState extends State<EnginScreen> {
 }
 
 class ExitScreen extends StatefulWidget {
-  const ExitScreen({super.key,required this.repository,required this.canCancel});
-  final PointageRepository repository;final bool canCancel;
-  @override State<ExitScreen> createState()=>_ExitScreenState();
+  const ExitScreen({super.key, required this.repository, required this.canCancel});
+  final PointageRepository repository;
+  final bool canCancel;
+  @override State<ExitScreen> createState() => _ExitScreenState();
 }
+
 class _ExitScreenState extends State<ExitScreen> {
-  late Future<List<TruckVisit>> queue;
-  @override void initState(){super.initState();queue=widget.repository.visits();}
-  void refresh()=>setState((){queue=widget.repository.visits();});
-  @override Widget build(BuildContext context)=>VisitQueue(title:'Sortie · tous les camions présents',
-    repository:widget.repository,queue:queue,onRefresh:refresh,
-    canCancel:widget.canCancel,exitMode:true);
+  final searchController = TextEditingController();
+  final reasonController = TextEditingController();
+  late Future<List<TruckVisit>> visitsFuture;
+  TruckVisit? selectedVisit;
+  bool busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    loadVisits();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    reasonController.dispose();
+    super.dispose();
+  }
+
+  void loadVisits() {
+    setState(() {
+      visitsFuture = widget.repository.visits(insideOnly: true);
+    });
+  }
+
+  Future<void> exitTruck(TruckVisit visit) async {
+    setState(() => busy = true);
+    DocumentOutcome? outcome;
+    try {
+      await widget.repository.exit(visit.id);
+      try {
+        final documents = DocumentService(widget.repository.client);
+        outcome = await documents.finalizeLatest(visit.id, 'SORTIE');
+      } catch (_) {
+        /* Retry in Bons. */
+      }
+      if (!mounted) return;
+      message(context, 'Sortie confirmée pour le camion ${visit.plate}.');
+      final visitId = visit.id;
+      final pdfBytes = outcome?.bytes;
+      setState(() {
+        selectedVisit = null;
+        searchController.clear();
+      });
+      loadVisits();
+
+      if (mounted && pdfBytes != null) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BonPdfScreen(
+              bytes: pdfBytes,
+              kind: 'SORTIE',
+              visitId: visitId,
+              autoPrint: true,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) message(context, 'Sortie refusée : $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> cancelTruck(TruckVisit visit) async {
+    if (reasonController.text.trim().length < 5) {
+      message(context, 'Motif d’annulation de 5 caractères minimum requis.');
+      return;
+    }
+    setState(() => busy = true);
+    try {
+      await widget.repository.cancel(visit.id, reasonController.text.trim());
+      if (!mounted) return;
+      message(context, 'Visite annulée avec trace.');
+      setState(() {
+        selectedVisit = null;
+        searchController.clear();
+        reasonController.clear();
+      });
+      loadVisits();
+    } catch (e) {
+      if (mounted) message(context, 'Annulation refusée : $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  void showCancelDialog(BuildContext context, TruckVisit v) {
+    reasonController.clear();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Annuler la visite (${v.plate})'),
+        content: TextField(
+          controller: reasonController,
+          decoration: const InputDecoration(
+            labelText: 'Motif d’annulation (requis)',
+            hintText: '5 caractères minimum',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Retour'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () {
+              Navigator.pop(ctx);
+              cancelTruck(v);
+            },
+            child: const Text('Confirmer l’annulation'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget infoTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool isHighlighted = false,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: const Color(0xff075a8d)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11, color: Color(0xff64748b), fontWeight: FontWeight.w500)),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: isHighlighted ? 17 : 14,
+                  fontWeight: isHighlighted ? FontWeight.bold : FontWeight.w600,
+                  color: isHighlighted ? const Color(0xff063e66) : const Color(0xff1e293b),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        loadVisits();
+        await visitsFuture;
+      },
+      child: FutureBuilder<List<TruckVisit>>(
+        future: visitsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                ListTile(
+                  title: Text('Erreur : ${snapshot.error}'),
+                  trailing: IconButton(icon: const Icon(Icons.refresh), onPressed: loadVisits),
+                ),
+              ],
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final insideVisits = (snapshot.data ?? []).where((v) => v.isInside).toList();
+          final query = searchController.text.trim().toUpperCase();
+
+          List<TruckVisit> matches = [];
+          if (query.isNotEmpty) {
+            matches = insideVisits.where((v) {
+              final plate = v.plate.toUpperCase();
+              final cont = v.container?.toUpperCase() ?? '';
+              final book = v.booking?.toUpperCase() ?? '';
+              return plate.contains(query) || cont.contains(query) || book.contains(query);
+            }).toList();
+          }
+
+          TruckVisit? activeVisit = selectedVisit;
+          if (activeVisit != null && !insideVisits.any((v) => v.id == activeVisit!.id)) {
+            activeVisit = null;
+          }
+          if (activeVisit == null && matches.length == 1) {
+            activeVisit = matches.first;
+          }
+
+          return ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 20, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 8),
+                    const Text('Validation de la sortie',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, size: 20),
+                      tooltip: 'Actualiser',
+                      onPressed: loadVisits,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Search field
+              Card(
+                elevation: 1,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: searchController,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [UpperCaseFormatter()],
+                        decoration: InputDecoration(
+                          labelText: 'Plaque ou Conteneur *',
+                          hintText: 'Ex: 12345-A-06 ou CSQU3054383',
+                          prefixIcon: const Icon(Icons.search, size: 22),
+                          suffixIcon: searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 20),
+                                tooltip: 'Effacer la recherche',
+                                onPressed: () {
+                                  searchController.clear();
+                                  setState(() => selectedVisit = null);
+                                },
+                              )
+                            : null,
+                        ),
+                        onChanged: (_) => setState(() => selectedVisit = null),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // State 1: Search query is empty -> DO NOT show truck list upfront
+              if (query.isEmpty)
+                Card(
+                  elevation: 0,
+                  color: const Color(0xfff8fafc),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+                    child: Column(
+                      children: [
+                        Icon(Icons.search_rounded, size: 48, color: Colors.blueGrey.shade300),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Saisie requise pour valider la sortie',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xff1e293b)),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Saisissez la plaque ou le numéro de conteneur ci-dessus. Les données du camion s’afficheront pour vérification avant la sortie.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 13, color: Color(0xff64748b)),
+                        ),
+                        const SizedBox(height: 16),
+                        Chip(
+                          avatar: const Icon(Icons.local_shipping, size: 16, color: Color(0xff075a8d)),
+                          label: Text(
+                            insideVisits.isEmpty
+                              ? 'Aucun camion actuellement sur parc'
+                              : '${insideVisits.length} camion(s) actuellement sur parc',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xff075a8d)),
+                          ),
+                          backgroundColor: const Color(0xffe7f3ff),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+
+              // State 2: Query entered, but no matching inside truck found
+              else if (matches.isEmpty)
+                Card(
+                  color: const Color(0xfffff5f5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Color(0xfffed7d7)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, size: 40, color: Colors.redAccent),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Aucun camion actif trouvé pour "$query"',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xff9b2c2c)),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Vérifiez la plaque d’immatriculation ou le numéro de conteneur. Seuls les camions entrés et non encore sortis sont éligibles.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: Color(0xff742a2a)),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+
+              // State 3: Multiple matches found and none selected yet
+              else if (activeVisit == null && matches.length > 1)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                      child: Text(
+                        '${matches.length} camions correspondent à "$query" : choisissez le camion',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xff334155)),
+                      ),
+                    ),
+                    for (final v in matches)
+                      Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: const Icon(Icons.local_shipping, color: Color(0xff075a8d)),
+                          title: Text(v.plate, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('${v.container ?? v.booking ?? 'Sans conteneur'} · ${v.armateur} · ${v.iso}'),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () => setState(() => selectedVisit = v),
+                        ),
+                      ),
+                  ],
+                )
+
+              // State 4: Truck matched or selected -> Full verification card & exit action
+              else if (activeVisit != null)
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Verification header badge
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xffe7f3ff),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.verified_user, size: 16, color: Color(0xff075a8d)),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Données du camion à vérifier',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xff075a8d)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (matches.length > 1)
+                              TextButton.icon(
+                                style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                onPressed: () => setState(() => selectedVisit = null),
+                                icon: const Icon(Icons.swap_horiz, size: 16),
+                                label: const Text('Changer', style: TextStyle(fontSize: 12)),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // 1. Truck visual & status (like Entrée)
+                        Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xfff8fafc),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              TruckScene(
+                                kind: activeVisit.entryKind == 'loaded' ? 'loaded' : 'empty',
+                                height: 65,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      activeVisit.entryKind == 'loaded' ? 'Camion avec conteneur' : 'Camion sans conteneur (Vide)',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Arrivée : ${activeVisit.enteredAt.toLocal().toString().substring(0, 16)}',
+                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // 2. Plaque d'immatriculation
+                        infoTile(
+                          icon: Icons.pin_outlined,
+                          label: 'Plaque d’immatriculation',
+                          value: activeVisit.plate,
+                          isHighlighted: true,
+                        ),
+                        const Divider(height: 16),
+
+                        // 3. CIN Chauffeur
+                        infoTile(
+                          icon: Icons.badge_outlined,
+                          label: 'CIN chauffeur',
+                          value: activeVisit.cin.isNotEmpty ? activeVisit.cin : '—',
+                        ),
+                        const Divider(height: 16),
+
+                        // 4. Numéro de Conteneur ou Booking
+                        infoTile(
+                          icon: activeVisit.container != null ? Icons.inventory_2_outlined : Icons.receipt_long,
+                          label: activeVisit.container != null ? 'Numéro de conteneur' : 'Booking / Ordre libre',
+                          value: activeVisit.container ?? activeVisit.booking ?? '—',
+                          isHighlighted: activeVisit.container != null,
+                        ),
+                        const Divider(height: 16),
+
+                        // 5. Code ISO & Armateur
+                        Row(
+                          children: [
+                            Expanded(
+                              child: infoTile(
+                                icon: Icons.qr_code,
+                                label: 'Code ISO',
+                                value: activeVisit.iso,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: infoTile(
+                                icon: Icons.business,
+                                label: 'Armateur',
+                                value: activeVisit.armateur,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // 6. Action Button: Valider la sortie du camion
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xff168846),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: busy ? null : () => exitTruck(activeVisit!),
+                          icon: busy
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.exit_to_app, size: 22),
+                          label: Text(
+                            busy ? 'Validation de la sortie…' : 'Valider la sortie du camion',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+
+                        // 7. Option Annulation (Admin)
+                        if (widget.canCancel) ...[
+                          const SizedBox(height: 10),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+                            onPressed: busy ? null : () => showCancelDialog(context, activeVisit!),
+                            icon: const Icon(Icons.cancel_outlined, size: 18),
+                            label: const Text('Annuler cette visite (Admin)'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
 
 class BonPdfScreen extends StatefulWidget {

@@ -15,26 +15,68 @@ class QueueFixture extends PointageRepository {
   @override Future<List<TruckVisit>> visits({bool insideOnly = true}) async => [];
 }
 
+class QueueFixtureWithTrucks extends PointageRepository {
+  QueueFixtureWithTrucks(this.mockVisits) : super(SupabaseClient('https://example.supabase.co', 'publishable-test-key',
+      authOptions: const AuthClientOptions(autoRefreshToken: false)));
+  final List<TruckVisit> mockVisits;
+  @override Future<List<String>> roles() async => ['entree', 'sortie'];
+  @override Future<List<OperatorRecord>> operators() async =>
+      [const OperatorRecord('MAE', 'Maersk', 'MAEU')];
+  @override Future<List<TruckVisit>> visits({bool insideOnly = true}) async => mockVisits;
+}
+
 void main() {
-  testWidgets('operator can navigate Entrée, Engin and Sortie; empty booking replaces ISO boxes',
+  testWidgets('operator navigates Entrée and Sortie directly; Sortie requires search before verification',
       (tester) async {
-    final repository = QueueFixture();
+    final sampleVisit = TruckVisit(
+      id: 'test-visit-1',
+      plate: '12345-A-06',
+      cin: 'AB123456',
+      entryKind: 'loaded',
+      container: 'CSQU3054383',
+      booking: null,
+      iso: '45G1',
+      armateur: 'MAE',
+      enteredAt: DateTime.now(),
+      enginAt: null,
+      exitedAt: null,
+      canceledAt: null,
+    );
+    final repository = QueueFixtureWithTrucks([sampleVisit]);
     await tester.pumpWidget(MaterialApp(home: PointageShell(repository: repository)));
     await tester.pumpAndSettle();
+
     expect(find.text('Enregistrement de l’entrée'), findsOneWidget);
     expect(tester.widgetList<TextField>(find.byType(TextField))
         .where((field) => field.maxLength == 1).length, 11);
-    await tester.ensureVisible(find.text('Sans conteneur'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Sans conteneur'));
-    await tester.pumpAndSettle();
-    expect(find.text('Booking / ordre libre *'), findsOneWidget);
-    await tester.tap(find.text('Engin'));
-    await tester.pumpAndSettle();
-    expect(find.text('Engin · dépose / prise'), findsOneWidget);
+
+    // Engin is hidden from header
+    expect(find.text('Engin'), findsNothing);
+
+    // Navigate to Sortie
     await tester.tap(find.text('Sortie'));
     await tester.pumpAndSettle();
-    expect(find.text('Sortie · tous les camions présents'), findsOneWidget);
+
+    expect(find.text('Validation de la sortie'), findsOneWidget);
+    expect(find.text('Plaque ou Conteneur *'), findsOneWidget);
+
+    // Without search, truck details are not shown upfront
+    expect(find.text('Saisie requise pour valider la sortie'), findsOneWidget);
+    expect(find.text('Données du camion à vérifier'), findsNothing);
+
+    // Enter plate or container in search
+    await tester.enterText(find.widgetWithText(TextFormField, 'Plaque ou Conteneur *'), '12345');
+    await tester.pumpAndSettle();
+
+    // Verification card is now displayed
+    expect(find.text('Données du camion à vérifier'), findsOneWidget);
+    expect(find.text('12345-A-06'), findsOneWidget);
+    expect(find.text('AB123456'), findsOneWidget);
+    expect(find.text('CSQU3054383'), findsOneWidget);
+    expect(find.text('45G1'), findsOneWidget);
+    expect(find.text('MAE'), findsOneWidget);
+    expect(find.text('Valider la sortie du camion'), findsOneWidget);
+
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

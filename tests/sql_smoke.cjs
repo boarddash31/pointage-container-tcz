@@ -43,7 +43,18 @@ try{await db.query("select public.enter_truck('9876','EF12345','empty',null,'BK'
 denied=false;try{await db.query('select public.resolve_forced_action($1,$2)',[forcedId,'FORBIDDEN'])}catch(e){denied=/admin required/.test(e.message)}assert.ok(denied,'viewer must not reconcile forced actions');
 denied=false;try{await db.query('select public.register_observed_container($1,$2,$3)',[observed.rows[0].number,'42G1','MAE'])}
 catch(e){denied=/admin required/.test(e.message)}assert.ok(denied,'viewer must not register containers');
-await db.exec('set role authenticated');let visible=await db.query('select count(*) n from public.armateurs');assert.equal(Number(visible.rows[0].n),95);denied=false;try{await db.query("insert into public.armateurs(id,name) values('BAD','BAD')")}catch(e){denied=true}assert.ok(denied,'client table write must be denied');console.log('PASS: migrations, 95 operators, checksum, lifecycle, stock, audit, documents, forced pickup/reconciliation, role denial and RLS role');
+await db.exec(fs.readFileSync('supabase/migrations/202610200003_allow_direct_exit.sql','utf8'));
+await db.exec(`set request.jwt.claim.sub='${actor}'`);
+const directCont = await db.query("select 'MSCU123456'||d::text as number from generate_series(0,9) d where public.valid_container_number('MSCU123456'||d::text) limit 1");
+let directVisit = await db.query("select public.enter_truck('DIR-01','EF999999','loaded',$1,null,'45G1','MAE') id", [directCont.rows[0].number]);
+const directId = directVisit.rows[0].id;
+await db.query('select public.exit_truck($1)', [directId]);
+let directRow = await db.query('select engin_at, exited_at from public.truck_visits where id=$1', [directId]);
+assert.ok(directRow.rows[0].engin_at, 'direct exit should auto-set engin_at');
+assert.ok(directRow.rows[0].exited_at, 'direct exit should set exited_at');
+let directStock = await db.query('select count(*) n from public.container_stock_intervals where container_number=$1 and departed_at is null', [directCont.rows[0].number]);
+assert.equal(Number(directStock.rows[0].n), 1, 'stock interval should be created on direct exit');
+await db.exec('set role authenticated');let visible=await db.query('select count(*) n from public.armateurs');assert.equal(Number(visible.rows[0].n),95);denied=false;try{await db.query("insert into public.armateurs(id,name) values('BAD','BAD')")}catch(e){denied=true}assert.ok(denied,'client table write must be denied');console.log('PASS: migrations, 95 operators, checksum, lifecycle, stock, audit, documents, forced pickup/reconciliation, direct exit, role denial and RLS role');
 }catch(e){console.error('ERROR',e);process.exitCode=1}finally{await db.close()}})();
 
 

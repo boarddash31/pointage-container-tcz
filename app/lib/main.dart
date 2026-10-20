@@ -273,8 +273,6 @@ class _PointageShellState extends State<PointageShell> {
         switch(process){
           0=>allowed('entree')?EntryScreen(repository:repo,canCorrect:admin)
               :const PermissionScreen(role:'Entrée'),
-          1=>allowed('engin')?EnginScreen(repository:repo,canCancel:admin)
-              :const PermissionScreen(role:'Engin'),
           _=>allowed('sortie')?ExitScreen(repository:repo,canCancel:admin)
               :const PermissionScreen(role:'Sortie'),
         },
@@ -294,13 +292,13 @@ class _PointageShellState extends State<PointageShell> {
           title:section==0
             ? Container(
                 height:38,
-                constraints:const BoxConstraints(maxWidth:340),
+                constraints:const BoxConstraints(maxWidth:240),
                 padding:const EdgeInsets.all(3),
                 decoration:BoxDecoration(
                   color:Colors.black.withValues(alpha:0.25),
                   borderRadius:BorderRadius.circular(9)),
                 child:Row(children:[
-                  for(var i=0;i<3;i++)
+                  for(var i=0;i<2;i++)
                     Expanded(child:InkWell(
                       borderRadius:BorderRadius.circular(7),
                       onTap:()=>setState(()=>process=i),
@@ -309,7 +307,7 @@ class _PointageShellState extends State<PointageShell> {
                         decoration:BoxDecoration(
                           color:process==i?Colors.white:Colors.transparent,
                           borderRadius:BorderRadius.circular(7)),
-                        child:Text(['Entrée','Engin','Sortie'][i],
+                        child:Text(['Entrée','Sortie'][i],
                           style:TextStyle(
                             fontSize:13,
                             fontWeight:process==i?FontWeight.bold:FontWeight.w500,
