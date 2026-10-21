@@ -132,8 +132,25 @@ class LoginScreen extends StatefulWidget {
 }
 class _LoginScreenState extends State<LoginScreen> {
   final email = TextEditingController(), password = TextEditingController();
+  final passwordFocus = FocusNode();
+  String? selectedProfile;
   bool busy = false; String? error, notice;
-  @override void dispose() { email.dispose(); password.dispose(); super.dispose(); }
+  static const quickProfiles = [
+    ('Admin', 'dahhaknouamane@gmail.com', Icons.admin_panel_settings_outlined),
+    ('Entrée', 'dahhaknouamane+tcz-entree@gmail.com', Icons.login_rounded),
+    ('Sortie', 'dahhaknouamane+tcz-sortie@gmail.com', Icons.logout_rounded),
+  ];
+  void chooseProfile(String label, String address) {
+    setState(() {
+      selectedProfile = label;
+      email.text = address;
+      password.clear();
+      error = null;
+      notice = null;
+    });
+    passwordFocus.requestFocus();
+  }
+  @override void dispose() { email.dispose(); password.dispose(); passwordFocus.dispose(); super.dispose(); }
   Future<void> signIn() async {
     final targetEmail = email.text.trim();
     final targetPassword = password.text;
@@ -179,11 +196,27 @@ class _LoginScreenState extends State<LoginScreen> {
       const SizedBox(height:14),
       Text('Pointage Container',textAlign:TextAlign.center,style:Theme.of(context).textTheme.headlineMedium),
       const Text('Terminal TCZ · Connexion agent',textAlign:TextAlign.center),
-      const SizedBox(height:28),
+      const SizedBox(height:22),
+      const Text('Accès rapide',textAlign:TextAlign.center,
+        style:TextStyle(fontWeight:FontWeight.w700,color:Color(0xff17324d))),
+      const SizedBox(height:8),
+      Wrap(alignment:WrapAlignment.center,spacing:8,runSpacing:8,children:[
+        for(final profile in quickProfiles)
+          ChoiceChip(
+            label:Text(profile.$1),avatar:Icon(profile.$3,size:18),
+            selected:selectedProfile==profile.$1,
+            onSelected:busy?null:(_)=>chooseProfile(profile.$1,profile.$2)),
+      ]),
+      const SizedBox(height:8),
+      const Text('Choisissez votre poste, puis saisissez votre mot de passe.',
+        textAlign:TextAlign.center,style:TextStyle(fontSize:12,color:Color(0xff49677e))),
+      const SizedBox(height:20),
       TextField(controller:email,keyboardType:TextInputType.emailAddress,
+        onChanged:(_){if(selectedProfile!=null)setState(()=>selectedProfile=null);},
         decoration:const InputDecoration(labelText:'E-mail professionnel')),
       const SizedBox(height:12),
-      TextField(controller:password,obscureText:true,onSubmitted:(_)=>signIn(),
+      TextField(controller:password,focusNode:passwordFocus,
+        obscureText:true,onSubmitted:(_)=>signIn(),
         decoration:const InputDecoration(labelText:'Mot de passe')),
       if(error!=null) Padding(padding:const EdgeInsets.only(top:12),
         child:Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error))),
