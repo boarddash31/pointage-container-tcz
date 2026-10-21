@@ -85,18 +85,13 @@ class _EntryScreenState extends State<EntryScreen> {
   final focus2=List.generate(11,(_)=>FocusNode());
   List<OperatorRecord> operators=[];
   OperatorRecord? operator, operator2;
-  String iso='45G1', iso2='22G1', kind='loaded';
+  String iso='', iso2='', kind='loaded';
   bool isTwin=false, busy=false;
   String? lookupHint, lookupHint2;
   void selectGateMode(String selectedKind, bool selectedTwin) {
     setState(() {
       kind = selectedKind;
       isTwin = selectedTwin;
-      if (selectedTwin) {
-        iso = '22G1';
-        iso2 = '22G1';
-        operator2 ??= operator;
-      }
     });
   }
   @override void initState(){super.initState();loadOperators();}
@@ -106,10 +101,6 @@ class _EntryScreenState extends State<EntryScreen> {
       if(mounted){
         setState((){
           operators=records;
-          if(operator==null&&records.isNotEmpty){
-            operator=records.where((o)=>o.id=='MAE').firstOrNull??records.first;
-            operator2=operator;
-          }
         });
       }
     }catch(_){
@@ -119,10 +110,6 @@ class _EntryScreenState extends State<EntryScreen> {
           final list=(jsonDecode(raw) as List).map((x)=>OperatorRecord.fromJson(x)).toList();
           setState((){
             operators=list;
-            if(operator==null&&list.isNotEmpty){
-              operator=list.where((o)=>o.id=='MAE').firstOrNull??list.first;
-              operator2=operator;
-            }
           });
         }
       }catch(_){ if(mounted)message(context,'Catalogue des armateurs indisponible.'); }
@@ -240,6 +227,10 @@ class _EntryScreenState extends State<EntryScreen> {
   Future<void> submit() async {
     if(!form.currentState!.validate())return;
     if(operator==null){message(context,'Choisissez un armateur.');return;}
+    if(iso.trim().isEmpty || !RegExp(r'^[0-9A-Z]{4}$').hasMatch(iso.trim())){
+      message(context,'Code ISO requis (4 caractères, ex: 22G1, 45G1).');
+      return;
+    }
     if(kind=='loaded'){
       if(number.length < 11){
         message(context,'Veuillez saisir les 11 caractères du numéro de conteneur.');
@@ -268,6 +259,10 @@ class _EntryScreenState extends State<EntryScreen> {
           }
           return;
         }
+        if(iso2.trim().isEmpty || !RegExp(r'^[0-9A-Z]{4}$').hasMatch(iso2.trim())){
+          message(context,'Code ISO requis pour le 2ème conteneur Twin.');
+          return;
+        }
         if(operator2==null){
           message(context,'Choisissez l’armateur du 2ème conteneur Twin.');
           return;
@@ -278,12 +273,12 @@ class _EntryScreenState extends State<EntryScreen> {
     try{
       final visitId=await widget.repository.enter(
         plate:TruckPlate.format(plate.text),cin:cin.text.trim(),kind:kind,
-        iso:iso,armateur:operator!.id,
+        iso:iso.trim(),armateur:operator!.id,
         containerNumber:kind=='loaded'?number:null,
         booking:kind=='empty'?booking.text.trim():null,
         isTwin:isTwin,
         containerNumber2:(isTwin&&kind=='loaded')?number2:null,
-        iso2:isTwin?iso2:null,
+        iso2:isTwin?iso2.trim():null,
         armateur2:isTwin?(operator2?.id??operator!.id):null,
         booking2:(isTwin&&kind=='empty')?booking2.text.trim():null,
       );
@@ -301,9 +296,9 @@ class _EntryScreenState extends State<EntryScreen> {
       }
       form.currentState!.reset();for(final c in [plate,cin,booking,booking2,...boxes,...boxes2]){c.clear();}
       setState((){
-        operator=operators.where((o)=>o.id=='MAE').firstOrNull??operators.firstOrNull;
-        operator2=operator;
-        lookupHint=null;lookupHint2=null;kind='loaded';isTwin=false;iso='45G1';iso2='22G1';
+        operator=null;
+        operator2=null;
+        lookupHint=null;lookupHint2=null;kind='loaded';isTwin=false;iso='';iso2='';
       });
       if(mounted && outcome?.bytes != null){
         await Navigator.push(context, MaterialPageRoute(
@@ -768,13 +763,13 @@ class _ExitScreenState extends State<ExitScreen> {
   // Pickup container 1
   final List<TextEditingController> boxes1 = List.generate(11, (_) => TextEditingController());
   final List<FocusNode> focus1 = List.generate(11, (_) => FocusNode());
-  String iso1 = '45G1';
+  String iso1 = '';
   OperatorRecord? operator1;
 
   // Pickup container 2 (Twin)
   final List<TextEditingController> boxes2 = List.generate(11, (_) => TextEditingController());
   final List<FocusNode> focus2 = List.generate(11, (_) => FocusNode());
-  String iso2 = '22G1';
+  String iso2 = '';
   OperatorRecord? operator2;
 
   String get number1 => boxes1.map((c) => c.text).join().toUpperCase();
@@ -819,10 +814,10 @@ class _ExitScreenState extends State<ExitScreen> {
     isDeposited = true;
     isPickedUp = true;
     isTwin = false;
-    iso1 = visit.iso.isNotEmpty ? visit.iso : '45G1';
-    iso2 = '22G1';
-    operator1 = operators.where((o) => o.id == visit.armateur).firstOrNull ?? (operators.isNotEmpty ? operators.first : null);
-    operator2 = operator1;
+    iso1 = visit.iso;
+    iso2 = visit.iso2 ?? '';
+    operator1 = operators.where((o) => o.id == visit.armateur).firstOrNull;
+    operator2 = visit.armateur2 != null ? operators.where((o) => o.id == visit.armateur2).firstOrNull : null;
     for (final b in [...boxes1, ...boxes2]) {
       b.clear();
     }
@@ -909,6 +904,14 @@ class _ExitScreenState extends State<ExitScreen> {
       message(context, isoError);
       return;
     }
+    if (iso1.trim().isEmpty || !RegExp(r'^[0-9A-Z]{4}$').hasMatch(iso1.trim())) {
+      message(context, 'Code ISO requis pour le conteneur 1 (4 caractères, ex: 22G1, 45G1).');
+      return;
+    }
+    if (operator1 == null) {
+      message(context, 'Choisissez l’armateur du conteneur 1.');
+      return;
+    }
     final c1 = number1;
     if (c1.length < 11 || !ContainerNumber.isValid(c1)) {
       final expected = ContainerNumber.expectedCheckDigit(c1);
@@ -928,6 +931,10 @@ class _ExitScreenState extends State<ExitScreen> {
         } else {
           message(context, 'Numéro du 2ème conteneur Twin ISO 6346 invalide (4 lettres + 7 chiffres requis).');
         }
+        return;
+      }
+      if (iso2.trim().isEmpty || !RegExp(r'^[0-9A-Z]{4}$').hasMatch(iso2.trim())) {
+        message(context, 'Code ISO requis pour le 2ème conteneur Twin.');
         return;
       }
       if (operator2 == null) {
@@ -1875,9 +1882,6 @@ class _ExitScreenState extends State<ExitScreen> {
                                     if (sel) {
                                       setState(() {
                                         isTwin = true;
-                                        iso1 = '22G1';
-                                        iso2 = '22G1';
-                                        operator2 ??= operator1;
                                       });
                                     }
                                   },

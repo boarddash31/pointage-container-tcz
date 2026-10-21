@@ -131,7 +131,7 @@ class LoginScreen extends StatefulWidget {
   @override State<LoginScreen> createState() => _LoginScreenState();
 }
 class _LoginScreenState extends State<LoginScreen> {
-  final email = TextEditingController(), password = TextEditingController();
+  final email = TextEditingController(), password = TextEditingController(text: 'AdminTCZ2026!');
   final passwordFocus = FocusNode();
   String? selectedProfile;
   bool busy = false; String? error, notice;
@@ -144,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       selectedProfile = label;
       email.text = address;
-      password.clear();
+      password.text = 'AdminTCZ2026!';
       error = null;
       notice = null;
     });
@@ -285,6 +285,27 @@ class _LoginScreenState extends State<LoginScreen> {
                   label: const Text('Sortie 1-clic', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xffc5d9e8)),
+              ),
+              child: const Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  Icon(Icons.key, size: 14, color: Color(0xff075a8d)),
+                  Text('Mot de passe test :', style: TextStyle(fontSize: 11, color: Color(0xff475569))),
+                  SelectableText('AdminTCZ2026!',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xff0f172a))),
+                ],
+              ),
             ),
             const SizedBox(height: 6),
             const Text('Connexion instantanée en 1 clic sans saisie de mot de passe',

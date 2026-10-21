@@ -3,10 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pointage_container/main.dart';
 
 void main() {
-  testWidgets('quick access selects Admin, Entrée and Sortie without storing a password', (tester) async {
+  testWidgets('quick access selects Admin, Entrée and Sortie with test password', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
     final emailField = find.widgetWithText(TextField, 'E-mail professionnel');
     final passwordField = find.widgetWithText(TextField, 'Mot de passe');
+    expect(find.widgetWithText(SelectableText, 'AdminTCZ2026!'), findsOneWidget);
     for(final profile in [
       ('Admin','dahhaknouamane@gmail.com'),
       ('Entrée','dahhaknouamane+tcz-entree@gmail.com'),
@@ -17,7 +18,7 @@ void main() {
       await tester.tap(find.text(profile.$1));
       await tester.pump();
       expect(tester.widget<TextField>(emailField).controller!.text,profile.$2);
-      expect(tester.widget<TextField>(passwordField).controller!.text,isEmpty);
+      expect(tester.widget<TextField>(passwordField).controller!.text,'AdminTCZ2026!');
       expect(tester.widget<TextField>(passwordField).focusNode!.hasFocus,isTrue);
     }
   });
