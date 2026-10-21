@@ -85,6 +85,8 @@ class _EntryScreenState extends State<EntryScreen> {
   final focus2=List.generate(11,(_)=>FocusNode());
   List<OperatorRecord> operators=[];
   OperatorRecord? operator, operator2;
+  final isoController = TextEditingController();
+  final iso2Controller = TextEditingController();
   String iso='', iso2='', kind='loaded';
   bool isTwin=false, busy=false;
   String? lookupHint, lookupHint2;
@@ -115,7 +117,7 @@ class _EntryScreenState extends State<EntryScreen> {
       }catch(_){ if(mounted)message(context,'Catalogue des armateurs indisponible.'); }
     }
   }
-  @override void dispose(){for(final c in [plate,cin,booking,booking2,...boxes,...boxes2]){c.dispose();}
+  @override void dispose(){for(final c in [plate,cin,booking,booking2,isoController,iso2Controller,...boxes,...boxes2]){c.dispose();}
     for(final f in [plateFocus,bookingFocus,bookingFocus2,...focus,...focus2]){f.dispose();}
     modeScrollController.dispose();super.dispose();}
   void focusGateField(int index){
@@ -134,6 +136,7 @@ class _EntryScreenState extends State<EntryScreen> {
       if(row==null){if(mounted)setState(()=>lookupHint='Conteneur absent du référentiel : vérification en zone requise.');return;}
       setState((){
         iso=row['iso_code'] as String;
+        isoController.text=iso;
         operator=operators.where((o)=>o.id==row['armateur_id']).firstOrNull??operator;
         lookupHint='ISO et armateur repris du référentiel.';
       });
@@ -148,6 +151,7 @@ class _EntryScreenState extends State<EntryScreen> {
       if(row==null){if(mounted)setState(()=>lookupHint2='Conteneur absent du référentiel : vérification en zone requise.');return;}
       setState((){
         iso2=row['iso_code'] as String;
+        iso2Controller.text=iso2;
         operator2=operators.where((o)=>o.id==row['armateur_id']).firstOrNull??operator2;
         lookupHint2='ISO et armateur repris du référentiel.';
       });
@@ -294,7 +298,7 @@ class _EntryScreenState extends State<EntryScreen> {
       }catch(error){
         if(mounted)message(context,'Entrée enregistrée. Bon PDF à réessayer dans Bons : $error');
       }
-      form.currentState!.reset();for(final c in [plate,cin,booking,booking2,...boxes,...boxes2]){c.clear();}
+      form.currentState!.reset();for(final c in [plate,cin,booking,booking2,isoController,iso2Controller,...boxes,...boxes2]){c.clear();}
       setState((){
         operator=null;
         operator2=null;
@@ -593,7 +597,8 @@ class _EntryScreenState extends State<EntryScreen> {
                       if(lookupHint!=null) Padding(padding:const EdgeInsets.only(top:6),
                         child:Text(lookupHint!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
                       const SizedBox(height:10),
-                      TextFormField(key:ValueKey('iso1-$iso'), initialValue:iso,
+                      TextFormField(
+                        controller: isoController,
                         decoration:const InputDecoration(
                           labelText:'Code ISO Conteneur 1 *',
                           helperText:'Ex: 22G1',
@@ -601,7 +606,10 @@ class _EntryScreenState extends State<EntryScreen> {
                         ),
                         maxLength:4, textCapitalization:TextCapitalization.characters,
                         inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                        onChanged:(v)=>setState(()=>iso=v.toUpperCase()),
+                        onChanged:(v){
+                          iso = v.trim().toUpperCase();
+                          setState((){});
+                        },
                         validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
                       const SizedBox(height:8),
                       OutlinedButton.icon(
@@ -617,7 +625,7 @@ class _EntryScreenState extends State<EntryScreen> {
                     final second=Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xfff8fafc),
+                       color: const Color(0xfff8fafc),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.blueGrey.shade200),
                     ),
@@ -637,7 +645,8 @@ class _EntryScreenState extends State<EntryScreen> {
                       if(lookupHint2!=null) Padding(padding:const EdgeInsets.only(top:6),
                         child:Text(lookupHint2!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
                       const SizedBox(height:10),
-                      TextFormField(key:ValueKey('iso2-$iso2'), initialValue:iso2,
+                      TextFormField(
+                        controller: iso2Controller,
                         decoration:const InputDecoration(
                           labelText:'Code ISO Conteneur 2 *',
                           helperText:'Ex: 22G1',
@@ -645,7 +654,10 @@ class _EntryScreenState extends State<EntryScreen> {
                         ),
                         maxLength:4, textCapitalization:TextCapitalization.characters,
                         inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                        onChanged:(v)=>setState(()=>iso2=v.toUpperCase()),
+                        onChanged:(v){
+                          iso2 = v.trim().toUpperCase();
+                          setState((){});
+                        },
                         validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
                       const SizedBox(height:8),
                       OutlinedButton.icon(
@@ -679,7 +691,8 @@ class _EntryScreenState extends State<EntryScreen> {
                     child:Text(lookupHint!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
                   const SizedBox(height:14),
                   // 5. Code ISO
-                  TextFormField(key:ValueKey(iso), initialValue:iso,
+                  TextFormField(
+                    controller: isoController,
                     decoration:const InputDecoration(
                       labelText:'Code ISO *',
                       helperText:'4 caractères alphanumériques (ex: 22G1, 45G1, 45R1)',
@@ -688,7 +701,10 @@ class _EntryScreenState extends State<EntryScreen> {
                     maxLength:4, textCapitalization:TextCapitalization.characters,
                     inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
                     readOnly:!widget.canCorrect&&lookupHint=='ISO et armateur repris du référentiel.',
-                    onChanged:(v)=>setState(()=>iso=v.toUpperCase()),
+                    onChanged:(v){
+                      iso = v.trim().toUpperCase();
+                      setState((){});
+                    },
                     validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
                   const SizedBox(height:12),
                   // 6. Armateur
@@ -722,7 +738,7 @@ class _EntryScreenState extends State<EntryScreen> {
 
 class UpperCaseFormatter extends TextInputFormatter {
   @override TextEditingValue formatEditUpdate(TextEditingValue oldValue,TextEditingValue newValue)=>
-    newValue.copyWith(text:newValue.text.toUpperCase());
+    newValue.copyWith(text:newValue.text.toUpperCase(), selection:newValue.selection);
 }
 
 class EnginScreen extends StatefulWidget {
@@ -763,12 +779,14 @@ class _ExitScreenState extends State<ExitScreen> {
   // Pickup container 1
   final List<TextEditingController> boxes1 = List.generate(11, (_) => TextEditingController());
   final List<FocusNode> focus1 = List.generate(11, (_) => FocusNode());
+  final iso1Controller = TextEditingController();
   String iso1 = '';
   OperatorRecord? operator1;
 
   // Pickup container 2 (Twin)
   final List<TextEditingController> boxes2 = List.generate(11, (_) => TextEditingController());
   final List<FocusNode> focus2 = List.generate(11, (_) => FocusNode());
+  final iso2Controller = TextEditingController();
   String iso2 = '';
   OperatorRecord? operator2;
 
@@ -786,6 +804,8 @@ class _ExitScreenState extends State<ExitScreen> {
   void dispose() {
     searchController.dispose();
     reasonController.dispose();
+    iso1Controller.dispose();
+    iso2Controller.dispose();
     for (final c in [...boxes1, ...boxes2]) {
       c.dispose();
     }
@@ -815,7 +835,9 @@ class _ExitScreenState extends State<ExitScreen> {
     isPickedUp = true;
     isTwin = false;
     iso1 = visit.iso;
+    iso1Controller.text = iso1;
     iso2 = visit.iso2 ?? '';
+    iso2Controller.text = iso2;
     operator1 = operators.where((o) => o.id == visit.armateur).firstOrNull;
     operator2 = visit.armateur2 != null ? operators.where((o) => o.id == visit.armateur2).firstOrNull : null;
     for (final b in [...boxes1, ...boxes2]) {
@@ -1924,8 +1946,7 @@ class _ExitScreenState extends State<ExitScreen> {
                                   exitContainerBoxes(second: false),
                                   const SizedBox(height: 10),
                                   TextFormField(
-                                    key: ValueKey('iso1-$iso1'),
-                                    initialValue: iso1,
+                                    controller: iso1Controller,
                                     decoration: InputDecoration(
                                       labelText: 'Code ISO Conteneur 1 *',
                                       helperText: 'ISO réservé : ${activeVisit.iso} · même longueur requise',
@@ -1934,7 +1955,10 @@ class _ExitScreenState extends State<ExitScreen> {
                                     maxLength: 4,
                                     textCapitalization: TextCapitalization.characters,
                                     inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                                    onChanged: (v) => iso1 = v.toUpperCase(),
+                                    onChanged: (v) {
+                                      iso1 = v.trim().toUpperCase();
+                                      setState(() {});
+                                    },
                                   ),
                                   const SizedBox(height: 8),
                                   OutlinedButton.icon(
@@ -1974,8 +1998,7 @@ class _ExitScreenState extends State<ExitScreen> {
                                     exitContainerBoxes(second: true),
                                     const SizedBox(height: 10),
                                     TextFormField(
-                                      key: ValueKey('iso2-$iso2'),
-                                      initialValue: iso2,
+                                      controller: iso2Controller,
                                       decoration: const InputDecoration(
                                         labelText: 'Code ISO Conteneur 2 *',
                                         helperText: 'Ex: 22G1',
@@ -1984,7 +2007,10 @@ class _ExitScreenState extends State<ExitScreen> {
                                       maxLength: 4,
                                       textCapitalization: TextCapitalization.characters,
                                       inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                                      onChanged: (v) => iso2 = v.toUpperCase(),
+                                      onChanged: (v) {
+                                        iso2 = v.trim().toUpperCase();
+                                        setState(() {});
+                                      },
                                     ),
                                     const SizedBox(height: 8),
                                     OutlinedButton.icon(
