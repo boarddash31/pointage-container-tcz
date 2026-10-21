@@ -90,3 +90,10 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 - Added migration 20261020162717_gate_out_iso_length_check to TCZ through ZENATA. Pickup checks compare the original visit length code against submitted ISO, registered container ISO and open stock ISO before any upsert or movement. Twin pickups require two 20-foot containers; missing pickup details are rejected unless a previous Engin movement already completed. Empty cancellation and loaded deposit remain available.
 - Added matching Flutter validation and reserved-ISO guidance. This checks container length, allowing different heights/types of the same length (for example 42G1 and 45G1 are both 40-foot).
 - Eleven Flutter tests pass. Extended isolated database tests cover both mismatch directions, false ISO declarations, second twin mismatch, missing pickup, unchanged records after failure, valid same-length pickups, valid twins and empty cancellation. A live rolled-back authenticated test confirmed that a 20-foot visit rejects a 40-foot pickup.
+
+## Gate truck visual and role separation update (2026-10-21)
+
+- Added a responsive truck preview for Entrée and queue/action cards. It renders a dark container label with container number (or `?` when not yet entered), ISO code and armateur/line; Twin mode renders two labels side-by-side.
+- Added Moroccan truck plate validation and normalization (`12345-A-06`, with scanner-friendly `12345A06` input). Invalid plate formats are rejected before the Entrée RPC.
+- Role enforcement already scopes the shell and backend RPCs: an account with `entree` sees Entrée, an account with `sortie` sees Sortie, and an admin can assign either role from Admin > Profils. Separate one-click test accounts still need to be created in Supabase Auth and assigned their single role.
+- Tests: full Flutter suite 13 tests passed; `flutter analyze --no-pub` completed with the existing six style infos and no errors.

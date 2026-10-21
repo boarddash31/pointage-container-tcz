@@ -9,19 +9,35 @@ import '../data/freepool_export.dart';
 import '../data/pointage_repository.dart';
 import '../domain/container_number.dart';
 import '../domain/container_iso.dart';
+import '../domain/truck_plate.dart';
 
 void message(BuildContext context,String text) => ScaffoldMessenger.of(context)
   ..hideCurrentSnackBar()..showSnackBar(SnackBar(content:Text(text)));
 
 class TruckScene extends StatelessWidget {
-  const TruckScene({super.key,required this.kind,this.height=125});
+  const TruckScene({super.key,required this.kind,this.height=125,
+    this.containerNumber,this.iso,this.operator,this.containerNumber2,this.iso2,
+    this.operator2,this.showUnknown=false});
   final String kind; final double height;
-  @override Widget build(BuildContext context) => Semantics(
-    label:switch(kind){'loaded'=>'Camion avec conteneur sur châssis',
-      'depose'=>'Conteneur posé au sol à côté du camion vide',
-      'prise'=>'Conteneur chargé sur le châssis du camion',
-      _=>'Camion sans conteneur'},
-    child:Image.asset('assets/truck-$kind.png',height:height,fit:BoxFit.contain));
+  final String? containerNumber,iso,operator,containerNumber2,iso2,operator2;
+  final bool showUnknown;
+  Widget _label(String? number,String? code,String? line,{required bool twin})=>Container(
+    width:twin?126:160,padding:const EdgeInsets.symmetric(horizontal:7,vertical:5),
+    decoration:BoxDecoration(color:const Color(0xff102a43).withValues(alpha:.94),borderRadius:BorderRadius.circular(7),border:Border.all(color:const Color(0xff6ee7b7))),
+    child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
+      Text(number?.trim().isNotEmpty==true?number!:(showUnknown?'?':'Conteneur'),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,fontSize:11,fontWeight:FontWeight.w800)),
+      Text('ISO ${code?.isNotEmpty==true?code:'—'}',style:const TextStyle(color:Color(0xffb9f6ca),fontSize:10,fontWeight:FontWeight.w600)),
+      Text(line?.isNotEmpty==true?line!:'Ligne —',maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white70,fontSize:9)),
+    ]));
+  @override Widget build(BuildContext context){
+    final hasContainer=showUnknown||kind=='loaded'||kind=='prise', twin=containerNumber2!=null||iso2!=null||operator2!=null;
+    return Semantics(label:switch(kind){'loaded'=>'Camion avec conteneur sur châssis','depose'=>'Conteneur posé au sol à côté du camion vide','prise'=>'Conteneur chargé sur le châssis du camion',_=>'Camion sans conteneur'},
+      child:SizedBox(height:height,child:Stack(alignment:Alignment.center,children:[
+        Image.asset('assets/truck-$kind.png',height:height,fit:BoxFit.contain),
+        if(hasContainer&&twin) Positioned(top:height*.08,right:2,child:Row(mainAxisSize:MainAxisSize.min,children:[_label(containerNumber,iso,operator,twin:true),const SizedBox(width:3),_label(containerNumber2,iso2,operator2,twin:true)]))
+        else if(hasContainer&&(containerNumber!=null||iso!=null||operator!=null||showUnknown)) Positioned(top:height*.08,right:4,child:_label(containerNumber,iso,operator,twin:false)),
+      ])));
+  }
 }
 
 Future<OperatorRecord?> showOperatorPicker(BuildContext context, List<OperatorRecord> operators) async {
@@ -267,7 +283,7 @@ class _EntryScreenState extends State<EntryScreen> {
     setState(()=>busy=true);
     try{
       final visitId=await widget.repository.enter(
-        plate:plate.text.trim(),cin:cin.text.trim(),kind:kind,
+        plate:TruckPlate.format(plate.text),cin:cin.text.trim(),kind:kind,
         iso:iso,armateur:operator!.id,
         containerNumber:kind=='loaded'?number:null,
         booking:kind=='empty'?booking.text.trim():null,
@@ -521,6 +537,10 @@ class _EntryScreenState extends State<EntryScreen> {
                     },
                   )),
                 ]),
+                const SizedBox(height:10),
+                TruckScene(kind:kind,height:isTwin?122:105,containerNumber:kind=='loaded'?number:null,
+                  iso:kind=='loaded'?iso:null,operator:operator?.id,containerNumber2:isTwin&&kind=='loaded'?number2:null,
+                  iso2:isTwin?iso2:null,operator2:isTwin?operator2?.id:null,showUnknown:true),
                 const SizedBox(height:14),
 
                 // 2. Plaque camion
@@ -530,7 +550,9 @@ class _EntryScreenState extends State<EntryScreen> {
                     hintText:'Ex: 12345-A-1',
                     prefixIcon:Icon(Icons.pin, size:20),
                   ),
-                  validator:(v)=>(v?.trim().length??0)<2?'Plaque requise':null),
+                  inputFormatters:[FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z -]')),UpperCaseFormatter()],
+                  onEditingComplete:(){plate.text=TruckPlate.format(plate.text);FocusScope.of(context).nextFocus();},
+                  validator:(v)=>TruckPlate.isValid(v??'')?null:'Format marocain requis : 12345-A-06'),
                 const SizedBox(height:12),
 
                 // 3. CIN chauffeur
