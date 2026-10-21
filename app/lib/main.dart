@@ -75,7 +75,8 @@ class _AuthGateState extends State<AuthGate> {
     if(recoveryFlow || auth.currentUser?.userMetadata?['must_set_password']==true){
       return PasswordSetupScreen(onComplete: () => setState(() => recoveryFlow = false));
     }
-    return PointageShell(repository: PointageRepository(Supabase.instance.client));
+    return PointageShell(key: ValueKey(auth.currentUser!.id),
+      repository: PointageRepository(Supabase.instance.client));
   }
 }
 
@@ -133,11 +134,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final email = TextEditingController(), password = TextEditingController();
   bool busy = false; String? error, notice;
   @override void dispose() { email.dispose(); password.dispose(); super.dispose(); }
-  Future<void> signIn([String? customEmail, String? customPassword]) async {
-    final targetEmail = (customEmail ?? email.text).trim();
-    final targetPassword = customPassword ?? password.text;
-    if (customEmail != null) email.text = customEmail;
-    if (customPassword != null) password.text = customPassword;
+  Future<void> signIn() async {
+    final targetEmail = email.text.trim();
+    final targetPassword = password.text;
     setState(() { busy=true; error=null; notice=null; });
     try {
       await Supabase.instance.client.auth.signInWithPassword(
@@ -194,45 +193,9 @@ class _LoginScreenState extends State<LoginScreen> {
       FilledButton(onPressed:busy?null:()=>signIn(),child:Text(busy?'Connexion…':'Se connecter')),
       TextButton(onPressed:busy?null:requestRecovery,
         child:const Text('Mot de passe oublié ?')),
-      const SizedBox(height:6),
-      Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          OutlinedButton.icon(
-            onPressed: busy ? null : () => signIn('dahhaknouamane@gmail.com', 'AdminTCZ2026!'),
-            icon: const Icon(Icons.admin_panel_settings, size: 16),
-            label: const Text('Accès Admin 1-clic', style: TextStyle(fontSize: 12)),
-          ),
-          OutlinedButton.icon(
-            onPressed: busy ? null : () => signIn('agent@tcz.ma', 'AgentTCZ2026!'),
-            icon: const Icon(Icons.badge, size: 16),
-            label: const Text('Accès Agent 1-clic', style: TextStyle(fontSize: 12)),
-          ),
-        ],
-      ),
       const SizedBox(height:10),
-      Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: const Color(0xfff0f6fa),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xffd5e3ed)),
-        ),
-        child: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Comptes de test préconfigurés :',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xff075a8d))),
-            SizedBox(height: 3),
-            Text('• Admin : dahhaknouamane@gmail.com / AdminTCZ2026!',
-                style: TextStyle(fontSize: 11, color: Color(0xff334155))),
-            Text('• Agent : agent@tcz.ma / AgentTCZ2026!',
-                style: TextStyle(fontSize: 11, color: Color(0xff334155))),
-          ],
-        ),
-      ),
+      const Text('Utilisez le compte et le rôle attribués par votre administrateur.',
+        textAlign:TextAlign.center,style:TextStyle(fontSize:12,color:Color(0xff49677e))),
       if(kIsWeb) Padding(padding:const EdgeInsets.only(top:10),
         child:TextButton.icon(onPressed:()=>launchUrl(
           Uri.base.resolve('downloads/pointage-tcz.apk'),
@@ -268,9 +231,11 @@ class _PointageShellState extends State<PointageShell> {
       }
       final admin=roles.contains('admin');
       bool allowed(String role)=>admin||roles.contains(role);
+      final canEnter=allowed('entree'),canExit=allowed('sortie');
+      final activeProcess=canEnter&&canExit?process:(canEnter?0:1);
       final repo=widget.repository;
       final screens=<Widget>[
-        switch(process){
+        switch(activeProcess){
           0=>allowed('entree')?EntryScreen(repository:repo,canCorrect:admin)
               :const PermissionScreen(role:'Entrée'),
           _=>allowed('sortie')?ExitScreen(repository:repo,canCancel:admin)
@@ -290,7 +255,7 @@ class _PointageShellState extends State<PointageShell> {
           titleSpacing:8,
           centerTitle:true,
           title:section==0
-            ? Container(
+            ? (canEnter&&canExit?Container(
                 height:38,
                 constraints:const BoxConstraints(maxWidth:240),
                 padding:const EdgeInsets.all(3),
@@ -305,15 +270,15 @@ class _PointageShellState extends State<PointageShell> {
                       child:Container(
                         alignment:Alignment.center,
                         decoration:BoxDecoration(
-                          color:process==i?Colors.white:Colors.transparent,
+                          color:activeProcess==i?Colors.white:Colors.transparent,
                           borderRadius:BorderRadius.circular(7)),
                         child:Text(['Entrée','Sortie'][i],
                           style:TextStyle(
                             fontSize:13,
-                            fontWeight:process==i?FontWeight.bold:FontWeight.w500,
-                            color:process==i?const Color(0xff063e66):Colors.white)),
+                            fontWeight:activeProcess==i?FontWeight.bold:FontWeight.w500,
+                            color:activeProcess==i?const Color(0xff063e66):Colors.white)),
                       ))),
-                ]))
+                ])):Text(canEnter?'Entrée':'Sortie'))
             : Text(section==1?'Data · Référentiel':'Bons · Documents'),
           backgroundColor:const Color(0xff063e66),foregroundColor:Colors.white,
           actions:[

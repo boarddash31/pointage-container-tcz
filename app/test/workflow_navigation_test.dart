@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pointage_container/data/pointage_repository.dart';
 import 'package:pointage_container/main.dart';
 import 'package:pointage_container/ui/pointage_screens.dart';
+import 'package:pointage_container/ui/truck_diagram.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class QueueFixture extends PointageRepository {
@@ -25,7 +26,27 @@ class QueueFixtureWithTrucks extends PointageRepository {
   @override Future<List<TruckVisit>> visits({bool insideOnly = true}) async => mockVisits;
 }
 
+class SingleRoleFixture extends QueueFixture {
+  SingleRoleFixture(this.role);
+  final String role;
+  @override Future<List<String>> roles() async => [role];
+}
+
 void main() {
+  testWidgets('single-role agents open only their permitted gate', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: PointageShell(key: const ValueKey('sortie'),
+      repository: SingleRoleFixture('sortie'))));
+    await tester.pumpAndSettle();
+    expect(find.text('Validation de la sortie'), findsOneWidget);
+    expect(find.text('Enregistrement de l’entrée'), findsNothing);
+    await tester.pumpWidget(MaterialApp(home: PointageShell(key: const ValueKey('entree'),
+      repository: SingleRoleFixture('entree'))));
+    await tester.pumpAndSettle();
+    expect(find.text('Enregistrement de l’entrée'), findsOneWidget);
+    expect(find.text('Validation de la sortie'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('operator navigates Entrée and Sortie directly; Sortie requires search before verification',
       (tester) async {
     final sampleVisit = TruckVisit(
@@ -116,15 +137,49 @@ void main() {
     ))));
     await tester.pumpAndSettle();
 
-    expect(find.text('1 Conteneur (Mono)'), findsOneWidget);
-    expect(find.text('Twin (2 x 20\')'), findsOneWidget);
+    expect(find.text('Avec 1 conteneur'), findsOneWidget);
+    expect(find.text('Avec 2 conteneurs'), findsOneWidget);
+    expect(find.text('Sans · 1 à prendre'), findsOneWidget);
+    expect(find.text('Sans · 2 à prendre'), findsOneWidget);
 
     // Switch to Twin mode
-    await tester.tap(find.text('Twin (2 x 20\')'));
+    await tester.tap(find.byKey(const ValueKey('gate-loaded-true')));
     await tester.pumpAndSettle();
 
     expect(find.text('Premier Conteneur (20\')'), findsOneWidget);
     expect(find.text('Deuxième Conteneur (20\') · Compagnie différente autorisée'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('gate-empty-true')));
+    await tester.pumpAndSettle();
+    expect(find.text('Booking Conteneur 1 *'), findsOneWidget);
+    expect(find.text('Booking Conteneur 2 *'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('truck picture takes the operator to the plate and container fields', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: EntryScreen(
+      repository: QueueFixture(), canCorrect: false))));
+    await tester.pumpAndSettle();
+    final preview = find.byWidgetPredicate((widget) =>
+      widget is TruckScene && widget.onContainerTap != null);
+    Future<void> touch(double x, double y) async {
+      await tester.ensureVisible(preview);
+      await tester.pumpAndSettle();
+      final size = tester.getSize(preview);
+      final origin = tester.getTopLeft(preview);
+      final scale = size.width / 300 < size.height / 120
+        ? size.width / 300 : size.height / 120;
+      await tester.tapAt(origin + Offset((size.width - 300 * scale) / 2 + x * scale,
+        (size.height - 120 * scale) / 2 + y * scale));
+      await tester.pump();
+    }
+    await touch(35, 82);
+    final plateField = tester.widget<TextField>(find.descendant(
+      of: find.widgetWithText(TextFormField, 'Plaque camion *'),
+      matching: find.byType(TextField)));
+    expect(plateField.focusNode!.hasFocus, isTrue);
+    await touch(130, 50);
+    expect(plateField.focusNode!.hasFocus, isFalse);
+    expect(tester.binding.focusManager.primaryFocus?.hasFocus, isTrue);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

@@ -10,35 +10,10 @@ import '../data/pointage_repository.dart';
 import '../domain/container_number.dart';
 import '../domain/container_iso.dart';
 import '../domain/truck_plate.dart';
+import 'truck_diagram.dart';
 
 void message(BuildContext context,String text) => ScaffoldMessenger.of(context)
   ..hideCurrentSnackBar()..showSnackBar(SnackBar(content:Text(text)));
-
-class TruckScene extends StatelessWidget {
-  const TruckScene({super.key,required this.kind,this.height=125,
-    this.containerNumber,this.iso,this.operator,this.containerNumber2,this.iso2,
-    this.operator2,this.showUnknown=false});
-  final String kind; final double height;
-  final String? containerNumber,iso,operator,containerNumber2,iso2,operator2;
-  final bool showUnknown;
-  Widget _label(String? number,String? code,String? line,{required bool twin})=>Container(
-    width:twin?126:160,padding:const EdgeInsets.symmetric(horizontal:7,vertical:5),
-    decoration:BoxDecoration(color:const Color(0xff102a43).withValues(alpha:.94),borderRadius:BorderRadius.circular(7),border:Border.all(color:const Color(0xff6ee7b7))),
-    child:Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
-      Text(number?.trim().isNotEmpty==true?number!:(showUnknown?'?':'Conteneur'),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,fontSize:11,fontWeight:FontWeight.w800)),
-      Text('ISO ${code?.isNotEmpty==true?code:'—'}',style:const TextStyle(color:Color(0xffb9f6ca),fontSize:10,fontWeight:FontWeight.w600)),
-      Text(line?.isNotEmpty==true?line!:'Ligne —',maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white70,fontSize:9)),
-    ]));
-  @override Widget build(BuildContext context){
-    final hasContainer=showUnknown||kind=='loaded'||kind=='prise', twin=containerNumber2!=null||iso2!=null||operator2!=null;
-    return Semantics(label:switch(kind){'loaded'=>'Camion avec conteneur sur châssis','depose'=>'Conteneur posé au sol à côté du camion vide','prise'=>'Conteneur chargé sur le châssis du camion',_=>'Camion sans conteneur'},
-      child:SizedBox(height:height,child:Stack(alignment:Alignment.center,children:[
-        Image.asset('assets/truck-$kind.png',height:height,fit:BoxFit.contain),
-        if(hasContainer&&twin) Positioned(top:height*.08,right:2,child:Row(mainAxisSize:MainAxisSize.min,children:[_label(containerNumber,iso,operator,twin:true),const SizedBox(width:3),_label(containerNumber2,iso2,operator2,twin:true)]))
-        else if(hasContainer&&(containerNumber!=null||iso!=null||operator!=null||showUnknown)) Positioned(top:height*.08,right:4,child:_label(containerNumber,iso,operator,twin:false)),
-      ])));
-  }
-}
 
 Future<OperatorRecord?> showOperatorPicker(BuildContext context, List<OperatorRecord> operators) async {
   var query = '';
@@ -102,6 +77,8 @@ class _EntryScreenState extends State<EntryScreen> {
   final form=GlobalKey<FormState>();
   final plate=TextEditingController(),cin=TextEditingController(),booking=TextEditingController();
   final booking2=TextEditingController();
+  final plateFocus=FocusNode(),bookingFocus=FocusNode(),bookingFocus2=FocusNode();
+  final modeScrollController=ScrollController();
   final boxes=List.generate(11,(_)=>TextEditingController());
   final focus=List.generate(11,(_)=>FocusNode());
   final boxes2=List.generate(11,(_)=>TextEditingController());
@@ -111,6 +88,17 @@ class _EntryScreenState extends State<EntryScreen> {
   String iso='45G1', iso2='22G1', kind='loaded';
   bool isTwin=false, busy=false;
   String? lookupHint, lookupHint2;
+  void selectGateMode(String selectedKind, bool selectedTwin) {
+    setState(() {
+      kind = selectedKind;
+      isTwin = selectedTwin;
+      if (selectedTwin) {
+        iso = '22G1';
+        iso2 = '22G1';
+        operator2 ??= operator;
+      }
+    });
+  }
   @override void initState(){super.initState();loadOperators();}
   Future<void> loadOperators() async {
     try{
@@ -141,7 +129,13 @@ class _EntryScreenState extends State<EntryScreen> {
     }
   }
   @override void dispose(){for(final c in [plate,cin,booking,booking2,...boxes,...boxes2]){c.dispose();}
-    for(final f in [...focus,...focus2]){f.dispose();}super.dispose();}
+    for(final f in [plateFocus,bookingFocus,bookingFocus2,...focus,...focus2]){f.dispose();}
+    modeScrollController.dispose();super.dispose();}
+  void focusGateField(int index){
+    final target=kind=='loaded'?(index==0?focus[0]:focus2[0]):
+      (index==0?bookingFocus:bookingFocus2);
+    target.requestFocus();
+  }
   String get number=>boxes.map((x)=>x.text).join().toUpperCase();
   String get number2=>boxes2.map((x)=>x.text).join().toUpperCase();
   Future<void> lookup() async {
@@ -409,7 +403,7 @@ class _EntryScreenState extends State<EntryScreen> {
                     f[i+1].requestFocus();
                   } else {
                     FocusScope.of(context).unfocus();
-                    if(second) lookup2(); else lookup();
+                    if(second) { lookup2(); } else { lookup(); }
                   }}
                 },
               )),
@@ -441,7 +435,7 @@ class _EntryScreenState extends State<EntryScreen> {
               onPressed: () {
                 b[10].text = expected.toString();
                 setState(() {});
-                if(second) lookup2(); else lookup();
+                if(second) { lookup2(); } else { lookup(); }
               },
             ),
           ],
@@ -460,7 +454,7 @@ class _EntryScreenState extends State<EntryScreen> {
               onPressed: () {
                 b[10].text = expected.toString();
                 setState(() {});
-                if(second) lookup2(); else lookup();
+                if(second) { lookup2(); } else { lookup(); }
               },
             ),
           ],
@@ -492,65 +486,75 @@ class _EntryScreenState extends State<EntryScreen> {
             child:Column(
               crossAxisAlignment:CrossAxisAlignment.stretch,
               children:[
-                // 1. État du camion (images & icônes en premier)
-                Row(children:[for(final value in ['loaded','empty'])
-                  Expanded(child:Padding(padding:const EdgeInsets.all(4),child:InkWell(
-                    borderRadius:BorderRadius.circular(12),onTap:()=>setState(()=>kind=value),
-                    child:Container(decoration:BoxDecoration(color:kind==value?const Color(0xffe7f3ff):Colors.white,
-                      border:Border.all(color:kind==value?Theme.of(context).colorScheme.primary:Colors.grey.shade300, width:kind==value?2:1),
-                      borderRadius:BorderRadius.circular(12)),padding:const EdgeInsets.symmetric(horizontal:6, vertical:6),
-                      child:Column(children:[
-                        TruckScene(kind:value, height:65),
-                        const SizedBox(height:4),
-                        Row(mainAxisAlignment:MainAxisAlignment.center, children:[
-                          Icon(kind==value?Icons.check_circle:Icons.radio_button_unchecked,
-                            size:16, color:kind==value?Theme.of(context).colorScheme.primary:Colors.grey),
-                          const SizedBox(width:5),
-                          Text(value=='loaded'?'Avec conteneur':'Sans conteneur',
-                            style:TextStyle(fontWeight:kind==value?FontWeight.bold:FontWeight.w500, fontSize:13)),
-                        ]),
-                      ]))))),]),
-                const SizedBox(height:12),
-
-                // 1b. Mode Conteneur (Mono 1 conteneur vs Twin 2x20')
-                Row(children: [
-                  Expanded(child: ChoiceChip(
-                    avatar: Icon(!isTwin ? Icons.check_circle : Icons.circle_outlined, size: 16),
-                    label: const Text('1 Conteneur (Mono)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    selected: !isTwin,
-                    onSelected: (sel) { if (sel) setState(() => isTwin = false); },
-                  )),
-                  const SizedBox(width: 8),
-                  Expanded(child: ChoiceChip(
-                    avatar: Icon(isTwin ? Icons.check_circle : Icons.circle_outlined, size: 16),
-                    label: const Text('Twin (2 x 20\')', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    selected: isTwin,
-                    onSelected: (sel) {
-                      if (sel) {
-                        setState(() {
-                          isTwin = true;
-                          iso = '22G1';
-                          iso2 = '22G1';
-                          operator2 ??= operator;
-                        });
-                      }
-                    },
-                  )),
-                ]),
+                // Four physical truck states at the gate.
+                const Text('État du camion à l’arrivée',
+                  style:TextStyle(fontWeight:FontWeight.w700)),
+                const SizedBox(height:8),
+                SizedBox(height:150,child:Scrollbar(
+                  controller:modeScrollController,thumbVisibility:true,
+                  child:SingleChildScrollView(
+                    controller:modeScrollController,
+                    scrollDirection:Axis.horizontal,
+                    child:Row(children:[
+                    for(final option in [
+                      ('loaded',false,'Avec 1 conteneur'),
+                      ('loaded',true,'Avec 2 conteneurs'),
+                      ('empty',false,'Sans · 1 à prendre'),
+                      ('empty',true,'Sans · 2 à prendre'),
+                    ])
+                      Padding(padding:const EdgeInsets.only(right:8,bottom:10),child:InkWell(
+                        key:ValueKey('gate-${option.$1}-${option.$2}'),
+                        borderRadius:BorderRadius.circular(12),
+                        onTap:()=>selectGateMode(option.$1,option.$2),
+                        child:Container(width:170,
+                          padding:const EdgeInsets.all(7),
+                          decoration:BoxDecoration(
+                            color:kind==option.$1&&isTwin==option.$2
+                              ?const Color(0xffe7f3ff):Colors.white,
+                            border:Border.all(color:kind==option.$1&&isTwin==option.$2
+                              ?Theme.of(context).colorScheme.primary:Colors.grey.shade300,
+                              width:kind==option.$1&&isTwin==option.$2?2:1),
+                            borderRadius:BorderRadius.circular(12)),
+                          child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
+                            TruckScene(kind:option.$1,isTwin:option.$2,
+                              width:150,height:70,plate:plate.text,
+                              showUnknown:true),
+                            const SizedBox(height:4),
+                            Text(option.$3,textAlign:TextAlign.center,
+                              style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700)),
+                          ]),
+                        ),
+                      )),
+                    ]),
+                  ),
+                )),
+                const Padding(padding:EdgeInsets.only(top:3),
+                  child:Text('← Glissez pour voir les 4 états →',
+                    style:TextStyle(fontSize:11,color:Color(0xff49677e)))),
                 const SizedBox(height:10),
-                TruckScene(kind:kind,height:isTwin?122:105,containerNumber:kind=='loaded'?number:null,
-                  iso:kind=='loaded'?iso:null,operator:operator?.id,containerNumber2:isTwin&&kind=='loaded'?number2:null,
-                  iso2:isTwin?iso2:null,operator2:isTwin?operator2?.id:null,showUnknown:true),
+                TruckScene(kind:kind,isTwin:isTwin,width:double.infinity,
+                  height:isTwin?122:105,plate:plate.text,
+                  containerNumber:kind=='loaded'?number:null,
+                  iso:iso,operator:operator?.id,
+                  containerNumber2:isTwin&&kind=='loaded'?number2:null,
+                  iso2:isTwin?iso2:null,operator2:isTwin?operator2?.id:null,
+                  booking:kind=='empty'?booking.text:null,
+                  booking2:kind=='empty'&&isTwin?booking2.text:null,
+                  showUnknown:true,highlightMissing:true,
+                  onPlateTap:()=>plateFocus.requestFocus(),
+                  onContainerTap:focusGateField),
                 const SizedBox(height:14),
 
                 // 2. Plaque camion
-                TextFormField(controller:plate, textCapitalization:TextCapitalization.characters,
+                TextFormField(controller:plate,focusNode:plateFocus,
+                  textCapitalization:TextCapitalization.characters,
                   decoration:const InputDecoration(
                     labelText:'Plaque camion *',
                     hintText:'Ex: 12345-A-1',
                     prefixIcon:Icon(Icons.pin, size:20),
                   ),
                   inputFormatters:[FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z -]')),UpperCaseFormatter()],
+                  onChanged:(_)=>setState((){}),
                   onEditingComplete:(){plate.text=TruckPlate.format(plate.text);FocusScope.of(context).nextFocus();},
                   validator:(v)=>TruckPlate.isValid(v??'')?null:'Format marocain requis : 12345-A-06'),
                 const SizedBox(height:12),
@@ -579,7 +583,8 @@ class _EntryScreenState extends State<EntryScreen> {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d))),
                       const SizedBox(height: 8),
                       if(kind=='loaded') containerBoxes() else TextFormField(
-                        controller:booking,
+                        controller:booking,focusNode:bookingFocus,
+                        onChanged:(_)=>setState((){}),
                         textCapitalization:TextCapitalization.characters,
                         decoration:const InputDecoration(
                           labelText:'Booking Conteneur 1 *',
@@ -597,7 +602,7 @@ class _EntryScreenState extends State<EntryScreen> {
                         ),
                         maxLength:4, textCapitalization:TextCapitalization.characters,
                         inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                        onChanged:(v)=>iso=v.toUpperCase(),
+                        onChanged:(v)=>setState(()=>iso=v.toUpperCase()),
                         validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
                       const SizedBox(height:8),
                       OutlinedButton.icon(
@@ -623,7 +628,8 @@ class _EntryScreenState extends State<EntryScreen> {
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d))),
                       const SizedBox(height: 8),
                       if(kind=='loaded') containerBoxes(second: true) else TextFormField(
-                        controller:booking2,
+                        controller:booking2,focusNode:bookingFocus2,
+                        onChanged:(_)=>setState((){}),
                         textCapitalization:TextCapitalization.characters,
                         decoration:const InputDecoration(
                           labelText:'Booking Conteneur 2 *',
@@ -641,7 +647,7 @@ class _EntryScreenState extends State<EntryScreen> {
                         ),
                         maxLength:4, textCapitalization:TextCapitalization.characters,
                         inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                        onChanged:(v)=>iso2=v.toUpperCase(),
+                        onChanged:(v)=>setState(()=>iso2=v.toUpperCase()),
                         validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
                       const SizedBox(height:8),
                       OutlinedButton.icon(
@@ -655,7 +661,8 @@ class _EntryScreenState extends State<EntryScreen> {
                 ] else ...[
                   // 4. Numéro de conteneur ou Booking (Mono)
                   if(kind=='loaded') containerBoxes() else TextFormField(
-                    controller:booking,
+                    controller:booking,focusNode:bookingFocus,
+                    onChanged:(_)=>setState((){}),
                     textCapitalization:TextCapitalization.characters,
                     decoration:const InputDecoration(
                       labelText:'Booking / ordre libre *',
@@ -676,7 +683,7 @@ class _EntryScreenState extends State<EntryScreen> {
                     maxLength:4, textCapitalization:TextCapitalization.characters,
                     inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
                     readOnly:!widget.canCorrect&&lookupHint=='ISO et armateur repris du référentiel.',
-                    onChanged:(v)=>iso=v.toUpperCase(),
+                    onChanged:(v)=>setState(()=>iso=v.toUpperCase()),
                     validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
                   const SizedBox(height:12),
                   // 6. Armateur
@@ -1513,7 +1520,15 @@ class _ExitScreenState extends State<ExitScreen> {
                                 kind: activeVisit.entryKind == 'loaded'
                                     ? (isDeposited ? 'empty' : 'loaded')
                                     : (isPickedUp ? 'loaded' : 'empty'),
-                                height: 65,
+                                height: 65, width: 135,
+                                plate: activeVisit.plate,
+                                isTwin: activeVisit.isTwin,
+                                containerNumber: activeVisit.container,
+                                containerNumber2: activeVisit.container2,
+                                iso: activeVisit.iso, iso2: activeVisit.iso2,
+                                operator: activeVisit.armateur,
+                                operator2: activeVisit.armateur2,
+                                showUnknown: true,
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -2165,7 +2180,11 @@ class VisitQueue extends StatelessWidget {
         for(final v in visits)Card(child:InkWell(onTap:()=>open(context,v),
           child:Padding(padding:const EdgeInsets.all(12),child:Row(children:[
             TruckScene(kind:v.needsEngin?(v.entryKind=='loaded'?'loaded':'empty'):
-              (v.entryKind=='loaded'?'empty':'loaded'),height:70),
+              (v.entryKind=='loaded'?'empty':'loaded'),height:70,width:110,
+              plate:v.plate,
+              isTwin:v.isTwin,containerNumber:v.container,containerNumber2:v.container2,
+              iso:v.iso,iso2:v.iso2,operator:v.armateur,operator2:v.armateur2,
+              showUnknown:true),
             const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,
               children:[Text(v.plate,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16)),
                 Text(v.container??v.booking??'—',maxLines:1,overflow:TextOverflow.ellipsis),
@@ -2263,7 +2282,11 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
       Text('${v.armateur} · ${v.iso} · ${v.container??v.booking??''}'),
       const SizedBox(height:12),TruckScene(kind:pending?
         (v.entryKind=='loaded'?'depose':'prise'):
-        (v.entryKind=='loaded'?'empty':'loaded'),height:165),
+        (v.entryKind=='loaded'?'empty':'loaded'),height:165,
+        plate:v.plate,
+        isTwin:v.isTwin,containerNumber:v.container,containerNumber2:v.container2,
+        iso:v.iso,iso2:v.iso2,operator:v.armateur,operator2:v.armateur2,
+        showUnknown:true),
       Text(pending?(v.entryKind=='loaded'?'DÉPOSE · conteneur au sol':'PRISE · conteneur sur châssis'):
         'Engin validé',textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold)),
       const SizedBox(height:14),

@@ -50,8 +50,8 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 
 - Identifié la cause du blocage initial ("enregistrer mkhdamach") :
   1. L'envoi des e-mails Supabase Auth était bloqué par le quota d'envoi du tier gratuit Supabase (`429 over_email_send_rate_limit`), empêchant la réinitialisation du mot de passe admin par e-mail.
-  2. Mots de passe activés et vérifiés directement via l'API Supabase Admin : Admin (`dahhaknouamane@gmail.com` / `AdminTCZ2026!`) et Agent (`agent@tcz.ma` / `AgentTCZ2026!`). Les JWT et accès RLS ont été vérifiés avec succès.
-  3. L'écran de connexion propose désormais des boutons "Accès Admin 1-clic" et "Accès Agent 1-clic", ainsi qu'un encadré rappelant les identifiants de test.
+  2. Comptes de test admin et agent activés via l'API Supabase Admin ; les JWT et accès RLS ont été vérifiés. Les anciens mots de passe ayant été publiés dans le code et l'historique Git, leur rotation est obligatoire avant usage en production.
+  3. Les anciens boutons d'accès en un clic et les identifiants affichés sur la page de connexion ont été retirés du code courant.
 - Résolution des blocages sur l'enregistrement de l'entrée (`EntryScreen`) :
   - Support du collage du numéro de conteneur complet (bouton "Coller" dédié et raccourci Ctrl+V / Cmd+V) distribuant les 11 caractères dans les cases respectives.
   - Calcul dynamique du chiffre de contrôle ISO 6346 (`ContainerNumber.expectedCheckDigit`) avec suggestion en temps réel ("Appliquer X" dès que 10 caractères sont saisis, badge vert "Numéro ISO 6346 conforme et vérifié", ou "Corriger en X" en cas d'erreur de saisie).
@@ -97,3 +97,10 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 - Added Moroccan truck plate validation and normalization (`12345-A-06`, with scanner-friendly `12345A06` input). Invalid plate formats are rejected before the Entrée RPC.
 - Role enforcement already scopes the shell and backend RPCs: an account with `entree` sees Entrée, an account with `sortie` sees Sortie, and an admin can assign either role from Admin > Profils. Separate one-click test accounts still need to be created in Supabase Auth and assigned their single role.
 - Tests: full Flutter suite 13 tests passed; `flutter analyze --no-pub` completed with the existing six style infos and no errors.
+
+## Truck diagram release (2026-10-21)
+
+- Entrée now offers four horizontally scrolling truck choices: loaded mono/twin and empty mono/twin. A live diagram draws each container or empty slot above the chassis. Loaded containers are red with white number, ISO and line text; the truck plate appears on the cab. Missing required container details receive a yellow outline. Tapping the cab or either slot focuses the relevant form field.
+- Single-role agents land directly on their permitted gate. Removed public one-click credential buttons and passwords from the current web and mobile code and this document. Previously published bundles and Git history exposed those credentials, so both Supabase Auth passwords still require rotation; removal from code alone is insufficient.
+- Flutter analyze passed without issues; all 15 tests passed. Release script built the signed Android APK and production Flutter Web output. APK SHA-256: `b26b86a261f210b16fa09d09d0d46fd69ddb36bb7054e710535189863af4e696`.
+- Authenticated end-to-end operation, private PDF output, archive writing and physical printing remain unverified. Do not mark production acceptance complete until these checks and credential rotation pass.
