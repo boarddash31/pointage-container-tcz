@@ -143,11 +143,15 @@ void main() {
     expect(find.text('Sans · 2 à prendre'), findsOneWidget);
 
     // Switch to Twin mode
+    await tester.ensureVisible(find.byKey(const ValueKey('gate-loaded-true')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('gate-loaded-true')));
     await tester.pumpAndSettle();
 
     expect(find.text('Premier Conteneur (20\')'), findsOneWidget);
     expect(find.text('Deuxième Conteneur (20\') · Compagnie différente autorisée'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('gate-empty-true')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('gate-empty-true')));
     await tester.pumpAndSettle();
     expect(find.text('Booking Conteneur 1 *'), findsOneWidget);
@@ -180,6 +184,39 @@ void main() {
     await touch(130, 50);
     expect(plateField.focusNode!.hasFocus, isFalse);
     expect(tester.binding.focusManager.primaryFocus?.hasFocus, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Twin container forms are side by side on web and stacked on mobile', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1200, 1000);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: EntryScreen(
+      repository: QueueFixture(), canCorrect: false))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('gate-loaded-true')));
+    await tester.pumpAndSettle();
+    final first = find.text("Premier Conteneur (20')");
+    final second = find.text("Deuxième Conteneur (20') · Compagnie différente autorisée");
+    final left = tester.getTopLeft(first);
+    final right = tester.getTopLeft(second);
+    expect(right.dx, greaterThan(left.dx + 300));
+    expect((right.dy - left.dy).abs(), lessThan(10));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    tester.view.physicalSize = const Size(390, 1000);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: EntryScreen(
+      repository: QueueFixture(), canCorrect: false))));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('gate-loaded-true')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('gate-loaded-true')));
+    await tester.pumpAndSettle();
+    expect((tester.getTopLeft(second).dx - tester.getTopLeft(first).dx).abs(), lessThan(10));
+    expect(tester.getTopLeft(second).dy, greaterThan(tester.getTopLeft(first).dy + 100));
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

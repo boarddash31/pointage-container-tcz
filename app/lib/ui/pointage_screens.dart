@@ -342,8 +342,9 @@ class _EntryScreenState extends State<EntryScreen> {
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(second ? '2ème Conteneur (20\') · ISO 6346 *' : (isTwin ? '1er Conteneur (20\') · ISO 6346 *' : 'Numéro du conteneur · ISO 6346 *'),
-            style: const TextStyle(fontWeight: FontWeight.w700)),
+          Expanded(child:Text(second ? '2ème Conteneur (20\') · ISO 6346 *' : (isTwin ? '1er Conteneur (20\') · ISO 6346 *' : 'Numéro du conteneur · ISO 6346 *'),
+            maxLines:2,overflow:TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w700))),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -472,8 +473,9 @@ class _EntryScreenState extends State<EntryScreen> {
         child:Row(children:[
           Icon(Icons.login, size:20, color:Theme.of(context).colorScheme.primary),
           const SizedBox(width:8),
-          const Text('Enregistrement de l’entrée',
-            style:TextStyle(fontWeight:FontWeight.bold, fontSize:16)),
+          const Expanded(child:Text('Enregistrement de l’entrée',
+            maxLines:2,overflow:TextOverflow.ellipsis,
+            style:TextStyle(fontWeight:FontWeight.bold, fontSize:16))),
         ]),
       ),
       Card(
@@ -490,7 +492,7 @@ class _EntryScreenState extends State<EntryScreen> {
                 const Text('État du camion à l’arrivée',
                   style:TextStyle(fontWeight:FontWeight.w700)),
                 const SizedBox(height:8),
-                SizedBox(height:150,child:Scrollbar(
+                SizedBox(height:180,child:Scrollbar(
                   controller:modeScrollController,thumbVisibility:true,
                   child:SingleChildScrollView(
                     controller:modeScrollController,
@@ -505,8 +507,9 @@ class _EntryScreenState extends State<EntryScreen> {
                       Padding(padding:const EdgeInsets.only(right:8,bottom:10),child:InkWell(
                         key:ValueKey('gate-${option.$1}-${option.$2}'),
                         borderRadius:BorderRadius.circular(12),
-                        onTap:()=>selectGateMode(option.$1,option.$2),
-                        child:Container(width:170,
+                        onTap:kind==option.$1&&isTwin==option.$2
+                          ?null:()=>selectGateMode(option.$1,option.$2),
+                        child:Container(width:260,
                           padding:const EdgeInsets.all(7),
                           decoration:BoxDecoration(
                             color:kind==option.$1&&isTwin==option.$2
@@ -517,8 +520,20 @@ class _EntryScreenState extends State<EntryScreen> {
                             borderRadius:BorderRadius.circular(12)),
                           child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
                             TruckScene(kind:option.$1,isTwin:option.$2,
-                              width:150,height:70,plate:plate.text,
-                              showUnknown:true),
+                              width:240,height:110,plate:plate.text,
+                              containerNumber:kind==option.$1&&isTwin==option.$2&&option.$1=='loaded'?number:null,
+                              iso:kind==option.$1&&isTwin==option.$2?iso:null,
+                              operator:kind==option.$1&&isTwin==option.$2?operator?.id:null,
+                              containerNumber2:kind==option.$1&&isTwin==option.$2&&option.$2&&option.$1=='loaded'?number2:null,
+                              iso2:kind==option.$1&&isTwin==option.$2&&option.$2?iso2:null,
+                              operator2:kind==option.$1&&isTwin==option.$2&&option.$2?operator2?.id:null,
+                              booking:kind==option.$1&&isTwin==option.$2&&option.$1=='empty'?booking.text:null,
+                              booking2:kind==option.$1&&isTwin==option.$2&&option.$2&&option.$1=='empty'?booking2.text:null,
+                              highlightMissing:kind==option.$1&&isTwin==option.$2,
+                              onPlateTap:kind==option.$1&&isTwin==option.$2
+                                ?()=>plateFocus.requestFocus():null,
+                              onContainerTap:kind==option.$1&&isTwin==option.$2
+                                ?focusGateField:null),
                             const SizedBox(height:4),
                             Text(option.$3,textAlign:TextAlign.center,
                               style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700)),
@@ -531,18 +546,6 @@ class _EntryScreenState extends State<EntryScreen> {
                 const Padding(padding:EdgeInsets.only(top:3),
                   child:Text('← Glissez pour voir les 4 états →',
                     style:TextStyle(fontSize:11,color:Color(0xff49677e)))),
-                const SizedBox(height:10),
-                TruckScene(kind:kind,isTwin:isTwin,width:double.infinity,
-                  height:isTwin?122:105,plate:plate.text,
-                  containerNumber:kind=='loaded'?number:null,
-                  iso:iso,operator:operator?.id,
-                  containerNumber2:isTwin&&kind=='loaded'?number2:null,
-                  iso2:isTwin?iso2:null,operator2:isTwin?operator2?.id:null,
-                  booking:kind=='empty'?booking.text:null,
-                  booking2:kind=='empty'&&isTwin?booking2.text:null,
-                  showUnknown:true,highlightMissing:true,
-                  onPlateTap:()=>plateFocus.requestFocus(),
-                  onContainerTap:focusGateField),
                 const SizedBox(height:14),
 
                 // 2. Plaque camion
@@ -571,7 +574,8 @@ class _EntryScreenState extends State<EntryScreen> {
 
                 // 4. Conteneur 1 (ou Mono)
                 if (isTwin) ...[
-                  Container(
+                  LayoutBuilder(builder:(context,space) {
+                    final first=Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: const Color(0xfff8fafc),
@@ -612,11 +616,10 @@ class _EntryScreenState extends State<EntryScreen> {
                         label:Text(operator==null?'Armateur Conteneur 1 *':'${operator!.name} (${operator!.id})',
                           style:const TextStyle(fontWeight:FontWeight.w600))),
                     ]),
-                  ),
-                  const SizedBox(height:14),
+                  );
 
                   // Conteneur 2 (Twin)
-                  Container(
+                    final second=Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: const Color(0xfff8fafc),
@@ -657,7 +660,14 @@ class _EntryScreenState extends State<EntryScreen> {
                         label:Text(operator2==null?'Armateur Conteneur 2 *':'${operator2!.name} (${operator2!.id})',
                           style:const TextStyle(fontWeight:FontWeight.w600))),
                     ]),
-                  ),
+                    );
+                    if(space.maxWidth>=900) {
+                      return Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                        Expanded(child:first),const SizedBox(width:14),Expanded(child:second),
+                      ]);
+                    }
+                    return Column(children:[first,const SizedBox(height:14),second]);
+                  }),
                 ] else ...[
                   // 4. Numéro de conteneur ou Booking (Mono)
                   if(kind=='loaded') containerBoxes() else TextFormField(
