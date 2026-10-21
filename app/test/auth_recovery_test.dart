@@ -31,4 +31,11 @@ void main() {
     expect(find.text('Saisissez votre e-mail professionnel pour recevoir le lien.'),
         findsOneWidget);
   });
+
+  testWidgets('direct 1-click test buttons exist for Admin, Entrée and Sortie', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    expect(find.text('Admin 1-clic'), findsOneWidget);
+    expect(find.text('Entrée 1-clic'), findsOneWidget);
+    expect(find.text('Sortie 1-clic'), findsOneWidget);
+  });
 }

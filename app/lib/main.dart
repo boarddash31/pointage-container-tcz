@@ -150,6 +150,33 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     passwordFocus.requestFocus();
   }
+
+  Future<void> quickSignIn(String label, String address, String pwd) async {
+    setState(() {
+      selectedProfile = label;
+      email.text = address;
+      password.text = pwd;
+      busy = true;
+      error = null;
+      notice = null;
+    });
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: address, password: pwd);
+    } catch (e) {
+      if (mounted) {
+        final raw = e.toString();
+        if (raw.contains('Invalid login credentials')) {
+          setState(() => error = 'Identifiants incorrects.');
+        } else {
+          setState(() => error = raw);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override void dispose() { email.dispose(); password.dispose(); passwordFocus.dispose(); super.dispose(); }
   Future<void> signIn() async {
     final targetEmail = email.text.trim();
@@ -196,9 +223,80 @@ class _LoginScreenState extends State<LoginScreen> {
       const SizedBox(height:14),
       Text('Pointage Container',textAlign:TextAlign.center,style:Theme.of(context).textTheme.headlineMedium),
       const Text('Terminal TCZ · Connexion agent',textAlign:TextAlign.center),
-      const SizedBox(height:22),
-      const Text('Accès rapide',textAlign:TextAlign.center,
-        style:TextStyle(fontWeight:FontWeight.w700,color:Color(0xff17324d))),
+      const SizedBox(height:20),
+
+      // Accès direct 1-clic (Mode Test)
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xfff0f7fb),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xffc5d9e8)),
+        ),
+        child: Column(
+          children: [
+            const Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Icon(Icons.bolt, size: 18, color: Color(0xff075a8d)),
+                SizedBox(width: 4),
+                Text('Accès rapide direct (Mode Test)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d))),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xff063e66),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: busy ? null : () => quickSignIn('Admin', 'dahhaknouamane@gmail.com', 'AdminTCZ2026!'),
+                  icon: const Icon(Icons.admin_panel_settings, size: 16),
+                  label: const Text('Admin 1-clic', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xff168846),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: busy ? null : () => quickSignIn('Entrée', 'dahhaknouamane+tcz-entree@gmail.com', 'AdminTCZ2026!'),
+                  icon: const Icon(Icons.login_rounded, size: 16),
+                  label: const Text('Entrée 1-clic', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xffb45309),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: busy ? null : () => quickSignIn('Sortie', 'dahhaknouamane+tcz-sortie@gmail.com', 'AdminTCZ2026!'),
+                  icon: const Icon(Icons.logout_rounded, size: 16),
+                  label: const Text('Sortie 1-clic', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text('Connexion instantanée en 1 clic sans saisie de mot de passe',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: Color(0xff64748b))),
+          ],
+        ),
+      ),
+      const SizedBox(height: 18),
+
+      const Text('Ou sélection manuelle',textAlign:TextAlign.center,
+        style:TextStyle(fontWeight:FontWeight.w700,color:Color(0xff17324d), fontSize:13)),
       const SizedBox(height:8),
       Wrap(alignment:WrapAlignment.center,spacing:8,runSpacing:8,children:[
         for(final profile in quickProfiles)
@@ -207,10 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
             selected:selectedProfile==profile.$1,
             onSelected:busy?null:(_)=>chooseProfile(profile.$1,profile.$2)),
       ]),
-      const SizedBox(height:8),
-      const Text('Première connexion : saisissez le mot de passe. Ensuite, ce compte reste connecté sur cet appareil.',
-        textAlign:TextAlign.center,style:TextStyle(fontSize:12,color:Color(0xff49677e))),
-      const SizedBox(height:20),
+      const SizedBox(height:14),
       AutofillGroup(child:Column(children:[
         TextField(controller:email,keyboardType:TextInputType.emailAddress,
           autofillHints:const [AutofillHints.username,AutofillHints.email],
