@@ -297,4 +297,35 @@ void main() {
     expect(find.byIcon(Icons.print), findsWidgets);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('Sortie search matches plate without dashes or spaces (e.g. 5262H1 matches 15262-H-1)', (tester) async {
+    final visit = TruckVisit(
+      id: 'visit-test-plate',
+      plate: '15262-H-1',
+      cin: 'AB123456',
+      entryKind: 'loaded',
+      container: 'MSCU9876543',
+      booking: null,
+      iso: '22G1',
+      armateur: 'MAE',
+      enteredAt: DateTime.now(),
+      enginAt: null,
+      exitedAt: null,
+      canceledAt: null,
+    );
+    final repository = QueueFixtureWithTrucks([visit]);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ExitScreen(
+      repository: repository,
+      canCancel: false,
+    ))));
+    await tester.pumpAndSettle();
+
+    // Search without dashes: 5262H1
+    await tester.enterText(find.widgetWithText(TextFormField, 'Plaque ou Conteneur *'), '5262H1');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Données du camion à vérifier'), findsOneWidget);
+    expect(find.text('15262-H-1'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }

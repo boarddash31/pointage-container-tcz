@@ -25,6 +25,8 @@ void main() {
 
   testWidgets('password recovery asks for an email before contacting Auth', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+    final emailField = find.widgetWithText(TextField, 'E-mail professionnel');
+    await tester.enterText(emailField, '');
     await tester.ensureVisible(find.text('Mot de passe oublié ?'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mot de passe oublié ?'));

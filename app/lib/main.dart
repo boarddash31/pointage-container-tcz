@@ -131,9 +131,10 @@ class LoginScreen extends StatefulWidget {
   @override State<LoginScreen> createState() => _LoginScreenState();
 }
 class _LoginScreenState extends State<LoginScreen> {
-  final email = TextEditingController(), password = TextEditingController(text: 'AdminTCZ2026!');
+  final email = TextEditingController(text: 'dahhaknouamane@gmail.com'), password = TextEditingController(text: 'AdminTCZ2026!');
   final passwordFocus = FocusNode();
-  String? selectedProfile;
+  String? selectedProfile = 'Admin';
+  bool obscurePassword = false;
   bool busy = false; String? error, notice;
   static const quickProfiles = [
     ('Admin', 'dahhaknouamane@gmail.com', Icons.admin_panel_settings_outlined),
@@ -335,8 +336,15 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height:12),
         TextField(controller:password,focusNode:passwordFocus,
           autofillHints:const [AutofillHints.password],
-          obscureText:true,onSubmitted:(_)=>signIn(),
-          decoration:const InputDecoration(labelText:'Mot de passe')),
+          obscureText:obscurePassword,onSubmitted:(_)=>signIn(),
+          decoration:InputDecoration(
+            labelText:'Mot de passe',
+            suffixIcon:IconButton(
+              tooltip: obscurePassword ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
+              icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility, size: 20),
+              onPressed: () => setState(() => obscurePassword = !obscurePassword),
+            ),
+          )),
       ])),
       if(error!=null) Padding(padding:const EdgeInsets.only(top:12),
         child:Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error))),

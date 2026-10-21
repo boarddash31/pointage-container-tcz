@@ -1301,15 +1301,29 @@ class _ExitScreenState extends State<ExitScreen> {
 
           final insideVisits = (snapshot.data ?? []).where((v) => v.isInside).toList();
           final query = searchController.text.trim().toUpperCase();
+          final cleanQuery = query.replaceAll(RegExp(r'[^A-Z0-9]'), '');
 
           List<TruckVisit> matches = [];
           if (query.isNotEmpty) {
             matches = insideVisits.where((v) {
               final plate = v.plate.toUpperCase();
+              final cleanPlate = plate.replaceAll(RegExp(r'[^A-Z0-9]'), '');
               final cont = v.container?.toUpperCase() ?? '';
+              final cleanCont = cont.replaceAll(RegExp(r'[^A-Z0-9]'), '');
               final cont2 = v.container2?.toUpperCase() ?? '';
+              final cleanCont2 = cont2.replaceAll(RegExp(r'[^A-Z0-9]'), '');
               final book = v.booking?.toUpperCase() ?? '';
-              return plate.contains(query) || cont.contains(query) || cont2.contains(query) || book.contains(query);
+              final cleanBook = book.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
+              final rawMatch = plate.contains(query) || cont.contains(query) || cont2.contains(query) || book.contains(query);
+              final cleanMatch = cleanQuery.isNotEmpty && (
+                cleanPlate.contains(cleanQuery) ||
+                cleanCont.contains(cleanQuery) ||
+                cleanCont2.contains(cleanQuery) ||
+                cleanBook.contains(cleanQuery)
+              );
+
+              return rawMatch || cleanMatch;
             }).toList();
           }
 
@@ -1360,7 +1374,8 @@ class _ExitScreenState extends State<ExitScreen> {
                         inputFormatters: [UpperCaseFormatter()],
                         decoration: InputDecoration(
                           labelText: 'Plaque ou Conteneur *',
-                          hintText: 'Ex: 12345-A-06 ou CSQU3054383',
+                          hintText: 'Ex: 15262-H-1, 5262H1 ou CSQU3054383',
+                          helperText: 'Recherche libre : tirets et espaces facultatifs (ex: 5262H1)',
                           prefixIcon: const Icon(Icons.search, size: 22),
                           suffixIcon: searchController.text.isNotEmpty
                             ? IconButton(
