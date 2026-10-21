@@ -19,7 +19,6 @@ void main() {
       await tester.pump();
       expect(tester.widget<TextField>(emailField).controller!.text,profile.$2);
       expect(tester.widget<TextField>(passwordField).controller!.text,'AdminTCZ2026!');
-      expect(tester.widget<TextField>(passwordField).focusNode!.hasFocus,isTrue);
     }
   });
 

@@ -144,23 +144,36 @@ class _LoginScreenState extends State<LoginScreen> {
   void chooseProfile(String label, String address) {
     setState(() {
       selectedProfile = label;
-      email.text = address;
-      password.text = 'AdminTCZ2026!';
+      email.value = TextEditingValue(
+        text: address,
+        selection: TextSelection.collapsed(offset: address.length),
+      );
+      password.value = const TextEditingValue(
+        text: 'AdminTCZ2026!',
+        selection: TextSelection.collapsed(offset: 13),
+      );
       error = null;
       notice = null;
     });
-    passwordFocus.requestFocus();
+    FocusScope.of(context).unfocus();
   }
 
   Future<void> quickSignIn(String label, String address, String pwd) async {
     setState(() {
       selectedProfile = label;
-      email.text = address;
-      password.text = pwd;
+      email.value = TextEditingValue(
+        text: address,
+        selection: TextSelection.collapsed(offset: address.length),
+      );
+      password.value = TextEditingValue(
+        text: pwd,
+        selection: TextSelection.collapsed(offset: pwd.length),
+      );
       busy = true;
       error = null;
       notice = null;
     });
+    FocusScope.of(context).unfocus();
     try {
       await Supabase.instance.client.auth.signInWithPassword(
         email: address, password: pwd);
@@ -328,14 +341,12 @@ class _LoginScreenState extends State<LoginScreen> {
             onSelected:busy?null:(_)=>chooseProfile(profile.$1,profile.$2)),
       ]),
       const SizedBox(height:14),
-      AutofillGroup(child:Column(children:[
+      Column(children:[
         TextField(controller:email,keyboardType:TextInputType.emailAddress,
-          autofillHints:const [AutofillHints.username,AutofillHints.email],
           onChanged:(_){if(selectedProfile!=null)setState(()=>selectedProfile=null);},
           decoration:const InputDecoration(labelText:'E-mail professionnel')),
         const SizedBox(height:12),
-        TextField(controller:password,focusNode:passwordFocus,
-          autofillHints:const [AutofillHints.password],
+        TextField(controller:password,
           obscureText:obscurePassword,onSubmitted:(_)=>signIn(),
           decoration:InputDecoration(
             labelText:'Mot de passe',
@@ -345,7 +356,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () => setState(() => obscurePassword = !obscurePassword),
             ),
           )),
-      ])),
+      ]),
       if(error!=null) Padding(padding:const EdgeInsets.only(top:12),
         child:Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error))),
       if(notice!=null) Padding(padding:const EdgeInsets.only(top:12),
