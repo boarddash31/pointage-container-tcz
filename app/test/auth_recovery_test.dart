@@ -12,6 +12,8 @@ void main() {
       ('Entrée','dahhaknouamane+tcz-entree@gmail.com'),
       ('Sortie','dahhaknouamane+tcz-sortie@gmail.com'),
     ]) {
+      await tester.ensureVisible(find.text(profile.$1));
+      await tester.pumpAndSettle();
       await tester.tap(find.text(profile.$1));
       await tester.pump();
       expect(tester.widget<TextField>(emailField).controller!.text,profile.$2);

@@ -117,3 +117,8 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 
 - Restored three prominent login shortcuts for Admin, Entrée and Sortie. Each selects the corresponding email and focuses the password field; it never stores or submits a public password. Agents can still edit the email to use their eventual individual account. A widget test checks all three shortcuts and verifies the password remains blank.
 - The previous password-based one-click login cannot be safely restored because its credentials remain visible in historic public builds. The new invitations must be accepted before the two agent shortcuts can authenticate. Flutter analyze and all 18 tests passed; signed APK and production Web builds succeeded. APK SHA-256: `466f4e0a4becd7725d32dc05247d2dc5a42d55891b29d93d8aa427fd70e4f782`.
+
+## Device sign-in convenience (2026-10-21)
+
+- Supabase Flutter already persists the authenticated session on each device by default, so reopening the app resumes the user's assigned workflow without entering credentials again. Added platform autofill hints for the first sign-in and clarified this on the login screen. The public role shortcuts still require their own credentials; embedding Admin or agent passwords in a public build would give every visitor those roles.
+- Flutter analyze and all 18 tests passed. Signed APK and production Web builds succeeded. APK SHA-256: `3a88be1a082731de14fa1a1ea5af26fd0bc73e89f12f484d0114cff254cc9766`.
