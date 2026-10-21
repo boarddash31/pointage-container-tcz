@@ -4,7 +4,7 @@
     "start_url": ".",
     "display": "standalone",
     "background_color": "#f2f6fa",
-    "theme_color": "#075a8d",
+    "theme_color": "#103c63",
     "description": "Pointage des conteneurs et camions du terminal TCZ.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,

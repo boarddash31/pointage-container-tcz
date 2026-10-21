@@ -33,6 +33,8 @@ async function main() {
     fs.writeFileSync(path.join(out, `${name}.svg`), source);
     await sharp(Buffer.from(source)).resize(name === 'tcz-icon' ? 1024 : 1260).png().toFile(path.join(out, `${name}.png`));
   }
+  fs.mkdirSync(path.join(root,'app/web/brand'),{recursive:true});
+  fs.writeFileSync(path.join(root,'app/web/brand/tcz-logo.svg'),svg());
   const targets = [
     ['app/web/favicon.png', 48],
     ...[192, 512].flatMap(n => [[`app/web/icons/Icon-${n}.png`, n], [`app/web/icons/Icon-maskable-${n}.png`, n]]),

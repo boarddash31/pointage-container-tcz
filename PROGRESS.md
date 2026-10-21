@@ -122,3 +122,10 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 
 - Supabase Flutter already persists the authenticated session on each device by default, so reopening the app resumes the user's assigned workflow without entering credentials again. Added platform autofill hints for the first sign-in and clarified this on the login screen. The public role shortcuts still require their own credentials; embedding Admin or agent passwords in a public build would give every visitor those roles.
 - Flutter analyze and all 18 tests passed. Signed APK and production Web builds succeeded. APK SHA-256: `3a88be1a082731de14fa1a1ea5af26fd0bc73e89f12f484d0114cff254cc9766`.
+
+## TCZ identity and gate illustrations (2026-10-21)
+
+- Created an original navy/cyan TCZ identity with a port crane, suspended container and wave; vector masters and reproducible raster generation are in `app/assets/brand/` and `scripts/generate_brand.cjs`. Applied it to login, the application header, web loading screen, favicon, PWA icons and Android/iOS launcher assets. iOS assets are supplied; no iOS build was run on Windows.
+- Redrew the truck cab, plate, trailer and red corrugated containers. Live container/booking, ISO and line values sit inside the container; empty slots use pale cyan outlines. Required data uses an amber marker and readable prompts. The selected gate card expands, remains in the horizontal row, and scrolls into view. Tap-to-focus and Twin layouts are preserved.
+- Reviewed rendered desktop (1320 px) and mobile (390 px) previews with live plate, container and ISO values. Fixed card overflow; Flutter analyze and all 20 tests passed. Retained the existing character-editing changes already present in the working tree.
+- Release build and publication verification are in progress. This visual update does not establish production-security readiness: the current branch contains pre-existing test-account shortcuts.

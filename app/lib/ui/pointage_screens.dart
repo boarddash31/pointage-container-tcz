@@ -553,6 +553,14 @@ class _EntryScreenState extends State<EntryScreen> {
                           ?null:()=>selectGateMode(option.$1,option.$2),
                         child:AnimatedContainer(
                           duration:const Duration(milliseconds:180),
+                          onEnd:() {
+                            if(kind==option.$1&&isTwin==option.$2&&modeScrollController.hasClients) {
+                              final index=(option.$1=='empty'?2:0)+(option.$2?1:0);
+                              modeScrollController.animateTo(
+                                (index*232.0).clamp(0.0,modeScrollController.position.maxScrollExtent),
+                                duration:const Duration(milliseconds:180),curve:Curves.easeOut);
+                            }
+                          },
                           width:kind==option.$1&&isTwin==option.$2
                             ?(MediaQuery.sizeOf(context).width<600?310:390):224,
                           padding:const EdgeInsets.fromLTRB(12,10,12,8),

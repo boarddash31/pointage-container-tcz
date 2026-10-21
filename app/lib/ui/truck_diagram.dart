@@ -214,7 +214,7 @@ class _TruckPainter extends CustomPainter {
   void _text(Canvas canvas, String value, Rect rect, Color color, double size,
       double offset, {bool bold = false}) {
     var painter = TextPainter(
-      text: TextSpan(text: value, style: TextStyle(color: color, fontSize: size,
+      text: TextSpan(text: value, style: TextStyle(fontFamily:'Roboto',color: color, fontSize: size,
         fontWeight: bold ? FontWeight.w800 : FontWeight.w600)),
       maxLines: 1, ellipsis: '…', textDirection: TextDirection.ltr,
     )..layout(maxWidth: rect.width);
@@ -222,7 +222,7 @@ class _TruckPainter extends CustomPainter {
     while(painter.didExceedMaxLines && size > 5) {
       size -= .5;
       painter=TextPainter(text:TextSpan(text:value,style:TextStyle(
-        color:color,fontSize:size,fontWeight:bold?FontWeight.w800:FontWeight.w600)),
+        fontFamily:'Roboto',color:color,fontSize:size,fontWeight:bold?FontWeight.w800:FontWeight.w600)),
         maxLines:1,ellipsis:'…',textDirection:TextDirection.ltr)..layout(maxWidth:rect.width);
     }
     painter.paint(canvas, Offset(rect.left + (rect.width - painter.width) / 2,
