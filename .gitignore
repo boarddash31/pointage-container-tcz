@@ -19,3 +19,6 @@ app/android/key.properties
 app/web/downloads/*.apk
 supabase/.temp/
 supabase/.branches/
+
+# Local Netlify folder
+.netlify
