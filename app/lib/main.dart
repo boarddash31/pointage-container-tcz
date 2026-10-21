@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'data/pointage_repository.dart';
 import 'ui/pointage_screens.dart';
 import 'ui/admin_screen.dart';
+import 'ui/tcz_brand.dart';
 
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const supabasePublishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
@@ -233,7 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
     constraints: const BoxConstraints(maxWidth: 440),
     child: Card(child: Padding(padding: const EdgeInsets.all(28),child: Column(
       mainAxisSize: MainAxisSize.min,crossAxisAlignment: CrossAxisAlignment.stretch,children: [
-      const Icon(Icons.local_shipping_rounded,size:52,color:Color(0xff075a8d)),
+      const Center(child:TczBrand(width:220)),
       const SizedBox(height:14),
       Text('Pointage Container',textAlign:TextAlign.center,style:Theme.of(context).textTheme.headlineMedium),
       const Text('Terminal TCZ · Connexion agent',textAlign:TextAlign.center),
@@ -432,6 +433,9 @@ class _PointageShellState extends State<PointageShell> {
         NavigationDestination(icon:Icon(Icons.description),label:'Bons')];
       return Scaffold(
         appBar:AppBar(
+          leadingWidth:86,
+          leading:const Padding(padding:EdgeInsets.only(left:12,right:4),
+            child:Center(child:TczBrand(width:72,onDark:true))),
           titleSpacing:8,
           centerTitle:true,
           title:section==0

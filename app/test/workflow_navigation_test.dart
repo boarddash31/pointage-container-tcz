@@ -81,7 +81,8 @@ void main() {
 
     expect(find.text('Enregistrement de l’entrée'), findsOneWidget);
     expect(tester.widgetList<TextField>(find.byType(TextField))
-        .where((field) => field.maxLength == 1).length, 11);
+        .where((field) => field.inputFormatters?.any(
+          (formatter) => formatter is SingleCharOverrideFormatter) == true).length, 11);
 
     // Engin is hidden from header
     expect(find.text('Engin'), findsNothing);

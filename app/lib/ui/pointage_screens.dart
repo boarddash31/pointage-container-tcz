@@ -96,7 +96,54 @@ class _EntryScreenState extends State<EntryScreen> {
       isTwin = selectedTwin;
     });
   }
-  @override void initState(){super.initState();loadOperators();}
+  @override void initState(){
+    super.initState();
+    loadOperators();
+    _initBoxKeyEvents();
+  }
+  void _initBoxKeyEvents() {
+    for (int i = 0; i < 11; i++) {
+      final idx = i;
+      focus[idx].onKeyEvent = (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (boxes[idx].text.isEmpty && idx > 0) {
+            focus[idx - 1].requestFocus();
+            boxes[idx - 1].selection = TextSelection(baseOffset: 0, extentOffset: boxes[idx - 1].text.length);
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      };
+      focus2[idx].onKeyEvent = (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (boxes2[idx].text.isEmpty && idx > 0) {
+            focus2[idx - 1].requestFocus();
+            boxes2[idx - 1].selection = TextSelection(baseOffset: 0, extentOffset: boxes2[idx - 1].text.length);
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      };
+    }
+  }
+  void _advanceBox(int index, bool second) {
+    final f = second ? focus2 : focus;
+    final b = second ? boxes2 : boxes;
+    if (index < 10) {
+      f[index + 1].requestFocus();
+      b[index + 1].selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: b[index + 1].text.length,
+      );
+    } else {
+      FocusScope.of(context).unfocus();
+      if (second) {
+        lookup2();
+      } else {
+        lookup();
+      }
+    }
+  }
   Future<void> loadOperators() async {
     try{
       final records=await widget.repository.operators();
@@ -377,10 +424,12 @@ class _EntryScreenState extends State<EntryScreen> {
             return Padding(
               padding: EdgeInsets.only(right: isLetter && i == 3 ? 10 : (isCheckDigit ? 0 : 3)),
               child: SizedBox(width:32, child: TextFormField(controller:b[i],focusNode:f[i],
-                textAlign:TextAlign.center,maxLength:1,
-                inputFormatters:[isLetter?FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')):
-                  FilteringTextInputFormatter.digitsOnly,UpperCaseFormatter()],
+                textAlign:TextAlign.center,
+                inputFormatters:[SingleCharOverrideFormatter(isLetter:isLetter, onAdvance:()=>_advanceBox(i, second))],
                 keyboardType:isLetter?TextInputType.text:TextInputType.number,
+                onTap:(){
+                  b[i].selection=TextSelection(baseOffset:0, extentOffset:b[i].text.length);
+                },
                 decoration:InputDecoration(counterText:'',contentPadding:const EdgeInsets.symmetric(vertical:12),
                   filled:true,
                   fillColor:isLetter
@@ -399,12 +448,6 @@ class _EntryScreenState extends State<EntryScreen> {
                     setState(() => second ? lookupHint2=null : lookupHint=null);
                   }
                   setState((){});
-                  if(v.isNotEmpty){if(i<10) {
-                    f[i+1].requestFocus();
-                  } else {
-                    FocusScope.of(context).unfocus();
-                    if(second) { lookup2(); } else { lookup(); }
-                  }}
                 },
               )),
             );
@@ -491,7 +534,7 @@ class _EntryScreenState extends State<EntryScreen> {
                 const Text('État du camion à l’arrivée',
                   style:TextStyle(fontWeight:FontWeight.w700)),
                 const SizedBox(height:8),
-                SizedBox(height:180,child:Scrollbar(
+                SizedBox(height:204,child:Scrollbar(
                   controller:modeScrollController,thumbVisibility:true,
                   child:SingleChildScrollView(
                     controller:modeScrollController,
@@ -508,18 +551,36 @@ class _EntryScreenState extends State<EntryScreen> {
                         borderRadius:BorderRadius.circular(12),
                         onTap:kind==option.$1&&isTwin==option.$2
                           ?null:()=>selectGateMode(option.$1,option.$2),
-                        child:Container(width:260,
-                          padding:const EdgeInsets.all(7),
+                        child:AnimatedContainer(
+                          duration:const Duration(milliseconds:180),
+                          width:kind==option.$1&&isTwin==option.$2
+                            ?(MediaQuery.sizeOf(context).width<600?310:390):224,
+                          padding:const EdgeInsets.fromLTRB(12,10,12,8),
                           decoration:BoxDecoration(
                             color:kind==option.$1&&isTwin==option.$2
-                              ?const Color(0xffe7f3ff):Colors.white,
+                              ?const Color(0xfff0f8fd):const Color(0xfffafcfe),
                             border:Border.all(color:kind==option.$1&&isTwin==option.$2
-                              ?Theme.of(context).colorScheme.primary:Colors.grey.shade300,
-                              width:kind==option.$1&&isTwin==option.$2?2:1),
-                            borderRadius:BorderRadius.circular(12)),
+                              ?const Color(0xff168dcc):const Color(0xffdfe8ef),
+                              width:kind==option.$1&&isTwin==option.$2?1.8:1),
+                            borderRadius:BorderRadius.circular(16)),
                           child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-                            TruckScene(kind:option.$1,isTwin:option.$2,
-                              width:240,height:110,plate:plate.text,
+                            Row(children:[
+                              Icon(option.$1=='loaded'?Icons.south_west_rounded:Icons.north_east_rounded,
+                                size:16,color:const Color(0xff176b93)),
+                              const SizedBox(width:5),
+                              Text(option.$1=='loaded'?'DÉPOSER':'PRENDRE',
+                                style:const TextStyle(fontSize:10,letterSpacing:1.2,
+                                  fontWeight:FontWeight.w800,color:Color(0xff176b93))),
+                              const Spacer(),
+                              if(kind==option.$1&&isTwin==option.$2)
+                                const Icon(Icons.check_circle_rounded,size:19,color:Color(0xff168dcc))
+                              else Text(option.$2?'2 × 20′':'1',
+                                style:const TextStyle(fontSize:11,fontWeight:FontWeight.w700,
+                                  color:Color(0xff71899c))),
+                            ]),
+                            Expanded(child:TruckScene(kind:option.$1,isTwin:option.$2,
+                              width:double.infinity,height:128,
+                              plate:kind==option.$1&&isTwin==option.$2?plate.text:null,
                               containerNumber:kind==option.$1&&isTwin==option.$2&&option.$1=='loaded'?number:null,
                               iso:kind==option.$1&&isTwin==option.$2?iso:null,
                               operator:kind==option.$1&&isTwin==option.$2?operator?.id:null,
@@ -532,10 +593,10 @@ class _EntryScreenState extends State<EntryScreen> {
                               onPlateTap:kind==option.$1&&isTwin==option.$2
                                 ?()=>plateFocus.requestFocus():null,
                               onContainerTap:kind==option.$1&&isTwin==option.$2
-                                ?focusGateField:null),
-                            const SizedBox(height:4),
+                                ?focusGateField:null)),
                             Text(option.$3,textAlign:TextAlign.center,
-                              style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700)),
+                              style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700,
+                                color:Color(0xff173c5b))),
                           ]),
                         ),
                       )),
@@ -543,7 +604,7 @@ class _EntryScreenState extends State<EntryScreen> {
                   ),
                 )),
                 const Padding(padding:EdgeInsets.only(top:3),
-                  child:Text('← Glissez pour voir les 4 états →',
+                  child:Text('Glissez pour choisir · Touchez la plaque ou le conteneur pour saisir',
                     style:TextStyle(fontSize:11,color:Color(0xff49677e)))),
                 const SizedBox(height:14),
 
@@ -741,6 +802,62 @@ class UpperCaseFormatter extends TextInputFormatter {
     newValue.copyWith(text:newValue.text.toUpperCase(), selection:newValue.selection);
 }
 
+class SingleCharOverrideFormatter extends TextInputFormatter {
+  final bool isLetter;
+  final VoidCallback? onAdvance;
+  SingleCharOverrideFormatter({required this.isLetter, this.onAdvance});
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    final allowedPattern = isLetter ? RegExp('[a-zA-Z]') : RegExp('[0-9]');
+
+    if (newValue.text.length == 1) {
+      if (allowedPattern.hasMatch(newValue.text)) {
+        if (oldValue.text.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => onAdvance?.call());
+        }
+        return TextEditingValue(
+          text: newValue.text.toUpperCase(),
+          selection: const TextSelection.collapsed(offset: 1),
+        );
+      }
+      return oldValue;
+    }
+
+    String? targetChar;
+    final cursor = newValue.selection.baseOffset;
+    if (cursor > 0 && cursor <= newValue.text.length) {
+      final typed = newValue.text[cursor - 1];
+      if (allowedPattern.hasMatch(typed)) {
+        targetChar = typed.toUpperCase();
+      }
+    }
+
+    if (targetChar == null) {
+      for (int i = newValue.text.length - 1; i >= 0; i--) {
+        if (allowedPattern.hasMatch(newValue.text[i])) {
+          targetChar = newValue.text[i].toUpperCase();
+          break;
+        }
+      }
+    }
+
+    if (targetChar != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => onAdvance?.call());
+      return TextEditingValue(
+        text: targetChar,
+        selection: const TextSelection.collapsed(offset: 1),
+      );
+    }
+
+    return oldValue;
+  }
+}
+
 class EnginScreen extends StatefulWidget {
   const EnginScreen({super.key,required this.repository,required this.canCancel});
   final PointageRepository repository;final bool canCancel;
@@ -798,6 +915,47 @@ class _ExitScreenState extends State<ExitScreen> {
     super.initState();
     loadVisits();
     loadOperators();
+    _initBoxKeyEvents();
+  }
+
+  void _initBoxKeyEvents() {
+    for (int i = 0; i < 11; i++) {
+      final idx = i;
+      focus1[idx].onKeyEvent = (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (boxes1[idx].text.isEmpty && idx > 0) {
+            focus1[idx - 1].requestFocus();
+            boxes1[idx - 1].selection = TextSelection(baseOffset: 0, extentOffset: boxes1[idx - 1].text.length);
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      };
+      focus2[idx].onKeyEvent = (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (boxes2[idx].text.isEmpty && idx > 0) {
+            focus2[idx - 1].requestFocus();
+            boxes2[idx - 1].selection = TextSelection(baseOffset: 0, extentOffset: boxes2[idx - 1].text.length);
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      };
+    }
+  }
+
+  void _advanceExitBox(int index, bool second) {
+    final f = second ? focus2 : focus1;
+    final b = second ? boxes2 : boxes1;
+    if (index < 10) {
+      f[index + 1].requestFocus();
+      b[index + 1].selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: b[index + 1].text.length,
+      );
+    } else {
+      FocusScope.of(context).unfocus();
+    }
   }
 
   @override
@@ -1207,12 +1365,16 @@ class _ExitScreenState extends State<ExitScreen> {
                     controller: b[i],
                     focusNode: f[i],
                     textAlign: TextAlign.center,
-                    maxLength: 1,
                     inputFormatters: [
-                      isLetter ? FilteringTextInputFormatter.allow(RegExp('[a-zA-Z]')) : FilteringTextInputFormatter.digitsOnly,
-                      UpperCaseFormatter(),
+                      SingleCharOverrideFormatter(
+                        isLetter: isLetter,
+                        onAdvance: () => _advanceExitBox(i, second),
+                      ),
                     ],
                     keyboardType: isLetter ? TextInputType.text : TextInputType.number,
+                    onTap: () {
+                      b[i].selection = TextSelection(baseOffset: 0, extentOffset: b[i].text.length);
+                    },
                     decoration: InputDecoration(
                       counterText: '',
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -1230,13 +1392,6 @@ class _ExitScreenState extends State<ExitScreen> {
                     ),
                     onChanged: (v) {
                       setState(() {});
-                      if (v.isNotEmpty) {
-                        if (i < 10) {
-                          f[i + 1].requestFocus();
-                        } else {
-                          FocusScope.of(context).unfocus();
-                        }
-                      }
                     },
                   ),
                 ),
