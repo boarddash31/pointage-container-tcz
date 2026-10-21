@@ -226,8 +226,16 @@ class _PointageShellState extends State<PointageShell> {
       if(!snapshot.hasData) return const Scaffold(body:Center(child:CircularProgressIndicator()));
       final roles=snapshot.data!;
       if(roles.isEmpty) {
-        return Scaffold(appBar:AppBar(title:const Text('Accès en attente')),
-        body:const Center(child:Text('Votre compte n’a aucun rôle actif. Contactez un administrateur.')));
+        return Scaffold(appBar:AppBar(title:const Text('Accès indisponible'),actions:[
+          IconButton(tooltip:'Déconnexion',icon:const Icon(Icons.logout),
+            onPressed:()=>Supabase.instance.client.auth.signOut()),
+        ]),body:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
+          const Padding(padding:EdgeInsets.symmetric(horizontal:24),
+            child:Text('Ce compte est désactivé ou n’a aucun rôle actif.',textAlign:TextAlign.center)),
+          const SizedBox(height:12),
+          FilledButton.icon(onPressed:()=>Supabase.instance.client.auth.signOut(),
+            icon:const Icon(Icons.logout),label:const Text('Se déconnecter')),
+        ])));
       }
       final admin=roles.contains('admin');
       bool allowed(String role)=>admin||roles.contains(role);

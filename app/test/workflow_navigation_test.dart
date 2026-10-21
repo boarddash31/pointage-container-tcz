@@ -32,7 +32,19 @@ class SingleRoleFixture extends QueueFixture {
   @override Future<List<String>> roles() async => [role];
 }
 
+class NoRoleFixture extends QueueFixture {
+  @override Future<List<String>> roles() async => [];
+}
+
 void main() {
+  testWidgets('inactive account can leave the access screen', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: PointageShell(repository: NoRoleFixture())));
+    await tester.pumpAndSettle();
+    expect(find.text('Ce compte est désactivé ou n’a aucun rôle actif.'), findsOneWidget);
+    expect(find.text('Se déconnecter'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('single-role agents open only their permitted gate', (tester) async {
     await tester.pumpWidget(MaterialApp(home: PointageShell(key: const ValueKey('sortie'),
       repository: SingleRoleFixture('sortie'))));
