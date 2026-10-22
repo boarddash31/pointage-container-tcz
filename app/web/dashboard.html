@@ -614,7 +614,7 @@
   <!-- JAVASCRIPT LOGIC -->
   <script>
     const SUPABASE_URL = 'https://iparzfqxopcvwqelxlad.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_AgyGT1cfJz9gkXTpVrLsXg_B3VNWHGs';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwYXJ6ZnF4b3BjdndxZWx4bGFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTE3MjMsImV4cCI6MjEwNzk4NzcyM30.3hCnAHLQ8KRNRmaXCAMO8POWIRrjdeqMtqs8EavIbBs';
     const SUPERVISOR_PIN = '01010909';
 
     let hourlyChartInstance = null;
@@ -647,21 +647,54 @@
       document.getElementById('agentPassword').value = `${word}${num}`;
     }
 
-    // Direct Supabase RPC Caller
+    // Supabase / Local Bridge RPC Caller
     async function callRpc(fnName, params = {}) {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+      // 1. Try local server bridge first (for localhost or local network)
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '8085';
+      if (isLocal) {
+        try {
+          const localRes = await fetch(`/api/rpc/${fnName}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+          });
+          if (localRes.ok) {
+            return await localRes.json();
+          }
+        } catch (localErr) {
+          console.warn('Local bridge error, trying direct Supabase:', localErr);
+        }
+      }
+
+      // 2. Direct Supabase call
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(params)
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (directErr) {
+        console.warn('Direct Supabase error:', directErr);
+      }
+
+      // 3. Fallback to /api/rpc/
+      const fallbackRes = await fetch(`/api/rpc/${fnName}`, {
         method: 'POST',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params)
       });
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText || `Erreur HTTP ${res.status}`);
+      if (fallbackRes.ok) {
+        return await fallbackRes.json();
       }
-      return await res.json();
+
+      throw new Error(`Impossible de charger les données pour ${fnName}. Vérifiez votre connexion réseau.`);
     }
 
     // Direct Supabase Query
