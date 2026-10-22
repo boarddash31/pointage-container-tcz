@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 /// An empty slot is an outline on the chassis, never a container beside it.
 class TruckScene extends StatelessWidget {
   const TruckScene({super.key, required this.kind, this.height = 125, this.width,
-    this.isTwin = false, this.plate, this.containerNumber, this.iso, this.operator,
+    this.isTwin = false, this.plate, this.driverCin, this.containerNumber, this.iso, this.operator,
     this.containerNumber2, this.iso2, this.operator2, this.booking,
     this.booking2, this.showUnknown = false, this.highlightMissing = false,
     this.onPlateTap, this.onContainerTap});
@@ -16,6 +16,7 @@ class TruckScene extends StatelessWidget {
   final double? width;
   final bool isTwin, showUnknown, highlightMissing;
   final String? plate;
+  final String? driverCin;
   final String? containerNumber, iso, operator, containerNumber2, iso2, operator2;
   final String? booking, booking2;
   final VoidCallback? onPlateTap;
@@ -28,14 +29,15 @@ class TruckScene extends StatelessWidget {
     return Semantics(
       label: '${empty ? 'Camion sans conteneur, emplacement prévu' : 'Camion chargé'} : '
         '${twin ? 'deux conteneurs' : 'un conteneur'}'
-        '${plate?.trim().isNotEmpty == true ? ', plaque $plate' : ''}',
+        '${plate?.trim().isNotEmpty == true ? ', plaque $plate' : ''}'
+        '${driverCin?.trim().isNotEmpty == true ? ', CIN $driverCin' : ''}',
       child: SizedBox(
         width: width ?? height * 2.5,
         height: height,
         child: LayoutBuilder(builder: (context, constraints) {
           final diagram = CustomPaint(painter: _TruckPainter(
             empty: empty, twin: twin, compact: height <= 85,
-            unknown: showUnknown, plate: plate,
+            unknown: showUnknown, plate: plate, driverCin: driverCin,
             highlightMissing: highlightMissing,
             numbers: [containerNumber, containerNumber2],
             bookings: [booking, booking2],
@@ -66,10 +68,11 @@ class TruckScene extends StatelessWidget {
 
 class _TruckPainter extends CustomPainter {
   const _TruckPainter({required this.empty, required this.twin, required this.compact,
-    required this.unknown, required this.plate, required this.numbers, required this.codes,
+    required this.unknown, required this.plate, this.driverCin, required this.numbers, required this.codes,
     required this.lines, required this.bookings, required this.highlightMissing});
   final bool empty, twin, compact, unknown, highlightMissing;
   final String? plate;
+  final String? driverCin;
   final List<String?> numbers, bookings, codes, lines;
 
   @override
@@ -113,7 +116,10 @@ class _TruckPainter extends CustomPainter {
     canvas.drawLine(const Offset(47,45),const Offset(58,45),
       Paint()..color=const Color(0xff92d5f0)..strokeWidth=1.5);
     _box(canvas,const Rect.fromLTWH(51,65,9,2),navy,1);
-    _text(canvas,'TCZ',const Rect.fromLTWH(17,64,27,10),navy,7.5,0,bold:true);
+    // CIN chauffeur sur la portière de la cabine
+    final hasCin = driverCin?.trim().isNotEmpty == true;
+    final cinText = hasCin ? driverCin!.trim().toUpperCase() : (highlightMissing ? 'CIN ?' : 'CIN');
+    _text(canvas, cinText, const Rect.fromLTWH(13, 64, 36, 10), navy, 6.8, 0, bold: true);
     _box(canvas,const Rect.fromLTWH(2,58,4,13),navy,1);
     _box(canvas,const Rect.fromLTWH(3,90,74,5),const Color(0xff233c4d),2);
     _box(canvas,const Rect.fromLTWH(6,86,5,4),const Color(0xffffcc70),1);
@@ -234,6 +240,7 @@ class _TruckPainter extends CustomPainter {
     old.empty != empty || old.twin != twin || old.compact != compact ||
     old.unknown != unknown ||
     old.plate != plate ||
+    old.driverCin != driverCin ||
     old.highlightMissing != highlightMissing ||
     !listEquals(old.numbers, numbers) || !listEquals(old.codes, codes) ||
     !listEquals(old.lines, lines) || !listEquals(old.bookings, bookings);

@@ -589,6 +589,7 @@ class _EntryScreenState extends State<EntryScreen> {
                             Expanded(child:TruckScene(kind:option.$1,isTwin:option.$2,
                               width:double.infinity,height:128,
                               plate:kind==option.$1&&isTwin==option.$2?plate.text:null,
+                              driverCin:kind==option.$1&&isTwin==option.$2?cin.text:null,
                               containerNumber:kind==option.$1&&isTwin==option.$2&&option.$1=='loaded'?number:null,
                               iso:kind==option.$1&&isTwin==option.$2?iso:null,
                               operator:kind==option.$1&&isTwin==option.$2?operator?.id:null,
@@ -632,6 +633,7 @@ class _EntryScreenState extends State<EntryScreen> {
 
                 // 3. CIN chauffeur
                 TextFormField(controller:cin, textCapitalization:TextCapitalization.characters,
+                  onChanged:(_)=>setState((){}),
                   decoration:const InputDecoration(
                     labelText:'CIN chauffeur *',
                     hintText:'Ex: AB123456',
@@ -1905,6 +1907,7 @@ class _ExitScreenState extends State<ExitScreen> {
                                     : (isPickedUp ? 'loaded' : 'empty'),
                                 height: 65, width: 135,
                                 plate: activeVisit.plate,
+                                driverCin: activeVisit.cin,
                                 isTwin: activeVisit.isTwin,
                                 containerNumber: activeVisit.container,
                                 containerNumber2: activeVisit.container2,
@@ -2623,6 +2626,7 @@ class VisitQueue extends StatelessWidget {
             TruckScene(kind:v.needsEngin?(v.entryKind=='loaded'?'loaded':'empty'):
               (v.entryKind=='loaded'?'empty':'loaded'),height:70,width:110,
               plate:v.plate,
+              driverCin:v.cin,
               isTwin:v.isTwin,containerNumber:v.container,containerNumber2:v.container2,
               iso:v.iso,iso2:v.iso2,operator:v.armateur,operator2:v.armateur2,
               showUnknown:true),
@@ -2725,6 +2729,7 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
         (v.entryKind=='loaded'?'depose':'prise'):
         (v.entryKind=='loaded'?'empty':'loaded'),height:165,
         plate:v.plate,
+        driverCin:v.cin,
         isTwin:v.isTwin,containerNumber:v.container,containerNumber2:v.container2,
         iso:v.iso,iso2:v.iso2,operator:v.armateur,operator2:v.armateur2,
         showUnknown:true),

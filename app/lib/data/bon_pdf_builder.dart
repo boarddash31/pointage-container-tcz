@@ -497,8 +497,12 @@ class BonPdfBuilder {
                                   style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: ink),
                                 ),
                                 pw.Text(
+                                  'Plaque : $plate · CIN : $cin',
+                                  style: pw.TextStyle(fontSize: 5, fontWeight: pw.FontWeight.bold, color: navy),
+                                ),
+                                pw.Text(
                                   isEntryEmpty ? 'Arrive sans conteneur' : 'Conteneur a decharger',
-                                  style: const pw.TextStyle(fontSize: 5, color: PdfColors.grey700),
+                                  style: const pw.TextStyle(fontSize: 4.8, color: PdfColors.grey700),
                                 ),
                               ],
                             ),
@@ -603,10 +607,14 @@ class BonPdfBuilder {
                                   ),
                                 ),
                                 pw.Text(
+                                  'Plaque : $plate · CIN : $cin',
+                                  style: pw.TextStyle(fontSize: 5, fontWeight: pw.FontWeight.bold, color: isAnnulation ? PdfColor.fromHex('#dc2626') : emerald),
+                                ),
+                                pw.Text(
                                   isAnnulation
                                       ? 'Ressorti avec son conteneur'
                                       : (isEntryEmpty ? 'Conteneur assigne + scelle' : 'Plateau verifie vide'),
-                                  style: const pw.TextStyle(fontSize: 5, color: PdfColors.grey700),
+                                  style: const pw.TextStyle(fontSize: 4.8, color: PdfColors.grey700),
                                 ),
                               ],
                             ),
