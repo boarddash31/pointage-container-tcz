@@ -31,6 +31,17 @@
 
   <title>Pointage Container · TCZ</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Local PDF.js engine for instantaneous zero-latency preview and printing -->
+  <script>
+    window.dartPdfJsBaseUrl = './';
+  </script>
+  <script src="pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
+    }
+  </script>
   <style>
     /* Suppress Netlify badge and drawer */
     iframe[src*="app.netlify.com"],

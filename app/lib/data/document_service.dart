@@ -109,29 +109,39 @@ class DocumentService {
   }
 
   Future<void> recordAction(Map<String,dynamic> document,String action) async {
-    await client.rpc('record_document_action',params:{
-      'p_document':document['id'],'p_action':action,
-    });
+    try {
+      await client.rpc('record_document_action',params:{
+        'p_document':document['id'],'p_action':action,
+      });
+    } catch (_) {
+      // Non-critical audit logging: do not crash user flow if RPC fails
+    }
   }
 
   Future<void> printWithDialog(Map<String,dynamic> document,{String printerName=''}) async {
     final bytes=await prepare(document);
     if(printerName.isNotEmpty){
-      final info=await Printing.info();
-      if(info.directPrint&&info.canListPrinters){
-        final printers=await Printing.listPrinters();
-        final matches=printers.where((printer)=>printer.name==printerName);
-        if(matches.isNotEmpty){
-          await recordAction(document,'DIRECT_PRINT_REQUESTED');
-          final printed=await Printing.directPrintPdf(printer:matches.first,
-            onLayout:(_)=>bytes,name:'TCZ-${document['kind']}-${document['visit_id']}');
-          if(!printed)throw StateError('L’imprimante a refusé le bon.');
-          return;
+      try {
+        final info=await Printing.info();
+        if(info.directPrint&&info.canListPrinters){
+          final printers=await Printing.listPrinters();
+          final matches=printers.where((printer)=>printer.name==printerName);
+          if(matches.isNotEmpty){
+            await recordAction(document,'DIRECT_PRINT_REQUESTED');
+            final printed=await Printing.directPrintPdf(printer:matches.first,
+              onLayout:(_)=>bytes,name:'TCZ-${document['kind']}-${document['visit_id']}');
+            if(!printed)throw StateError('L’imprimante a refusé le bon.');
+            return;
+          }
         }
-      }
+      } catch (_) {}
     }
     await recordAction(document,'PRINT_DIALOG_REQUESTED');
-    await Printing.layoutPdf(onLayout:(_)=>bytes,name:'TCZ-${document['kind']}-${document['visit_id']}');
+    try {
+      await Printing.layoutPdf(onLayout:(_)=>bytes,name:'TCZ-${document['kind']}-${document['visit_id']}');
+    } catch (_) {
+      await Printing.sharePdf(bytes:bytes,filename:'TCZ-${document['kind']}-${document['visit_id']}.pdf');
+    }
   }
 
   Future<bool> printPreferredLatest(String visitId,String kind) async {

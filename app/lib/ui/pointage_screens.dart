@@ -2294,33 +2294,55 @@ class _BonPdfScreenState extends State<BonPdfScreen> {
     }
   }
 
-  void _print() {
-    Printing.layoutPdf(
-      onLayout: (_) => widget.bytes,
-      name: 'TCZ-${widget.kind}-${widget.visitId}',
-    );
+  Future<void> _print() async {
+    final fileName = 'TCZ-${widget.kind}-${widget.visitId}.pdf';
+    try {
+      final printed = await Printing.layoutPdf(
+        onLayout: (_) => widget.bytes,
+        name: fileName,
+      );
+      if (!printed && mounted) {
+        await Printing.sharePdf(
+          bytes: widget.bytes,
+          filename: fileName,
+        );
+      }
+    } catch (_) {
+      await Printing.sharePdf(
+        bytes: widget.bytes,
+        filename: fileName,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final fileName = 'TCZ-${widget.kind}-${widget.visitId}.pdf';
     return Scaffold(
       appBar: AppBar(
         title: Text('Bon ${widget.kind}'),
         backgroundColor: const Color(0xff063e66),
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.download),
-            tooltip: 'Télécharger le PDF',
+          TextButton.icon(
+            icon: const Icon(Icons.download, color: Colors.white, size: 18),
+            label: const Text('Télécharger', style: TextStyle(color: Colors.white)),
             onPressed: () => Printing.sharePdf(
               bytes: widget.bytes,
-              filename: 'TCZ-${widget.kind}-${widget.visitId}.pdf',
+              filename: fileName,
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.print),
-            tooltip: 'Imprimer',
-            onPressed: _print,
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xff16a34a),
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.print, size: 18),
+              label: const Text('Imprimer'),
+              onPressed: _print,
+            ),
           ),
         ],
       ),
@@ -2330,7 +2352,42 @@ class _BonPdfScreenState extends State<BonPdfScreen> {
         allowSharing: true,
         canChangeOrientation: false,
         canChangePageFormat: false,
-        pdfFileName: 'TCZ-${widget.kind}-${widget.visitId}.pdf',
+        pdfFileName: fileName,
+      ),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xffcbd5e1), width: 1)),
+        ),
+        child: SafeArea(
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.download),
+                  label: const Text('Télécharger PDF'),
+                  onPressed: () => Printing.sharePdf(
+                    bytes: widget.bytes,
+                    filename: fileName,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xff075a8d),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  icon: const Icon(Icons.print),
+                  label: const Text('Lancer l\'impression', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: _print,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
