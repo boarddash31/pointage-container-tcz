@@ -69,8 +69,8 @@ Future<OperatorRecord?> showOperatorPicker(BuildContext context, List<OperatorRe
 }
 
 class EntryScreen extends StatefulWidget {
-  const EntryScreen({super.key,required this.repository,required this.canCorrect});
-  final PointageRepository repository;final bool canCorrect;
+  const EntryScreen({super.key,required this.repository,required this.canCorrect,this.isFullScreen=false});
+  final PointageRepository repository;final bool canCorrect;final bool isFullScreen;
   @override State<EntryScreen> createState()=>_EntryScreenState();
 }
 class _EntryScreenState extends State<EntryScreen> {
@@ -90,6 +90,7 @@ class _EntryScreenState extends State<EntryScreen> {
   final iso2Controller = TextEditingController();
   String iso='', iso2='', kind='loaded';
   bool isTwin=false, busy=false;
+  bool _isPickerOpen=false;
   String? lookupHint, lookupHint2;
   void selectGateMode(String selectedKind, bool selectedTwin) {
     setState(() {
@@ -137,11 +138,14 @@ class _EntryScreenState extends State<EntryScreen> {
         extentOffset: b[index + 1].text.length,
       );
     } else {
-      FocusScope.of(context).unfocus();
       if (second) {
         lookup2();
+        iso2Focus.requestFocus();
+        iso2Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso2Controller.text.length);
       } else {
         lookup();
+        isoFocus.requestFocus();
+        isoController.selection = TextSelection(baseOffset: 0, extentOffset: isoController.text.length);
       }
     }
   }
@@ -284,9 +288,24 @@ class _EntryScreenState extends State<EntryScreen> {
     focus2[0].requestFocus();
   }
   Future<void> pickOperator({bool forSecond = false}) async {
-    final chosen = await showOperatorPicker(context, operators);
-    if(chosen!=null&&mounted) {
-      setState(() => forSecond ? operator2 = chosen : operator = chosen);
+    if (_isPickerOpen) return;
+    _isPickerOpen = true;
+    try {
+      final chosen = await showOperatorPicker(context, operators);
+      if(chosen!=null&&mounted) {
+        setState(() => forSecond ? operator2 = chosen : operator = chosen);
+        if (!forSecond && isTwin) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (kind == 'loaded') {
+              focus2[0].requestFocus();
+            } else {
+              bookingFocus2.requestFocus();
+            }
+          });
+        }
+      }
+    } finally {
+      _isPickerOpen = false;
     }
   }
   Future<void> submit() async {
@@ -439,11 +458,13 @@ class _EntryScreenState extends State<EntryScreen> {
               padding: EdgeInsets.only(right: isLetter && i == 3 ? 10 : (isCheckDigit ? 0 : 3)),
               child: SizedBox(width:32, child: TextFormField(controller:b[i],focusNode:f[i],
                 textAlign:TextAlign.center,
+                textInputAction:TextInputAction.next,
                 inputFormatters:[SingleCharOverrideFormatter(isLetter:isLetter, onAdvance:()=>_advanceBox(i, second))],
                 keyboardType:isLetter?TextInputType.text:TextInputType.number,
                 onTap:(){
                   b[i].selection=TextSelection(baseOffset:0, extentOffset:b[i].text.length);
                 },
+                onFieldSubmitted:(_)=>_advanceBox(i, second),
                 decoration:InputDecoration(counterText:'',contentPadding:const EdgeInsets.symmetric(vertical:12),
                   filled:true,
                   fillColor:isLetter
@@ -492,7 +513,15 @@ class _EntryScreenState extends State<EntryScreen> {
               onPressed: () {
                 b[10].text = expected.toString();
                 setState(() {});
-                if(second) { lookup2(); } else { lookup(); }
+                if(second) {
+                  lookup2();
+                  iso2Focus.requestFocus();
+                  iso2Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso2Controller.text.length);
+                } else {
+                  lookup();
+                  isoFocus.requestFocus();
+                  isoController.selection = TextSelection(baseOffset: 0, extentOffset: isoController.text.length);
+                }
               },
             ),
           ],
@@ -511,7 +540,15 @@ class _EntryScreenState extends State<EntryScreen> {
               onPressed: () {
                 b[10].text = expected.toString();
                 setState(() {});
-                if(second) { lookup2(); } else { lookup(); }
+                if(second) {
+                  lookup2();
+                  iso2Focus.requestFocus();
+                  iso2Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso2Controller.text.length);
+                } else {
+                  lookup();
+                  isoFocus.requestFocus();
+                  isoController.selection = TextSelection(baseOffset: 0, extentOffset: isoController.text.length);
+                }
               },
             ),
           ],
@@ -521,315 +558,501 @@ class _EntryScreenState extends State<EntryScreen> {
     ]);
   }
 
-  @override Widget build(BuildContext context)=>ListView(
-    padding:const EdgeInsets.symmetric(horizontal:12, vertical:8),
-    children:[
-      Padding(
-        padding:const EdgeInsets.only(left:4, bottom:6),
-        child:Row(children:[
-          Icon(Icons.login, size:20, color:Theme.of(context).colorScheme.primary),
-          const SizedBox(width:8),
-          const Expanded(child:Text('Enregistrement de l’entrée',
-            maxLines:2,overflow:TextOverflow.ellipsis,
-            style:TextStyle(fontWeight:FontWeight.bold, fontSize:16))),
-        ]),
-      ),
-      Card(
-        elevation:1,
-        margin:EdgeInsets.zero,
-        child:Padding(
-          padding:const EdgeInsets.all(14),
-          child:Form(
-            key:form,
-            child:Column(
-              crossAxisAlignment:CrossAxisAlignment.stretch,
-              children:[
-                // Four physical truck states at the gate.
-                const Text('État du camion à l’arrivée',
-                  style:TextStyle(fontWeight:FontWeight.w700)),
-                const SizedBox(height:8),
-                SizedBox(height:204,child:Scrollbar(
-                  controller:modeScrollController,thumbVisibility:true,
-                  child:SingleChildScrollView(
-                    controller:modeScrollController,
-                    scrollDirection:Axis.horizontal,
-                    child:Row(children:[
-                    for(final option in [
-                      ('loaded',false,'Avec 1 conteneur'),
-                      ('loaded',true,'Avec 2 conteneurs'),
-                      ('empty',false,'Sans · 1 à prendre'),
-                      ('empty',true,'Sans · 2 à prendre'),
-                    ])
-                      Padding(padding:const EdgeInsets.only(right:8,bottom:10),child:InkWell(
-                        key:ValueKey('gate-${option.$1}-${option.$2}'),
-                        borderRadius:BorderRadius.circular(12),
-                        onTap:kind==option.$1&&isTwin==option.$2
-                          ?null:()=>selectGateMode(option.$1,option.$2),
-                        child:AnimatedContainer(
-                          duration:const Duration(milliseconds:180),
-                          onEnd:() {
-                            if(kind==option.$1&&isTwin==option.$2&&modeScrollController.hasClients) {
-                              final index=(option.$1=='empty'?2:0)+(option.$2?1:0);
-                              modeScrollController.animateTo(
-                                (index*232.0).clamp(0.0,modeScrollController.position.maxScrollExtent),
-                                duration:const Duration(milliseconds:180),curve:Curves.easeOut);
-                            }
-                          },
-                          width:kind==option.$1&&isTwin==option.$2
-                            ?(MediaQuery.sizeOf(context).width<600?310:390):224,
-                          padding:const EdgeInsets.fromLTRB(12,10,12,8),
-                          decoration:BoxDecoration(
-                            color:kind==option.$1&&isTwin==option.$2
-                              ?const Color(0xfff0f8fd):const Color(0xfffafcfe),
-                            border:Border.all(color:kind==option.$1&&isTwin==option.$2
-                              ?const Color(0xff168dcc):const Color(0xffdfe8ef),
-                              width:kind==option.$1&&isTwin==option.$2?1.8:1),
-                            borderRadius:BorderRadius.circular(16)),
-                          child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-                            Row(children:[
-                              Icon(option.$1=='loaded'?Icons.south_west_rounded:Icons.north_east_rounded,
-                                size:16,color:const Color(0xff176b93)),
-                              const SizedBox(width:5),
-                              Text(option.$1=='loaded'?'DÉPOSER':'PRENDRE',
-                                style:const TextStyle(fontSize:10,letterSpacing:1.2,
-                                  fontWeight:FontWeight.w800,color:Color(0xff176b93))),
-                              const Spacer(),
-                              if(kind==option.$1&&isTwin==option.$2)
-                                const Icon(Icons.check_circle_rounded,size:19,color:Color(0xff168dcc))
-                              else Text(option.$2?'2 × 20′':'1',
-                                style:const TextStyle(fontSize:11,fontWeight:FontWeight.w700,
-                                  color:Color(0xff71899c))),
-                            ]),
-                            Expanded(child:TruckScene(kind:option.$1,isTwin:option.$2,
-                              width:double.infinity,height:128,
-                              plate:kind==option.$1&&isTwin==option.$2?plate.text:null,
-                              driverCin:kind==option.$1&&isTwin==option.$2?cin.text:null,
-                              containerNumber:kind==option.$1&&isTwin==option.$2&&option.$1=='loaded'?number:null,
-                              iso:kind==option.$1&&isTwin==option.$2?iso:null,
-                              operator:kind==option.$1&&isTwin==option.$2?(operator?.name??operator?.id):null,
-                              containerNumber2:kind==option.$1&&isTwin==option.$2&&option.$2&&option.$1=='loaded'?number2:null,
-                              iso2:kind==option.$1&&isTwin==option.$2&&option.$2?iso2:null,
-                              operator2:kind==option.$1&&isTwin==option.$2&&option.$2?(operator2?.name??operator2?.id):null,
-                              booking:kind==option.$1&&isTwin==option.$2&&option.$1=='empty'?booking.text:null,
-                              booking2:kind==option.$1&&isTwin==option.$2&&option.$2&&option.$1=='empty'?booking2.text:null,
-                              highlightMissing:kind==option.$1&&isTwin==option.$2,
-                              onPlateTap:kind==option.$1&&isTwin==option.$2
-                                ?()=>_focusAndScroll(plateFocus):null,
-                              onCinTap:kind==option.$1&&isTwin==option.$2
-                                ?()=>_focusAndScroll(cinFocus):null,
-                              onContainerNumberTap:kind==option.$1&&isTwin==option.$2
-                                ?focusGateField:null,
-                              onIsoTap:kind==option.$1&&isTwin==option.$2
-                                ?(idx)=>_focusAndScroll(idx==0?isoFocus:iso2Focus):null,
-                              onLineTap:kind==option.$1&&isTwin==option.$2
-                                ?(idx)=>pickOperator(forSecond: idx==1):null,
-                              onContainerTap:kind==option.$1&&isTwin==option.$2
-                                ?focusGateField:null)),
-                            Text(option.$3,textAlign:TextAlign.center,
-                              style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700,
-                                color:Color(0xff173c5b))),
-                          ]),
-                        ),
-                      )),
-                    ]),
+  @override Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!widget.isFullScreen)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Row(
+              children: [
+                Icon(Icons.login, size: 20, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Enregistrement de l’entrée',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                )),
-                const Padding(padding:EdgeInsets.only(top:3),
-                  child:Text('Glissez pour choisir · Touchez la plaque ou le conteneur pour saisir',
-                    style:TextStyle(fontSize:11,color:Color(0xff49677e)))),
-                const SizedBox(height:14),
-
-                // 2. Plaque camion
-                TextFormField(controller:plate,focusNode:plateFocus,
-                  textCapitalization:TextCapitalization.characters,
-                  decoration:const InputDecoration(
-                    labelText:'Plaque camion *',
-                    hintText:'Ex: 12345-A-1',
-                    prefixIcon:Icon(Icons.pin, size:20),
-                  ),
-                  inputFormatters:[FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z -]')),UpperCaseFormatter()],
-                  onChanged:(_)=>setState((){}),
-                  onEditingComplete:(){plate.text=TruckPlate.format(plate.text);FocusScope.of(context).nextFocus();},
-                  validator:(v)=>TruckPlate.isValid(v??'')?null:'Format marocain requis : 12345-A-06'),
-                const SizedBox(height:12),
-
-                // 3. CIN chauffeur
-                TextFormField(controller:cin, focusNode:cinFocus, textCapitalization:TextCapitalization.characters,
-                  onChanged:(_)=>setState((){}),
-                  decoration:const InputDecoration(
-                    labelText:'CIN chauffeur *',
-                    hintText:'Ex: AB123456',
-                    prefixIcon:Icon(Icons.badge_outlined, size:20),
-                  ),
-                  validator:(v)=>(v?.trim().length??0)<2?'CIN requis':null),
-                const SizedBox(height:14),
-
-                // 4. Conteneur 1 (ou Mono)
-                if (isTwin) ...[
-                  LayoutBuilder(builder:(context,space) {
-                    final first=Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xfff8fafc),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blueGrey.shade200),
-                    ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      const Text('Premier Conteneur (20\')',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d))),
-                      const SizedBox(height: 8),
-                      if(kind=='loaded') containerBoxes() else TextFormField(
-                        controller:booking,focusNode:bookingFocus,
-                        onChanged:(_)=>setState((){}),
-                        textCapitalization:TextCapitalization.characters,
-                        decoration:const InputDecoration(
-                          labelText:'Booking Conteneur 1 *',
-                          prefixIcon:Icon(Icons.receipt_long, size:20),
-                        ),
-                        validator:(v)=>v==null||v.trim().isEmpty?'Booking requis':null),
-                      if(lookupHint!=null) Padding(padding:const EdgeInsets.only(top:6),
-                        child:Text(lookupHint!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
-                      const SizedBox(height:10),
-                      TextFormField(
-                        controller: isoController,
-                        focusNode: isoFocus,
-                        decoration:const InputDecoration(
-                          labelText:'Code ISO Conteneur 1 *',
-                          helperText:'Ex: 22G1',
-                          prefixIcon:Icon(Icons.qr_code, size:20),
-                        ),
-                        maxLength:4, textCapitalization:TextCapitalization.characters,
-                        inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                        onChanged:(v){
-                          iso = v.trim().toUpperCase();
-                          setState((){});
-                        },
-                        validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
-                      const SizedBox(height:8),
-                      OutlinedButton.icon(
-                        style:OutlinedButton.styleFrom(padding:const EdgeInsets.symmetric(horizontal:12, vertical:12), alignment:Alignment.centerLeft),
-                        onPressed:() => pickOperator(forSecond: false),
-                        icon:const Icon(Icons.business, size:20),
-                        label:Text(operator==null?'Armateur Conteneur 1 *':'${operator!.name} (${operator!.id})',
-                          style:const TextStyle(fontWeight:FontWeight.w600))),
-                    ]),
-                  );
-
-                  // Conteneur 2 (Twin)
-                    final second=Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                       color: const Color(0xfff8fafc),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blueGrey.shade200),
-                    ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      const Text('Deuxième Conteneur (20\') · Compagnie différente autorisée',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d))),
-                      const SizedBox(height: 8),
-                      if(kind=='loaded') containerBoxes(second: true) else TextFormField(
-                        controller:booking2,focusNode:bookingFocus2,
-                        onChanged:(_)=>setState((){}),
-                        textCapitalization:TextCapitalization.characters,
-                        decoration:const InputDecoration(
-                          labelText:'Booking Conteneur 2 *',
-                          prefixIcon:Icon(Icons.receipt_long, size:20),
-                        ),
-                        validator:(v)=>v==null||v.trim().isEmpty?'Booking requis':null),
-                      if(lookupHint2!=null) Padding(padding:const EdgeInsets.only(top:6),
-                        child:Text(lookupHint2!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
-                      const SizedBox(height:10),
-                      TextFormField(
-                        controller: iso2Controller,
-                        focusNode: iso2Focus,
-                        decoration:const InputDecoration(
-                          labelText:'Code ISO Conteneur 2 *',
-                          helperText:'Ex: 22G1',
-                          prefixIcon:Icon(Icons.qr_code, size:20),
-                        ),
-                        maxLength:4, textCapitalization:TextCapitalization.characters,
-                        inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                        onChanged:(v){
-                          iso2 = v.trim().toUpperCase();
-                          setState((){});
-                        },
-                        validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
-                      const SizedBox(height:8),
-                      OutlinedButton.icon(
-                        style:OutlinedButton.styleFrom(padding:const EdgeInsets.symmetric(horizontal:12, vertical:12), alignment:Alignment.centerLeft),
-                        onPressed:() => pickOperator(forSecond: true),
-                        icon:const Icon(Icons.business, size:20),
-                        label:Text(operator2==null?'Armateur Conteneur 2 *':'${operator2!.name} (${operator2!.id})',
-                          style:const TextStyle(fontWeight:FontWeight.w600))),
-                    ]),
-                    );
-                    if(space.maxWidth>=900) {
-                      return Row(crossAxisAlignment:CrossAxisAlignment.start,children:[
-                        Expanded(child:first),const SizedBox(width:14),Expanded(child:second),
-                      ]);
-                    }
-                    return Column(children:[first,const SizedBox(height:14),second]);
-                  }),
-                ] else ...[
-                  // 4. Numéro de conteneur ou Booking (Mono)
-                  if(kind=='loaded') containerBoxes() else TextFormField(
-                    controller:booking,focusNode:bookingFocus,
-                    onChanged:(_)=>setState((){}),
-                    textCapitalization:TextCapitalization.characters,
-                    decoration:const InputDecoration(
-                      labelText:'Booking / ordre libre *',
-                      helperText:'Le booking n’est pas un numéro ISO de conteneur',
-                      prefixIcon:Icon(Icons.receipt_long, size:20),
-                    ),
-                    validator:(v)=>v==null||v.trim().isEmpty?'Booking requis':null),
-                  if(lookupHint!=null) Padding(padding:const EdgeInsets.only(top:7),
-                    child:Text(lookupHint!, style:TextStyle(color:Theme.of(context).colorScheme.primary))),
-                  const SizedBox(height:14),
-                  // 5. Code ISO
-                  TextFormField(
-                    controller: isoController,
-                    focusNode: isoFocus,
-                    decoration:const InputDecoration(
-                      labelText:'Code ISO *',
-                      helperText:'4 caractères alphanumériques (ex: 22G1, 45G1, 45R1)',
-                      prefixIcon:Icon(Icons.qr_code, size:20),
-                    ),
-                    maxLength:4, textCapitalization:TextCapitalization.characters,
-                    inputFormatters:[FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                    readOnly:!widget.canCorrect&&lookupHint=='ISO et armateur repris du référentiel.',
-                    onChanged:(v){
-                      iso = v.trim().toUpperCase();
-                      setState((){});
-                    },
-                    validator:(v)=>RegExp(r'^[0-9A-Z]{4}$').hasMatch(v??'')?null:'Code ISO invalide'),
-                  const SizedBox(height:12),
-                  // 6. Armateur
-                  OutlinedButton.icon(
-                    style:OutlinedButton.styleFrom(
-                      padding:const EdgeInsets.symmetric(horizontal:14, vertical:14),
-                      alignment:Alignment.centerLeft),
-                    onPressed:widget.canCorrect||lookupHint!='ISO et armateur repris du référentiel.'?()=>pickOperator(forSecond: false):null,
-                    icon:const Icon(Icons.business, size:20),
-                    label:Text(operator==null?'Choisir armateur *':
-                      '${operator!.name} (${operator!.id})',
-                      style:const TextStyle(fontWeight:FontWeight.w600))),
-                ],
-                const SizedBox(height:18),
-
-                // 7. Bouton enregistrer
-                FilledButton.icon(
-                  style:FilledButton.styleFrom(padding:const EdgeInsets.symmetric(vertical:14)),
-                  onPressed:busy?null:submit,
-                  icon:const Icon(Icons.save),
-                  label:Text(busy?'Enregistrement…':'Enregistrer l’entrée',
-                    style:const TextStyle(fontSize:15, fontWeight:FontWeight.bold))),
+                ),
               ],
             ),
           ),
+        // PINNED / FIXED TOP: État du camion à l’arrivée (horizontal scroll)
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                offset: const Offset(0, 2),
+                blurRadius: 4,
+              ),
+            ],
+            border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+          ),
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('État du camion à l’arrivée',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xff063e66))),
+              const SizedBox(height: 2),
+              const Text('↔ Glissez pour changer de mode · Touchez la plaque ou le conteneur pour saisir',
+                style: TextStyle(fontSize: 10, color: Color(0xff49677e), fontWeight: FontWeight.w500)),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 198,
+                child: Scrollbar(
+                  controller: modeScrollController,
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
+                    controller: modeScrollController,
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final option in [
+                          ('loaded', false, 'Avec 1 conteneur'),
+                          ('loaded', true, 'Avec 2 conteneurs'),
+                          ('empty', false, 'Sans · 1 à prendre'),
+                          ('empty', true, 'Sans · 2 à prendre'),
+                        ])
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8, bottom: 8),
+                            child: InkWell(
+                              key: ValueKey('gate-${option.$1}-${option.$2}'),
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: kind == option.$1 && isTwin == option.$2
+                                  ? null
+                                  : () => selectGateMode(option.$1, option.$2),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                onEnd: () {
+                                  if (kind == option.$1 && isTwin == option.$2 && modeScrollController.hasClients) {
+                                    final index = (option.$1 == 'empty' ? 2 : 0) + (option.$2 ? 1 : 0);
+                                    modeScrollController.animateTo(
+                                      (index * 232.0).clamp(0.0, modeScrollController.position.maxScrollExtent),
+                                      duration: const Duration(milliseconds: 180),
+                                      curve: Curves.easeOut,
+                                    );
+                                  }
+                                },
+                                width: kind == option.$1 && isTwin == option.$2
+                                    ? (MediaQuery.sizeOf(context).width < 600 ? 310 : 390)
+                                    : 224,
+                                padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                                decoration: BoxDecoration(
+                                  color: kind == option.$1 && isTwin == option.$2
+                                      ? const Color(0xfff0f8fd)
+                                      : const Color(0xfffafcfe),
+                                  border: Border.all(
+                                    color: kind == option.$1 && isTwin == option.$2
+                                        ? const Color(0xff168dcc)
+                                        : const Color(0xffdfe8ef),
+                                    width: kind == option.$1 && isTwin == option.$2 ? 1.8 : 1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          option.$1 == 'loaded' ? Icons.south_west_rounded : Icons.north_east_rounded,
+                                          size: 15,
+                                          color: const Color(0xff176b93),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          option.$1 == 'loaded' ? 'DÉPOSER' : 'PRENDRE',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            letterSpacing: 1.1,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xff176b93),
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        if (kind == option.$1 && isTwin == option.$2)
+                                          const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xff168dcc))
+                                        else
+                                          Text(
+                                            option.$2 ? '2 × 20′' : '1',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xff71899c),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    Expanded(
+                                      child: TruckScene(
+                                        kind: option.$1,
+                                        isTwin: option.$2,
+                                        width: double.infinity,
+                                        height: 120,
+                                        plate: kind == option.$1 && isTwin == option.$2 ? plate.text : null,
+                                        driverCin: kind == option.$1 && isTwin == option.$2 ? cin.text : null,
+                                        containerNumber: kind == option.$1 && isTwin == option.$2 && option.$1 == 'loaded' ? number : null,
+                                        iso: kind == option.$1 && isTwin == option.$2 ? iso : null,
+                                        operator: kind == option.$1 && isTwin == option.$2 ? (operator?.name ?? operator?.id) : null,
+                                        containerNumber2: kind == option.$1 && isTwin == option.$2 && option.$2 && option.$1 == 'loaded' ? number2 : null,
+                                        iso2: kind == option.$1 && isTwin == option.$2 && option.$2 ? iso2 : null,
+                                        operator2: kind == option.$1 && isTwin == option.$2 && option.$2 ? (operator2?.name ?? operator2?.id) : null,
+                                        booking: kind == option.$1 && isTwin == option.$2 && option.$1 == 'empty' ? booking.text : null,
+                                        booking2: kind == option.$1 && isTwin == option.$2 && option.$2 && option.$1 == 'empty' ? booking2.text : null,
+                                        highlightMissing: kind == option.$1 && isTwin == option.$2,
+                                        onPlateTap: kind == option.$1 && isTwin == option.$2 ? () => _focusAndScroll(plateFocus) : null,
+                                        onCinTap: kind == option.$1 && isTwin == option.$2 ? () => _focusAndScroll(cinFocus) : null,
+                                        onContainerNumberTap: kind == option.$1 && isTwin == option.$2 ? focusGateField : null,
+                                        onIsoTap: kind == option.$1 && isTwin == option.$2 ? (idx) => _focusAndScroll(idx == 0 ? isoFocus : iso2Focus) : null,
+                                        onLineTap: kind == option.$1 && isTwin == option.$2 ? (idx) => pickOperator(forSecond: idx == 1) : null,
+                                        onContainerTap: kind == option.$1 && isTwin == option.$2 ? focusGateField : null,
+                                      ),
+                                    ),
+                                    Text(
+                                      option.$3,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xff173c5b),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    ],
-  );
+        // SCROLLABLE FORM AREA
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Form(
+              key: form,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 2. Plaque camion
+                  TextFormField(
+                    controller: plate,
+                    focusNode: plateFocus,
+                    textInputAction: TextInputAction.next,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Plaque camion *',
+                      hintText: 'Ex: 12345-A-1',
+                      prefixIcon: Icon(Icons.pin, size: 20),
+                    ),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z -]')), UpperCaseFormatter()],
+                    onChanged: (_) => setState(() {}),
+                    onFieldSubmitted: (_) {
+                      plate.text = TruckPlate.format(plate.text);
+                      cinFocus.requestFocus();
+                    },
+                    validator: (v) => TruckPlate.isValid(v ?? '') ? null : 'Format marocain requis : 12345-A-06',
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 3. CIN chauffeur
+                  TextFormField(
+                    controller: cin,
+                    focusNode: cinFocus,
+                    textInputAction: TextInputAction.next,
+                    textCapitalization: TextCapitalization.characters,
+                    onChanged: (_) => setState(() {}),
+                    onFieldSubmitted: (_) {
+                      if (kind == 'loaded') {
+                        focus[0].requestFocus();
+                        boxes[0].selection = TextSelection(baseOffset: 0, extentOffset: boxes[0].text.length);
+                      } else {
+                        bookingFocus.requestFocus();
+                      }
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'CIN chauffeur *',
+                      hintText: 'Ex: AB123456',
+                      prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                    ),
+                    validator: (v) => (v?.trim().length ?? 0) < 2 ? 'CIN requis' : null,
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 4. Conteneur 1 (ou Mono)
+                  if (isTwin) ...[
+                    LayoutBuilder(builder: (context, space) {
+                      final first = Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xfff8fafc),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blueGrey.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'Premier Conteneur (20\')',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d)),
+                            ),
+                            const SizedBox(height: 8),
+                            if (kind == 'loaded')
+                              containerBoxes()
+                            else
+                              TextFormField(
+                                controller: booking,
+                                focusNode: bookingFocus,
+                                textInputAction: TextInputAction.next,
+                                onChanged: (_) => setState(() {}),
+                                onFieldSubmitted: (_) {
+                                  isoFocus.requestFocus();
+                                  isoController.selection = TextSelection(baseOffset: 0, extentOffset: isoController.text.length);
+                                },
+                                textCapitalization: TextCapitalization.characters,
+                                decoration: const InputDecoration(
+                                  labelText: 'Booking Conteneur 1 *',
+                                  prefixIcon: Icon(Icons.receipt_long, size: 20),
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty ? 'Booking requis' : null,
+                              ),
+                            if (lookupHint != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(lookupHint!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                              ),
+                            const SizedBox(height: 10),
+                            TextFormField(
+                              controller: isoController,
+                              focusNode: isoFocus,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Code ISO Conteneur 1 *',
+                                helperText: 'Ex: 22G1',
+                                prefixIcon: Icon(Icons.qr_code, size: 20),
+                              ),
+                              maxLength: 4,
+                              textCapitalization: TextCapitalization.characters,
+                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                              onChanged: (v) {
+                                iso = v.trim().toUpperCase();
+                                setState(() {});
+                                if (iso.length == 4) {
+                                  pickOperator(forSecond: false);
+                                }
+                              },
+                              onFieldSubmitted: (_) => pickOperator(forSecond: false),
+                              validator: (v) => RegExp(r'^[0-9A-Z]{4}$').hasMatch(v ?? '') ? null : 'Code ISO invalide',
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                alignment: Alignment.centerLeft,
+                              ),
+                              onPressed: () => pickOperator(forSecond: false),
+                              icon: const Icon(Icons.business, size: 20),
+                              label: Text(
+                                operator == null ? 'Armateur Conteneur 1 *' : '${operator!.name} (${operator!.id})',
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      // Conteneur 2 (Twin)
+                      final second = Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xfff8fafc),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blueGrey.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'Deuxième Conteneur (20\') · Compagnie différente autorisée',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d)),
+                            ),
+                            const SizedBox(height: 8),
+                            if (kind == 'loaded')
+                              containerBoxes(second: true)
+                            else
+                              TextFormField(
+                                controller: booking2,
+                                focusNode: bookingFocus2,
+                                textInputAction: TextInputAction.next,
+                                onChanged: (_) => setState(() {}),
+                                onFieldSubmitted: (_) {
+                                  iso2Focus.requestFocus();
+                                  iso2Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso2Controller.text.length);
+                                },
+                                textCapitalization: TextCapitalization.characters,
+                                decoration: const InputDecoration(
+                                  labelText: 'Booking Conteneur 2 *',
+                                  prefixIcon: Icon(Icons.receipt_long, size: 20),
+                                ),
+                                validator: (v) => v == null || v.trim().isEmpty ? 'Booking requis' : null,
+                              ),
+                            if (lookupHint2 != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text(lookupHint2!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                              ),
+                            const SizedBox(height: 10),
+                            TextFormField(
+                              controller: iso2Controller,
+                              focusNode: iso2Focus,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Code ISO Conteneur 2 *',
+                                helperText: 'Ex: 22G1',
+                                prefixIcon: Icon(Icons.qr_code, size: 20),
+                              ),
+                              maxLength: 4,
+                              textCapitalization: TextCapitalization.characters,
+                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                              onChanged: (v) {
+                                iso2 = v.trim().toUpperCase();
+                                setState(() {});
+                                if (iso2.length == 4) {
+                                  pickOperator(forSecond: true);
+                                }
+                              },
+                              onFieldSubmitted: (_) => pickOperator(forSecond: true),
+                              validator: (v) => RegExp(r'^[0-9A-Z]{4}$').hasMatch(v ?? '') ? null : 'Code ISO invalide',
+                            ),
+                            const SizedBox(height: 8),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                alignment: Alignment.centerLeft,
+                              ),
+                              onPressed: () => pickOperator(forSecond: true),
+                              icon: const Icon(Icons.business, size: 20),
+                              label: Text(
+                                operator2 == null ? 'Armateur Conteneur 2 *' : '${operator2!.name} (${operator2!.id})',
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (space.maxWidth >= 900) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: first),
+                            const SizedBox(width: 14),
+                            Expanded(child: second),
+                          ],
+                        );
+                      }
+                      return Column(children: [first, const SizedBox(height: 14), second]);
+                    }),
+                  ] else ...[
+                    // 4. Numéro de conteneur ou Booking (Mono)
+                    if (kind == 'loaded')
+                      containerBoxes()
+                    else
+                      TextFormField(
+                        controller: booking,
+                        focusNode: bookingFocus,
+                        textInputAction: TextInputAction.next,
+                        onChanged: (_) => setState(() {}),
+                        onFieldSubmitted: (_) {
+                          isoFocus.requestFocus();
+                          isoController.selection = TextSelection(baseOffset: 0, extentOffset: isoController.text.length);
+                        },
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          labelText: 'Booking / ordre libre *',
+                          helperText: 'Le booking n’est pas un numéro ISO de conteneur',
+                          prefixIcon: Icon(Icons.receipt_long, size: 20),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Booking requis' : null,
+                      ),
+                    if (lookupHint != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 7),
+                        child: Text(lookupHint!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                      ),
+                    const SizedBox(height: 14),
+                    // 5. Code ISO
+                    TextFormField(
+                      controller: isoController,
+                      focusNode: isoFocus,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Code ISO *',
+                        helperText: '4 caractères alphanumériques (ex: 22G1, 45G1, 45R1)',
+                        prefixIcon: Icon(Icons.qr_code, size: 20),
+                      ),
+                      maxLength: 4,
+                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                      readOnly: !widget.canCorrect && lookupHint == 'ISO et armateur repris du référentiel.',
+                      onChanged: (v) {
+                        iso = v.trim().toUpperCase();
+                        setState(() {});
+                        if (iso.length == 4) {
+                          pickOperator(forSecond: false);
+                        }
+                      },
+                      onFieldSubmitted: (_) => pickOperator(forSecond: false),
+                      validator: (v) => RegExp(r'^[0-9A-Z]{4}$').hasMatch(v ?? '') ? null : 'Code ISO invalide',
+                    ),
+                    const SizedBox(height: 12),
+                    // 6. Armateur
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        alignment: Alignment.centerLeft,
+                      ),
+                      onPressed: widget.canCorrect || lookupHint != 'ISO et armateur repris du référentiel.'
+                          ? () => pickOperator(forSecond: false)
+                          : null,
+                      icon: const Icon(Icons.business, size: 20),
+                      label: Text(
+                        operator == null ? 'Choisir armateur *' : '${operator!.name} (${operator!.id})',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+
+                  // 7. Bouton enregistrer
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                    onPressed: busy ? null : submit,
+                    icon: const Icon(Icons.save),
+                    label: Text(
+                      busy ? 'Enregistrement…' : 'Enregistrer l’entrée',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class UpperCaseFormatter extends TextInputFormatter {
@@ -1032,9 +1255,10 @@ Future<SupervisorApproval?> showSupervisorApprovalDialog(
 }
 
 class ExitScreen extends StatefulWidget {
-  const ExitScreen({super.key, required this.repository, required this.canCancel});
+  const ExitScreen({super.key, required this.repository, required this.canCancel, this.isFullScreen = false});
   final PointageRepository repository;
   final bool canCancel;
+  final bool isFullScreen;
   @override State<ExitScreen> createState() => _ExitScreenState();
 }
 
@@ -1044,6 +1268,7 @@ class _ExitScreenState extends State<ExitScreen> {
   late Future<List<TruckVisit>> visitsFuture;
   TruckVisit? selectedVisit;
   bool busy = false;
+  bool _isPickerOpen = false;
   List<OperatorRecord> operators = [];
 
   // Active visit inspection & pickup state
@@ -1056,6 +1281,7 @@ class _ExitScreenState extends State<ExitScreen> {
   final List<TextEditingController> boxes1 = List.generate(11, (_) => TextEditingController());
   final List<FocusNode> focus1 = List.generate(11, (_) => FocusNode());
   final iso1Controller = TextEditingController();
+  final iso1Focus = FocusNode();
   String iso1 = '';
   OperatorRecord? operator1;
 
@@ -1063,6 +1289,7 @@ class _ExitScreenState extends State<ExitScreen> {
   final List<TextEditingController> boxes2 = List.generate(11, (_) => TextEditingController());
   final List<FocusNode> focus2 = List.generate(11, (_) => FocusNode());
   final iso2Controller = TextEditingController();
+  final iso2Focus = FocusNode();
   String iso2 = '';
   OperatorRecord? operator2;
 
@@ -1113,7 +1340,13 @@ class _ExitScreenState extends State<ExitScreen> {
         extentOffset: b[index + 1].text.length,
       );
     } else {
-      FocusScope.of(context).unfocus();
+      if (second) {
+        iso2Focus.requestFocus();
+        iso2Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso2Controller.text.length);
+      } else {
+        iso1Focus.requestFocus();
+        iso1Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso1Controller.text.length);
+      }
     }
   }
 
@@ -1123,6 +1356,8 @@ class _ExitScreenState extends State<ExitScreen> {
     reasonController.dispose();
     iso1Controller.dispose();
     iso2Controller.dispose();
+    iso1Focus.dispose();
+    iso2Focus.dispose();
     for (final c in [...boxes1, ...boxes2]) {
       c.dispose();
     }
@@ -1163,16 +1398,27 @@ class _ExitScreenState extends State<ExitScreen> {
   }
 
   Future<void> pickOperator({bool forSecond = false}) async {
-    final chosen = await showOperatorPicker(context, operators);
-    if (chosen != null) {
-      setState(() {
-        if (forSecond) {
-          operator2 = chosen;
-        } else {
-          operator1 = chosen;
-          operator2 ??= chosen;
+    if (_isPickerOpen) return;
+    _isPickerOpen = true;
+    try {
+      final chosen = await showOperatorPicker(context, operators);
+      if (chosen != null && mounted) {
+        setState(() {
+          if (forSecond) {
+            operator2 = chosen;
+          } else {
+            operator1 = chosen;
+            operator2 ??= chosen;
+          }
+        });
+        if (!forSecond && isTwin) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            focus2[0].requestFocus();
+          });
         }
-      });
+      }
+    } finally {
+      _isPickerOpen = false;
     }
   }
 
@@ -1566,6 +1812,7 @@ class _ExitScreenState extends State<ExitScreen> {
                     controller: b[i],
                     focusNode: f[i],
                     textAlign: TextAlign.center,
+                    textInputAction: TextInputAction.next,
                     inputFormatters: [
                       SingleCharOverrideFormatter(
                         isLetter: isLetter,
@@ -1576,6 +1823,7 @@ class _ExitScreenState extends State<ExitScreen> {
                     onTap: () {
                       b[i].selection = TextSelection(baseOffset: 0, extentOffset: b[i].text.length);
                     },
+                    onFieldSubmitted: (_) => _advanceExitBox(i, second),
                     decoration: InputDecoration(
                       counterText: '',
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -1625,6 +1873,13 @@ class _ExitScreenState extends State<ExitScreen> {
               onPressed: () {
                 b[10].text = expected.toString();
                 setState(() {});
+                if (second) {
+                  iso2Focus.requestFocus();
+                  iso2Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso2Controller.text.length);
+                } else {
+                  iso1Focus.requestFocus();
+                  iso1Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso1Controller.text.length);
+                }
               },
             ),
           ],
@@ -1643,6 +1898,13 @@ class _ExitScreenState extends State<ExitScreen> {
               onPressed: () {
                 b[10].text = expected.toString();
                 setState(() {});
+                if (second) {
+                  iso2Focus.requestFocus();
+                  iso2Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso2Controller.text.length);
+                } else {
+                  iso1Focus.requestFocus();
+                  iso1Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso1Controller.text.length);
+                }
               },
             ),
           ],
@@ -1719,23 +1981,24 @@ class _ExitScreenState extends State<ExitScreen> {
           return ListView(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 6),
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, size: 20, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 8),
-                    const Text('Validation de la sortie',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, size: 20),
-                      tooltip: 'Actualiser',
-                      onPressed: loadVisits,
-                    ),
-                  ],
+              if (!widget.isFullScreen)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 6),
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, size: 20, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 8),
+                      const Text('Validation de la sortie',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.refresh, size: 20),
+                        tooltip: 'Actualiser',
+                        onPressed: loadVisits,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
               // Search field
               Card(
@@ -2304,6 +2567,8 @@ class _ExitScreenState extends State<ExitScreen> {
                                   const SizedBox(height: 10),
                                   TextFormField(
                                     controller: iso1Controller,
+                                    focusNode: iso1Focus,
+                                    textInputAction: TextInputAction.next,
                                     decoration: InputDecoration(
                                       labelText: 'Code ISO Conteneur 1 *',
                                       helperText: 'ISO réservé : ${activeVisit.iso} · même longueur requise',
@@ -2315,7 +2580,11 @@ class _ExitScreenState extends State<ExitScreen> {
                                     onChanged: (v) {
                                       iso1 = v.trim().toUpperCase();
                                       setState(() {});
+                                      if (iso1.length == 4) {
+                                        pickOperator(forSecond: false);
+                                      }
                                     },
+                                    onFieldSubmitted: (_) => pickOperator(forSecond: false),
                                   ),
                                   const SizedBox(height: 8),
                                   OutlinedButton.icon(
@@ -2356,6 +2625,8 @@ class _ExitScreenState extends State<ExitScreen> {
                                     const SizedBox(height: 10),
                                     TextFormField(
                                       controller: iso2Controller,
+                                      focusNode: iso2Focus,
+                                      textInputAction: TextInputAction.next,
                                       decoration: const InputDecoration(
                                         labelText: 'Code ISO Conteneur 2 *',
                                         helperText: 'Ex: 22G1',
@@ -2367,7 +2638,11 @@ class _ExitScreenState extends State<ExitScreen> {
                                       onChanged: (v) {
                                         iso2 = v.trim().toUpperCase();
                                         setState(() {});
+                                        if (iso2.length == 4) {
+                                          pickOperator(forSecond: true);
+                                        }
                                       },
+                                      onFieldSubmitted: (_) => pickOperator(forSecond: true),
                                     ),
                                     const SizedBox(height: 8),
                                     OutlinedButton.icon(

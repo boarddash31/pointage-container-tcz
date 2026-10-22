@@ -427,6 +427,7 @@ class PointageShell extends StatefulWidget {
 }
 class _PointageShellState extends State<PointageShell> {
   int section=0,process=0;
+  bool isFullScreen=false;
   late Future<List<String>> roleFuture;
   @override void initState(){super.initState();roleFuture=widget.repository.roles();}
   @override Widget build(BuildContext context) => FutureBuilder<List<String>>(
@@ -460,9 +461,9 @@ class _PointageShellState extends State<PointageShell> {
       final repo=widget.repository;
       final screens=<Widget>[
         switch(activeProcess){
-          0=>allowed('entree')?EntryScreen(repository:repo,canCorrect:admin)
+          0=>allowed('entree')?EntryScreen(repository:repo,canCorrect:admin,isFullScreen:isFullScreen)
               :const PermissionScreen(role:'Entrée'),
-          _=>allowed('sortie')?ExitScreen(repository:repo,canCancel:admin)
+          _=>allowed('sortie')?ExitScreen(repository:repo,canCancel:admin,isFullScreen:isFullScreen)
               :const PermissionScreen(role:'Sortie'),
         },
         DataScreen(repository:repo),
@@ -474,38 +475,87 @@ class _PointageShellState extends State<PointageShell> {
       final destinations=const [NavigationDestination(icon:Icon(Icons.rule),label:'Pointage'),
         NavigationDestination(icon:Icon(Icons.dataset),label:'Data'),
         NavigationDestination(icon:Icon(Icons.description),label:'Bons')];
+
+      Widget content=LayoutBuilder(builder:(context,c)=>(c.maxWidth>900&&!isFullScreen)?
+        Row(children:[NavigationRail(selectedIndex:section,
+          onDestinationSelected:(i)=>setState(()=>section=i),labelType:NavigationRailLabelType.all,
+          destinations:const [NavigationRailDestination(icon:Icon(Icons.rule),label:Text('Pointage')),
+            NavigationRailDestination(icon:Icon(Icons.dataset),label:Text('Data')),
+            NavigationRailDestination(icon:Icon(Icons.description),label:Text('Bons'))]),
+          const VerticalDivider(width:1),Expanded(child:body)]):body);
+
+      if(isFullScreen){
+        content=Stack(children:[
+          content,
+          Positioned(
+            top:10,right:12,
+            child:Material(
+              elevation:6,
+              borderRadius:BorderRadius.circular(22),
+              color:const Color(0xff063e66),
+              child:InkWell(
+                borderRadius:BorderRadius.circular(22),
+                onTap:()=>setState(()=>isFullScreen=false),
+                child:Container(
+                  padding:const EdgeInsets.symmetric(horizontal:12,vertical:7),
+                  decoration:BoxDecoration(
+                    borderRadius:BorderRadius.circular(22),
+                    border:Border.all(color:Colors.amberAccent.withValues(alpha:0.6),width:1.2)),
+                  child:Row(mainAxisSize:MainAxisSize.min,children:[
+                    const Icon(Icons.fullscreen_exit_rounded,size:18,color:Colors.amberAccent),
+                    const SizedBox(width:5),
+                    Text(activeProcess==0?'Entrée':'Sortie',
+                      style:const TextStyle(color:Colors.white,fontSize:13,fontWeight:FontWeight.bold)),
+                    const SizedBox(width:6),
+                    const Icon(Icons.close_rounded,size:15,color:Colors.white70),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ]);
+      }
+
       return Scaffold(
-        appBar:AppBar(
+        appBar:isFullScreen?null:AppBar(
           leadingWidth:86,
           leading:const Padding(padding:EdgeInsets.only(left:12,right:4),
             child:Center(child:TczBrand(width:72,onDark:true))),
           titleSpacing:8,
           centerTitle:true,
           title:section==0
-            ? (canEnter&&canExit?Container(
-                height:38,
-                constraints:const BoxConstraints(maxWidth:240),
-                padding:const EdgeInsets.all(3),
-                decoration:BoxDecoration(
-                  color:Colors.black.withValues(alpha:0.25),
-                  borderRadius:BorderRadius.circular(9)),
-                child:Row(children:[
-                  for(var i=0;i<2;i++)
-                    Expanded(child:InkWell(
-                      borderRadius:BorderRadius.circular(7),
-                      onTap:()=>setState(()=>process=i),
-                      child:Container(
-                        alignment:Alignment.center,
-                        decoration:BoxDecoration(
-                          color:activeProcess==i?Colors.white:Colors.transparent,
-                          borderRadius:BorderRadius.circular(7)),
-                        child:Text(['Entrée','Sortie'][i],
-                          style:TextStyle(
-                            fontSize:13,
-                            fontWeight:activeProcess==i?FontWeight.bold:FontWeight.w500,
-                            color:activeProcess==i?const Color(0xff063e66):Colors.white)),
-                      ))),
-                ])):Text(canEnter?'Entrée':'Sortie'))
+            ? Row(mainAxisSize:MainAxisSize.min,children:[
+                if(canEnter&&canExit) Container(
+                  height:38,
+                  constraints:const BoxConstraints(maxWidth:220),
+                  padding:const EdgeInsets.all(3),
+                  decoration:BoxDecoration(
+                    color:Colors.black.withValues(alpha:0.25),
+                    borderRadius:BorderRadius.circular(9)),
+                  child:Row(children:[
+                    for(var i=0;i<2;i++)
+                      Expanded(child:InkWell(
+                        borderRadius:BorderRadius.circular(7),
+                        onTap:()=>setState(()=>process=i),
+                        child:Container(
+                          alignment:Alignment.center,
+                          decoration:BoxDecoration(
+                            color:activeProcess==i?Colors.white:Colors.transparent,
+                            borderRadius:BorderRadius.circular(7)),
+                          child:Text(['Entrée','Sortie'][i],
+                            style:TextStyle(
+                              fontSize:13,
+                              fontWeight:activeProcess==i?FontWeight.bold:FontWeight.w500,
+                              color:activeProcess==i?const Color(0xff063e66):Colors.white)),
+                        ))),
+                  ]))
+                else Text(canEnter?'Entrée':'Sortie'),
+                const SizedBox(width:4),
+                IconButton(
+                  tooltip:'Mode Plein Écran Saisie',
+                  icon:const Icon(Icons.fullscreen_rounded,color:Colors.amberAccent,size:26),
+                  onPressed:()=>setState(()=>isFullScreen=true)),
+              ])
             : Text(section==1?'Data · Référentiel':'Bons · Documents'),
           backgroundColor:const Color(0xff063e66),foregroundColor:Colors.white,
           actions:[
@@ -522,14 +572,8 @@ class _PointageShellState extends State<PointageShell> {
             IconButton(tooltip:'Déconnexion',icon:const Icon(Icons.logout),
               onPressed:()=>Supabase.instance.client.auth.signOut()),
           ]),
-        body:LayoutBuilder(builder:(context,c)=>c.maxWidth>900?
-          Row(children:[NavigationRail(selectedIndex:section,
-            onDestinationSelected:(i)=>setState(()=>section=i),labelType:NavigationRailLabelType.all,
-            destinations:const [NavigationRailDestination(icon:Icon(Icons.rule),label:Text('Pointage')),
-              NavigationRailDestination(icon:Icon(Icons.dataset),label:Text('Data')),
-              NavigationRailDestination(icon:Icon(Icons.description),label:Text('Bons'))]),
-            const VerticalDivider(width:1),Expanded(child:body)]):body),
-        bottomNavigationBar:MediaQuery.sizeOf(context).width>900?null:
+        body:content,
+        bottomNavigationBar:(isFullScreen||MediaQuery.sizeOf(context).width>900)?null:
           NavigationBar(selectedIndex:section,destinations:destinations,
             onDestinationSelected:(i)=>setState(()=>section=i)),
       );
