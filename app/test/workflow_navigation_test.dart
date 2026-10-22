@@ -426,10 +426,12 @@ void main() {
     expect(find.widgetWithText(TextFormField, 'Plaque camion *'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, 'CIN chauffeur *'), findsOneWidget);
 
-    // Bottom action bar contains page label, Enregistrer button and F11 button
-    expect(find.text('ENTRÉE · GATE IN'), findsOneWidget);
+    // Bottom action bar contains page label, Enregistrer button, direct Print button and F11 button
+    expect(find.text('ENTRÉE'), findsOneWidget);
     expect(find.byKey(const ValueKey('mobile-f11-submit-btn')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile-f11-print-btn')), findsOneWidget);
     expect(find.text('Enregistrer'), findsOneWidget);
+    expect(find.text('Print'), findsOneWidget);
     expect(find.text('F11'), findsOneWidget);
 
     // Tapping F11 calls onToggleFullScreen
@@ -438,9 +440,28 @@ void main() {
     expect(fullscreenToggled, isTrue);
 
     // Tapping ENTRÉE badge calls onSwitchProcess
-    await tester.tap(find.text('ENTRÉE · GATE IN'));
+    await tester.tap(find.text('ENTRÉE'));
     await tester.pumpAndSettle();
     expect(processSwitched, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    // Test ExitScreen bottom bar in mobile F11
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ExitScreen(
+          repository: QueueFixture(),
+          canCancel: false,
+          isFullScreen: true,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('SORTIE'), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile-f11-exit-submit-btn')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile-f11-exit-print-btn')), findsOneWidget);
+    expect(find.text('F11'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });

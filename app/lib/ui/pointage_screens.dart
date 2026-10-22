@@ -106,6 +106,9 @@ class _EntryScreenState extends State<EntryScreen> {
   final PageController _twinPageController = PageController();
   bool _isPickerOpen=false;
   String? lookupHint, lookupHint2;
+  Uint8List? _lastBonBytes;
+  String? _lastVisitId;
+  String? _lastPlate;
   void selectGateMode(String selectedKind, bool selectedTwin) {
     setState(() {
       kind = selectedKind;
@@ -410,6 +413,10 @@ class _EntryScreenState extends State<EntryScreen> {
       final savedPlate = TruckPlate.format(plate.text);
       final savedContainer1 = kind == 'loaded' ? number : (booking.text.isNotEmpty ? booking.text : null);
       final savedContainer2 = isTwin ? (kind == 'loaded' ? number2 : (booking2.text.isNotEmpty ? booking2.text : null)) : null;
+
+      _lastBonBytes = outcome?.bytes;
+      _lastVisitId = visitId;
+      _lastPlate = savedPlate;
 
       form.currentState!.reset();for(final c in [plate,cin,booking,booking2,isoController,iso2Controller,...boxes,...boxes2]){c.clear();}
       setState((){
@@ -719,9 +726,106 @@ class _EntryScreenState extends State<EntryScreen> {
     );
   }
 
+  Future<void> _sendToPrinter(Uint8List bytes, {required String kind, required String visitId, required String plate}) async {
+    final fileName = 'Bon_${kind}_${plate.isNotEmpty ? plate : visitId}';
+    try {
+      final printerName = await SharedPreferencesAsync().getString('preferred_printer_name') ?? '';
+      if (printerName.isNotEmpty) {
+        final info = await Printing.info();
+        if (info.directPrint && info.canListPrinters) {
+          final printers = await Printing.listPrinters();
+          final matches = printers.where((p) => p.name == printerName);
+          if (matches.isNotEmpty) {
+            final printed = await Printing.directPrintPdf(
+              printer: matches.first,
+              onLayout: (_) => bytes,
+              name: fileName,
+            );
+            if (printed) return;
+          }
+        }
+      }
+      final printed = await Printing.layoutPdf(
+        onLayout: (_) => bytes,
+        name: fileName,
+      );
+      if (!printed) {
+        await Printing.sharePdf(bytes: bytes, filename: '$fileName.pdf');
+      }
+    } catch (_) {
+      await Printing.sharePdf(bytes: bytes, filename: '$fileName.pdf');
+    }
+  }
+
+  Future<void> printDirectly() async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      Uint8List? bytesToPrint = _lastBonBytes;
+      String targetPlate = _lastPlate ?? '';
+      String targetVisitId = _lastVisitId ?? '';
+
+      final currentPlate = plate.text.trim();
+      if (currentPlate.isNotEmpty) {
+        final formattedPlate = TruckPlate.format(currentPlate);
+        if (formattedPlate != targetPlate || bytesToPrint == null) {
+          final visit = await widget.repository.client
+              .from('truck_visits')
+              .select('id,plate')
+              .eq('plate', formattedPlate)
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+          if (visit != null) {
+            targetVisitId = visit['id'] as String;
+            targetPlate = visit['plate'] as String? ?? formattedPlate;
+            final docs = DocumentService(widget.repository.client);
+            bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
+          } else {
+            if (mounted) message(context, 'Aucune entrée trouvée pour le camion $formattedPlate.');
+            return;
+          }
+        }
+      } else if (bytesToPrint == null) {
+        final latestVisit = await widget.repository.client
+            .from('truck_visits')
+            .select('id,plate')
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        if (latestVisit != null) {
+          targetVisitId = latestVisit['id'] as String;
+          targetPlate = latestVisit['plate'] as String? ?? '';
+          final docs = DocumentService(widget.repository.client);
+          bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
+        } else {
+          if (mounted) message(context, 'Aucun bon récent. Saisissez une plaque ou enregistrez une entrée.');
+          return;
+        }
+      }
+
+      if (bytesToPrint == null) {
+        if (mounted) message(context, 'Impossible de générer le bon pour $targetPlate.');
+        return;
+      }
+
+      if (mounted) {
+        message(context, 'Impression directe lancée pour $targetPlate…');
+      }
+      await _sendToPrinter(bytesToPrint, kind: 'ENTREE', visitId: targetVisitId, plate: targetPlate);
+    } catch (e) {
+      if (mounted) message(context, 'Erreur d’impression : $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Widget _buildBottomBar() {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final showFullBadge = screenWidth >= 480;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
       decoration: BoxDecoration(
         color: const Color(0xff063e66),
         boxShadow: [
@@ -734,12 +838,12 @@ class _EntryScreenState extends State<EntryScreen> {
       ),
       child: Row(
         children: [
-          // 1. Label dial page: ENTRÉE · GATE IN (or switcher if onSwitchProcess != null)
+          // 1. Label dial page: ENTRÉE (Gate In)
           InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: widget.onSwitchProcess,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(8),
@@ -748,26 +852,26 @@ class _EntryScreenState extends State<EntryScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.login, size: 14, color: Colors.white),
-                  const SizedBox(width: 4),
-                  const Text(
-                    'ENTRÉE · GATE IN',
-                    style: TextStyle(
+                  const Icon(Icons.login, size: 13, color: Colors.white),
+                  const SizedBox(width: 3),
+                  Text(
+                    showFullBadge ? 'ENTRÉE · GATE IN' : 'ENTRÉE',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
                       fontSize: 11,
-                      letterSpacing: 0.4,
+                      letterSpacing: 0.2,
                     ),
                   ),
                   if (widget.onSwitchProcess != null) ...[
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 3),
                     const Icon(Icons.sync_alt_rounded, size: 12, color: Colors.white70),
                   ],
                 ],
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 5),
 
           // 2. Bouton Enregistrer
           Expanded(
@@ -778,23 +882,50 @@ class _EntryScreenState extends State<EntryScreen> {
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xff168dcc),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
                 ),
                 onPressed: busy ? null : submit,
                 icon: busy
                     ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.check_circle_rounded, size: 17),
+                    : const Icon(Icons.check_circle_rounded, size: 16),
                 label: Text(
-                  busy ? 'Enregistrement…' : 'Enregistrer',
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.3),
+                  busy ? 'Enreg…' : 'Enregistrer',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, letterSpacing: 0.2),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 5),
 
-          // 3. Bouton F11
+          // 3. Bouton Print direct vers l'imprimante
+          InkWell(
+            key: const ValueKey('mobile-f11-print-btn'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: busy ? null : printDirectly,
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xff0e7490),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xff38bdf8), width: 1.0),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.print_rounded, size: 16, color: Colors.white),
+                  SizedBox(width: 3),
+                  Text('Print', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+
+          // 4. Bouton F11
           InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: () {
@@ -805,7 +936,9 @@ class _EntryScreenState extends State<EntryScreen> {
               }
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: Colors.amberAccent.withValues(alpha: 0.22),
                 borderRadius: BorderRadius.circular(8),
@@ -814,8 +947,8 @@ class _EntryScreenState extends State<EntryScreen> {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.fullscreen_rounded, size: 16, color: Colors.amberAccent),
-                  SizedBox(width: 3),
+                  Icon(Icons.fullscreen_rounded, size: 15, color: Colors.amberAccent),
+                  SizedBox(width: 2),
                   Text('F11', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
                 ],
               ),
@@ -1528,14 +1661,32 @@ class _EntryScreenState extends State<EntryScreen> {
                   // 7. Bouton enregistrer (quand pas en mobile F11)
                   if (!isMobileF11) ...[
                     const SizedBox(height: 18),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                      onPressed: busy ? null : submit,
-                      icon: const Icon(Icons.save),
-                      label: Text(
-                        busy ? 'Enregistrement…' : 'Enregistrer l’entrée',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                            onPressed: busy ? null : submit,
+                            icon: const Icon(Icons.save),
+                            label: Text(
+                              busy ? 'Enregistrement…' : 'Enregistrer l’entrée',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.tonalIcon(
+                          key: const ValueKey('desktop-direct-print-btn'),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                            backgroundColor: const Color(0xff0e7490).withValues(alpha: 0.15),
+                            foregroundColor: const Color(0xff0e7490),
+                          ),
+                          onPressed: busy ? null : printDirectly,
+                          icon: const Icon(Icons.print_rounded),
+                          label: const Text('Imprimer bon', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
                     ),
                   ],
                 ],
@@ -1775,6 +1926,9 @@ class _ExitScreenState extends State<ExitScreen> {
   bool busy = false;
   bool _isPickerOpen = false;
   List<OperatorRecord> operators = [];
+  Uint8List? _lastExitBytes;
+  String? _lastExitVisitId;
+  String? _lastExitPlate;
 
   // Active visit inspection & pickup state
   String? currentVisitId;
@@ -1960,6 +2114,9 @@ class _ExitScreenState extends State<ExitScreen> {
       message(context, 'Sortie confirmée pour le camion ${visit.plate}.');
       final visitId = visit.id;
       final pdfBytes = outcome?.bytes;
+      _lastExitBytes = pdfBytes;
+      _lastExitVisitId = visitId;
+      _lastExitPlate = visit.plate;
       setState(() {
         selectedVisit = null;
         currentVisitId = null;
@@ -2063,6 +2220,9 @@ class _ExitScreenState extends State<ExitScreen> {
       final savedPlate = visit.plate;
       final savedContainer1 = c1.isNotEmpty ? c1 : visit.container;
       final savedContainer2 = isTwin ? c2 : visit.container2;
+      _lastExitBytes = pdfBytes;
+      _lastExitVisitId = visitId;
+      _lastExitPlate = savedPlate;
       setState(() {
         selectedVisit = null;
         currentVisitId = null;
@@ -2145,6 +2305,9 @@ class _ExitScreenState extends State<ExitScreen> {
       message(context, 'Sortie sans dépose enregistrée pour le camion ${visit.plate} (Visite annulée).');
       final visitId = visit.id;
       final pdfBytes = outcome?.bytes;
+      _lastExitBytes = pdfBytes;
+      _lastExitVisitId = visitId;
+      _lastExitPlate = visit.plate;
 
       setState(() {
         selectedVisit = null;
@@ -2206,6 +2369,9 @@ class _ExitScreenState extends State<ExitScreen> {
       message(context, 'Visite annulée avec visa responsable.');
       final visitId = visit.id;
       final pdfBytes = outcome?.bytes;
+      _lastExitBytes = pdfBytes;
+      _lastExitVisitId = visitId;
+      _lastExitPlate = visit.plate;
 
       setState(() {
         selectedVisit = null;
@@ -2486,10 +2652,127 @@ class _ExitScreenState extends State<ExitScreen> {
     ]);
   }
 
+  Future<void> _sendToPrinter(Uint8List bytes, {required String kind, required String visitId, required String plate}) async {
+    final fileName = 'Bon_${kind}_${plate.isNotEmpty ? plate : visitId}';
+    try {
+      final printerName = await SharedPreferencesAsync().getString('preferred_printer_name') ?? '';
+      if (printerName.isNotEmpty) {
+        final info = await Printing.info();
+        if (info.directPrint && info.canListPrinters) {
+          final printers = await Printing.listPrinters();
+          final matches = printers.where((p) => p.name == printerName);
+          if (matches.isNotEmpty) {
+            final printed = await Printing.directPrintPdf(
+              printer: matches.first,
+              onLayout: (_) => bytes,
+              name: fileName,
+            );
+            if (printed) return;
+          }
+        }
+      }
+      final printed = await Printing.layoutPdf(
+        onLayout: (_) => bytes,
+        name: fileName,
+      );
+      if (!printed) {
+        await Printing.sharePdf(bytes: bytes, filename: '$fileName.pdf');
+      }
+    } catch (_) {
+      await Printing.sharePdf(bytes: bytes, filename: '$fileName.pdf');
+    }
+  }
+
+  Future<void> printExitDirectly([TruckVisit? activeVisit]) async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      Uint8List? bytesToPrint;
+      String targetPlate = '';
+      String targetVisitId = '';
+      String targetKind = 'SORTIE';
+
+      if (activeVisit != null) {
+        targetVisitId = activeVisit.id;
+        targetPlate = activeVisit.plate;
+        final docs = DocumentService(widget.repository.client);
+        bytesToPrint = await docs.prepareLatest(targetVisitId, 'SORTIE');
+        if (bytesToPrint == null) {
+          bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
+          targetKind = 'ENTREE';
+        }
+      } else if (_lastExitBytes != null) {
+        bytesToPrint = _lastExitBytes;
+        targetVisitId = _lastExitVisitId ?? '';
+        targetPlate = _lastExitPlate ?? '';
+      } else if (searchController.text.trim().isNotEmpty) {
+        final formattedPlate = TruckPlate.format(searchController.text.trim());
+        final visit = await widget.repository.client
+            .from('truck_visits')
+            .select('id,plate')
+            .eq('plate', formattedPlate)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        if (visit != null) {
+          targetVisitId = visit['id'] as String;
+          targetPlate = visit['plate'] as String? ?? formattedPlate;
+          final docs = DocumentService(widget.repository.client);
+          bytesToPrint = await docs.prepareLatest(targetVisitId, 'SORTIE');
+          if (bytesToPrint == null) {
+            bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
+            targetKind = 'ENTREE';
+          }
+        } else {
+          if (mounted) message(context, 'Aucun camion trouvé pour la plaque $formattedPlate.');
+          return;
+        }
+      } else {
+        // Find most recent completed visit or active visit
+        final latest = await widget.repository.client
+            .from('truck_visits')
+            .select('id,plate')
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        if (latest != null) {
+          targetVisitId = latest['id'] as String;
+          targetPlate = latest['plate'] as String? ?? '';
+          final docs = DocumentService(widget.repository.client);
+          bytesToPrint = await docs.prepareLatest(targetVisitId, 'SORTIE');
+          if (bytesToPrint == null) {
+            bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
+            targetKind = 'ENTREE';
+          }
+        } else {
+          if (mounted) message(context, 'Aucun bon récent à imprimer.');
+          return;
+        }
+      }
+
+      if (bytesToPrint == null) {
+        if (mounted) message(context, 'Impossible de charger le bon pour $targetPlate.');
+        return;
+      }
+
+      if (mounted) {
+        message(context, 'Impression directe lancée pour $targetPlate…');
+      }
+      await _sendToPrinter(bytesToPrint, kind: targetKind, visitId: targetVisitId, plate: targetPlate);
+    } catch (e) {
+      if (mounted) message(context, 'Erreur d’impression : $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Widget _buildExitBottomBar(TruckVisit? activeVisit) {
     final canSubmit = activeVisit != null;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final showFullBadge = screenWidth >= 480;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
       decoration: BoxDecoration(
         color: const Color(0xff063e66),
         boxShadow: [
@@ -2502,12 +2785,12 @@ class _ExitScreenState extends State<ExitScreen> {
       ),
       child: Row(
         children: [
-          // 1. Label dial page: SORTIE · GATE OUT
+          // 1. Label dial page: SORTIE (Gate Out)
           InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: widget.onSwitchProcess,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(8),
@@ -2516,26 +2799,26 @@ class _ExitScreenState extends State<ExitScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.logout, size: 14, color: Colors.white),
-                  const SizedBox(width: 4),
-                  const Text(
-                    'SORTIE · GATE OUT',
-                    style: TextStyle(
+                  const Icon(Icons.logout, size: 13, color: Colors.white),
+                  const SizedBox(width: 3),
+                  Text(
+                    showFullBadge ? 'SORTIE · GATE OUT' : 'SORTIE',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
                       fontSize: 11,
-                      letterSpacing: 0.4,
+                      letterSpacing: 0.2,
                     ),
                   ),
                   if (widget.onSwitchProcess != null) ...[
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 3),
                     const Icon(Icons.sync_alt_rounded, size: 12, color: Colors.white70),
                   ],
                 ],
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 5),
 
           // 2. Bouton Enregistrer / Valider
           Expanded(
@@ -2546,7 +2829,7 @@ class _ExitScreenState extends State<ExitScreen> {
                 style: FilledButton.styleFrom(
                   backgroundColor: canSubmit ? const Color(0xff168846) : Colors.blueGrey.shade600,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
                 ),
                 onPressed: busy || !canSubmit ? null : () {
@@ -2566,17 +2849,44 @@ class _ExitScreenState extends State<ExitScreen> {
                 },
                 icon: busy
                     ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.check_circle_rounded, size: 17),
+                    : const Icon(Icons.check_circle_rounded, size: 16),
                 label: Text(
-                  busy ? 'Validation…' : (canSubmit ? 'Valider Sortie' : 'Choisir camion'),
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.3),
+                  busy ? 'Valid…' : (canSubmit ? 'Valider Sortie' : 'Choisir camion'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, letterSpacing: 0.2),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 5),
 
-          // 3. Bouton F11
+          // 3. Bouton Print direct vers l'imprimante
+          InkWell(
+            key: const ValueKey('mobile-f11-exit-print-btn'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: busy ? null : () => printExitDirectly(activeVisit),
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xff0e7490),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xff38bdf8), width: 1.0),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.print_rounded, size: 16, color: Colors.white),
+                  SizedBox(width: 3),
+                  Text('Print', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+
+          // 4. Bouton F11
           InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: () {
@@ -2587,7 +2897,9 @@ class _ExitScreenState extends State<ExitScreen> {
               }
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: Colors.amberAccent.withValues(alpha: 0.22),
                 borderRadius: BorderRadius.circular(8),
@@ -2596,8 +2908,8 @@ class _ExitScreenState extends State<ExitScreen> {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.fullscreen_rounded, size: 16, color: Colors.amberAccent),
-                  SizedBox(width: 3),
+                  Icon(Icons.fullscreen_rounded, size: 15, color: Colors.amberAccent),
+                  SizedBox(width: 2),
                   Text('F11', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
                 ],
               ),
@@ -3520,6 +3832,22 @@ class BonConfirmationDialog extends StatelessWidget {
     }
     final fileName = 'TCZ-$kind-$visitId.pdf';
     try {
+      final printerName = await SharedPreferencesAsync().getString('preferred_printer_name') ?? '';
+      if (printerName.isNotEmpty) {
+        final info = await Printing.info();
+        if (info.directPrint && info.canListPrinters) {
+          final printers = await Printing.listPrinters();
+          final matches = printers.where((p) => p.name == printerName);
+          if (matches.isNotEmpty) {
+            final printed = await Printing.directPrintPdf(
+              printer: matches.first,
+              onLayout: (_) => bytes,
+              name: fileName,
+            );
+            if (printed) return;
+          }
+        }
+      }
       final printed = await Printing.layoutPdf(
         onLayout: (_) => bytes,
         name: fileName,
