@@ -900,40 +900,64 @@ class _EntryScreenState extends State<EntryScreen> {
                                 child: Text(lookupHint!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
                               ),
                             const SizedBox(height: 10),
-                            TextFormField(
-                              controller: isoController,
-                              focusNode: isoFocus,
-                              textInputAction: TextInputAction.next,
-                              decoration: const InputDecoration(
-                                labelText: 'Code ISO Conteneur 1 *',
-                                helperText: 'Ex: 22G1',
-                                prefixIcon: Icon(Icons.qr_code, size: 20),
-                              ),
-                              maxLength: 4,
-                              textCapitalization: TextCapitalization.characters,
-                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                              onChanged: (v) {
-                                iso = v.trim().toUpperCase();
-                                setState(() {});
-                                if (iso.length == 4) {
-                                  pickOperator(forSecond: false);
-                                }
-                              },
-                              onFieldSubmitted: (_) => pickOperator(forSecond: false),
-                              validator: (v) => RegExp(r'^[0-9A-Z]{4}$').hasMatch(v ?? '') ? null : 'Code ISO invalide',
-                            ),
-                            const SizedBox(height: 8),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                alignment: Alignment.centerLeft,
-                              ),
-                              onPressed: () => pickOperator(forSecond: false),
-                              icon: const Icon(Icons.business, size: 20),
-                              label: Text(
-                                operator == null ? 'Armateur Conteneur 1 *' : '${operator!.name} (${operator!.id})',
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
+                            // Code ISO 1 & Armateur 1 (Même ligne / Same Row)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 5,
+                                  child: TextFormField(
+                                    controller: isoController,
+                                    focusNode: isoFocus,
+                                    textInputAction: TextInputAction.next,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Code ISO 1 *',
+                                      hintText: 'Ex: 22G1',
+                                      counterText: '',
+                                      prefixIcon: Icon(Icons.qr_code, size: 18),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                    ),
+                                    maxLength: 4,
+                                    textCapitalization: TextCapitalization.characters,
+                                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                                    onChanged: (v) {
+                                      iso = v.trim().toUpperCase();
+                                      setState(() {});
+                                      if (iso.length == 4) {
+                                        pickOperator(forSecond: false);
+                                      }
+                                    },
+                                    onFieldSubmitted: (_) => pickOperator(forSecond: false),
+                                    validator: (v) => RegExp(r'^[0-9A-Z]{4}$').hasMatch(v ?? '') ? null : 'Code ISO invalide',
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 6,
+                                  child: InkWell(
+                                    onTap: () => pickOperator(forSecond: false),
+                                    borderRadius: BorderRadius.circular(11),
+                                    child: InputDecorator(
+                                      decoration: const InputDecoration(
+                                        labelText: 'Armateur 1 *',
+                                        prefixIcon: Icon(Icons.business, size: 18),
+                                        suffixIcon: Icon(Icons.arrow_drop_down, size: 20),
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                      ),
+                                      child: Text(
+                                        operator == null ? 'Armateur Conteneur 1 *' : '${operator!.name} (${operator!.id})',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: operator == null ? const Color(0xff64748b) : const Color(0xff0f172a),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             if (space.maxWidth < 900) ...[
                               const SizedBox(height: 6),
@@ -999,40 +1023,64 @@ class _EntryScreenState extends State<EntryScreen> {
                                 child: Text(lookupHint2!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
                               ),
                             const SizedBox(height: 10),
-                            TextFormField(
-                              controller: iso2Controller,
-                              focusNode: iso2Focus,
-                              textInputAction: TextInputAction.next,
-                              decoration: const InputDecoration(
-                                labelText: 'Code ISO Conteneur 2 *',
-                                helperText: 'Ex: 22G1',
-                                prefixIcon: Icon(Icons.qr_code, size: 20),
-                              ),
-                              maxLength: 4,
-                              textCapitalization: TextCapitalization.characters,
-                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                              onChanged: (v) {
-                                iso2 = v.trim().toUpperCase();
-                                setState(() {});
-                                if (iso2.length == 4) {
-                                  pickOperator(forSecond: true);
-                                }
-                              },
-                              onFieldSubmitted: (_) => pickOperator(forSecond: true),
-                              validator: (v) => RegExp(r'^[0-9A-Z]{4}$').hasMatch(v ?? '') ? null : 'Code ISO invalide',
-                            ),
-                            const SizedBox(height: 8),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                alignment: Alignment.centerLeft,
-                              ),
-                              onPressed: () => pickOperator(forSecond: true),
-                              icon: const Icon(Icons.business, size: 20),
-                              label: Text(
-                                operator2 == null ? 'Armateur Conteneur 2 *' : '${operator2!.name} (${operator2!.id})',
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
+                            // Code ISO 2 & Armateur 2 (Même ligne / Same Row)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 5,
+                                  child: TextFormField(
+                                    controller: iso2Controller,
+                                    focusNode: iso2Focus,
+                                    textInputAction: TextInputAction.next,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Code ISO 2 *',
+                                      hintText: 'Ex: 22G1',
+                                      counterText: '',
+                                      prefixIcon: Icon(Icons.qr_code, size: 18),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                    ),
+                                    maxLength: 4,
+                                    textCapitalization: TextCapitalization.characters,
+                                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                                    onChanged: (v) {
+                                      iso2 = v.trim().toUpperCase();
+                                      setState(() {});
+                                      if (iso2.length == 4) {
+                                        pickOperator(forSecond: true);
+                                      }
+                                    },
+                                    onFieldSubmitted: (_) => pickOperator(forSecond: true),
+                                    validator: (v) => RegExp(r'^[0-9A-Z]{4}$').hasMatch(v ?? '') ? null : 'Code ISO invalide',
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 6,
+                                  child: InkWell(
+                                    onTap: () => pickOperator(forSecond: true),
+                                    borderRadius: BorderRadius.circular(11),
+                                    child: InputDecorator(
+                                      decoration: const InputDecoration(
+                                        labelText: 'Armateur 2 *',
+                                        prefixIcon: Icon(Icons.business, size: 18),
+                                        suffixIcon: Icon(Icons.arrow_drop_down, size: 20),
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                      ),
+                                      child: Text(
+                                        operator2 == null ? 'Armateur Conteneur 2 *' : '${operator2!.name} (${operator2!.id})',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: operator2 == null ? const Color(0xff64748b) : const Color(0xff0f172a),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             if (space.maxWidth < 900) ...[
                               const SizedBox(height: 6),
@@ -1225,46 +1273,69 @@ class _EntryScreenState extends State<EntryScreen> {
                         padding: const EdgeInsets.only(top: 7),
                         child: Text(lookupHint!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
                       ),
-                    const SizedBox(height: 14),
-                    // 5. Code ISO
-                    TextFormField(
-                      controller: isoController,
-                      focusNode: isoFocus,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Code ISO *',
-                        helperText: '4 caractères alphanumériques (ex: 22G1, 45G1, 45R1)',
-                        prefixIcon: Icon(Icons.qr_code, size: 20),
-                      ),
-                      maxLength: 4,
-                      textCapitalization: TextCapitalization.characters,
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                      readOnly: !widget.canCorrect && lookupHint == 'ISO et armateur repris du référentiel.',
-                      onChanged: (v) {
-                        iso = v.trim().toUpperCase();
-                        setState(() {});
-                        if (iso.length == 4) {
-                          pickOperator(forSecond: false);
-                        }
-                      },
-                      onFieldSubmitted: (_) => pickOperator(forSecond: false),
-                      validator: (v) => RegExp(r'^[0-9A-Z]{4}$').hasMatch(v ?? '') ? null : 'Code ISO invalide',
-                    ),
                     const SizedBox(height: 12),
-                    // 6. Armateur
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                        alignment: Alignment.centerLeft,
-                      ),
-                      onPressed: widget.canCorrect || lookupHint != 'ISO et armateur repris du référentiel.'
-                          ? () => pickOperator(forSecond: false)
-                          : null,
-                      icon: const Icon(Icons.business, size: 20),
-                      label: Text(
-                        operator == null ? 'Choisir armateur *' : '${operator!.name} (${operator!.id})',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
+                    // 5. Code ISO & Armateur (Même ligne / Same Row)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: TextFormField(
+                            controller: isoController,
+                            focusNode: isoFocus,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: 'Code ISO *',
+                              hintText: 'Ex: 22G1',
+                              counterText: '',
+                              prefixIcon: Icon(Icons.qr_code, size: 18),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                            ),
+                            maxLength: 4,
+                            textCapitalization: TextCapitalization.characters,
+                            inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                            readOnly: !widget.canCorrect && lookupHint == 'ISO et armateur repris du référentiel.',
+                            onChanged: (v) {
+                              iso = v.trim().toUpperCase();
+                              setState(() {});
+                              if (iso.length == 4) {
+                                pickOperator(forSecond: false);
+                              }
+                            },
+                            onFieldSubmitted: (_) => pickOperator(forSecond: false),
+                            validator: (v) => RegExp(r'^[0-9A-Z]{4}$').hasMatch(v ?? '') ? null : 'Code ISO invalide',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 6,
+                          child: InkWell(
+                            onTap: widget.canCorrect || lookupHint != 'ISO et armateur repris du référentiel.'
+                                ? () => pickOperator(forSecond: false)
+                                : null,
+                            borderRadius: BorderRadius.circular(11),
+                            child: InputDecorator(
+                              decoration: InputDecoration(
+                                labelText: 'Armateur *',
+                                prefixIcon: const Icon(Icons.business, size: 18),
+                                suffixIcon: const Icon(Icons.arrow_drop_down, size: 20),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                enabled: widget.canCorrect || lookupHint != 'ISO et armateur repris du référentiel.',
+                              ),
+                              child: Text(
+                                operator == null ? 'Choisir armateur *' : '${operator!.name} (${operator!.id})',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: operator == null ? const Color(0xff64748b) : const Color(0xff0f172a),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                   const SizedBox(height: 18),
@@ -2821,39 +2892,63 @@ class _ExitScreenState extends State<ExitScreen> {
                                   const SizedBox(height: 8),
                                   exitContainerBoxes(second: false),
                                   const SizedBox(height: 10),
-                                  TextFormField(
-                                    controller: iso1Controller,
-                                    focusNode: iso1Focus,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: InputDecoration(
-                                      labelText: 'Code ISO Conteneur 1 *',
-                                      helperText: 'ISO réservé : ${activeVisit.iso} · même longueur requise',
-                                      prefixIcon: const Icon(Icons.qr_code, size: 20),
-                                    ),
-                                    maxLength: 4,
-                                    textCapitalization: TextCapitalization.characters,
-                                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                                    onChanged: (v) {
-                                      iso1 = v.trim().toUpperCase();
-                                      setState(() {});
-                                      if (iso1.length == 4) {
-                                        pickOperator(forSecond: false);
-                                      }
-                                    },
-                                    onFieldSubmitted: (_) => pickOperator(forSecond: false),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                      alignment: Alignment.centerLeft,
-                                    ),
-                                    onPressed: () => pickOperator(forSecond: false),
-                                    icon: const Icon(Icons.business, size: 20),
-                                    label: Text(
-                                      operator1 == null ? 'Armateur Conteneur 1 *' : '${operator1!.name} (${operator1!.id})',
-                                      style: const TextStyle(fontWeight: FontWeight.w600),
-                                    ),
+                                  // Code ISO 1 & Armateur 1 (Même ligne / Same Row)
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        flex: 5,
+                                        child: TextFormField(
+                                          controller: iso1Controller,
+                                          focusNode: iso1Focus,
+                                          textInputAction: TextInputAction.next,
+                                          decoration: InputDecoration(
+                                            labelText: isTwin ? 'Code ISO 1 *' : 'Code ISO *',
+                                            hintText: 'Ex: ${activeVisit.iso}',
+                                            counterText: '',
+                                            prefixIcon: const Icon(Icons.qr_code, size: 18),
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                          ),
+                                          maxLength: 4,
+                                          textCapitalization: TextCapitalization.characters,
+                                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                                          onChanged: (v) {
+                                            iso1 = v.trim().toUpperCase();
+                                            setState(() {});
+                                            if (iso1.length == 4) {
+                                              pickOperator(forSecond: false);
+                                            }
+                                          },
+                                          onFieldSubmitted: (_) => pickOperator(forSecond: false),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        flex: 6,
+                                        child: InkWell(
+                                          onTap: () => pickOperator(forSecond: false),
+                                          borderRadius: BorderRadius.circular(11),
+                                          child: InputDecorator(
+                                            decoration: InputDecoration(
+                                              labelText: isTwin ? 'Armateur 1 *' : 'Armateur *',
+                                              prefixIcon: const Icon(Icons.business, size: 18),
+                                              suffixIcon: const Icon(Icons.arrow_drop_down, size: 20),
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                            ),
+                                            child: Text(
+                                              operator1 == null ? (isTwin ? 'Armateur Conteneur 1 *' : 'Choisir armateur *') : '${operator1!.name} (${operator1!.id})',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: operator1 == null ? const Color(0xff64748b) : const Color(0xff0f172a),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -2879,39 +2974,63 @@ class _ExitScreenState extends State<ExitScreen> {
                                     const SizedBox(height: 8),
                                     exitContainerBoxes(second: true),
                                     const SizedBox(height: 10),
-                                    TextFormField(
-                                      controller: iso2Controller,
-                                      focusNode: iso2Focus,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Code ISO Conteneur 2 *',
-                                        helperText: 'Ex: 22G1',
-                                        prefixIcon: Icon(Icons.qr_code, size: 20),
-                                      ),
-                                      maxLength: 4,
-                                      textCapitalization: TextCapitalization.characters,
-                                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
-                                      onChanged: (v) {
-                                        iso2 = v.trim().toUpperCase();
-                                        setState(() {});
-                                        if (iso2.length == 4) {
-                                          pickOperator(forSecond: true);
-                                        }
-                                      },
-                                      onFieldSubmitted: (_) => pickOperator(forSecond: true),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    OutlinedButton.icon(
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                        alignment: Alignment.centerLeft,
-                                      ),
-                                      onPressed: () => pickOperator(forSecond: true),
-                                      icon: const Icon(Icons.business, size: 20),
-                                      label: Text(
-                                        operator2 == null ? 'Armateur Conteneur 2 *' : '${operator2!.name} (${operator2!.id})',
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
-                                      ),
+                                    // Code ISO 2 & Armateur 2 (Même ligne / Same Row)
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          flex: 5,
+                                          child: TextFormField(
+                                            controller: iso2Controller,
+                                            focusNode: iso2Focus,
+                                            textInputAction: TextInputAction.next,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Code ISO 2 *',
+                                              hintText: 'Ex: 22G1',
+                                              counterText: '',
+                                              prefixIcon: Icon(Icons.qr_code, size: 18),
+                                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                            ),
+                                            maxLength: 4,
+                                            textCapitalization: TextCapitalization.characters,
+                                            inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')), UpperCaseFormatter()],
+                                            onChanged: (v) {
+                                              iso2 = v.trim().toUpperCase();
+                                              setState(() {});
+                                              if (iso2.length == 4) {
+                                                pickOperator(forSecond: true);
+                                              }
+                                            },
+                                            onFieldSubmitted: (_) => pickOperator(forSecond: true),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          flex: 6,
+                                          child: InkWell(
+                                            onTap: () => pickOperator(forSecond: true),
+                                            borderRadius: BorderRadius.circular(11),
+                                            child: InputDecorator(
+                                              decoration: const InputDecoration(
+                                                labelText: 'Armateur 2 *',
+                                                prefixIcon: Icon(Icons.business, size: 18),
+                                                suffixIcon: Icon(Icons.arrow_drop_down, size: 20),
+                                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                              ),
+                                              child: Text(
+                                                operator2 == null ? 'Armateur Conteneur 2 *' : '${operator2!.name} (${operator2!.id})',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: operator2 == null ? const Color(0xff64748b) : const Color(0xff0f172a),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
