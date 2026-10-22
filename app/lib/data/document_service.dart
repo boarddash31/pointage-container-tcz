@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'bon_pdf_builder.dart';
 
 class DocumentService {
   DocumentService(this.client);
@@ -62,21 +63,43 @@ class DocumentService {
   }
 
   Future<Map<String,dynamic>?> latest(String visitId,String kind) async =>
-    client.from('generated_documents').select('id,visit_id,kind,status,storage_path,created_at')
+    client.from('generated_documents').select('id,visit_id,kind,status,storage_path,snapshot,created_at')
       .eq('visit_id',visitId).eq('kind',kind).order('created_at',ascending:false)
       .limit(1).maybeSingle();
 
   Future<Uint8List> prepare(Map<String,dynamic> document) async {
-    var path=document['storage_path'] as String?;
-    if(path==null || path.isEmpty){
-      final response=await client.functions.invoke('generate-bon',body:{
-        'document_id':document['id'],
-      });
-      if(response.status!=200)throw StateError('Génération PDF refusée (${response.status}) : ${response.data}');
-      path=(response.data as Map<String,dynamic>)['path'] as String?;
-      if(path==null)throw StateError('Chemin du PDF absent.');
+    // 1. Generate the modern, crystal-clear A5 Bon with truck visuals and gate-out rules
+    try {
+      Map<String, dynamic>? visitData;
+      final visitId = document['visit_id'] as String?;
+      if (visitId != null && visitId.isNotEmpty) {
+        try {
+          visitData = await client
+              .from('truck_visits')
+              .select('*,bookings(reference)')
+              .eq('id', visitId)
+              .maybeSingle();
+        } catch (_) {}
+      }
+      return await BonPdfBuilder.buildA5(
+        document: document,
+        visitData: visitData,
+      );
+    } catch (_) {
+      // Fallback to storage download if builder fails
+      var path = document['storage_path'] as String?;
+      if (path == null || path.isEmpty) {
+        final response = await client.functions.invoke('generate-bon', body: {
+          'document_id': document['id'],
+        });
+        if (response.status != 200) {
+          throw StateError('Génération PDF refusée (${response.status}) : ${response.data}');
+        }
+        path = (response.data as Map<String, dynamic>)['path'] as String?;
+        if (path == null) throw StateError('Chemin du PDF absent.');
+      }
+      return client.storage.from('pointage-documents').download(path);
     }
-    return client.storage.from('pointage-documents').download(path);
   }
 
   Future<Uint8List?> prepareLatest(String visitId,String kind) async {
