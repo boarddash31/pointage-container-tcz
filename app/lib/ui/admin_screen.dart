@@ -304,6 +304,169 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  void openEditAgentDialog(Map<String, dynamic> profile) {
+    final id = profile['id'] as String;
+    final fullName = (profile['display_name'] ?? '').toString();
+    final parts = fullName.split(' ');
+    final fNameController = TextEditingController(text: (profile['first_name'] ?? (parts.isNotEmpty ? parts[0] : '')).toString());
+    final lNameController = TextEditingController(text: (profile['last_name'] ?? (parts.length > 1 ? parts.sublist(1).join(' ') : '')).toString());
+    final phoneController = TextEditingController(text: (profile['phone'] ?? '').toString());
+    final passwordController = TextEditingController(text: (profile['initial_password'] ?? 'tcz123').toString());
+    
+    final currentRoles = (profile['user_roles'] as List).map((x) => x['role'].toString()).toList();
+    String selectedRole = currentRoles.contains('admin') ? 'admin'
+        : currentRoles.contains('sortie') ? 'sortie'
+        : currentRoles.contains('engin') ? 'engin' : 'entree';
+    bool isActive = profile['active'] != false;
+    bool saving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, update) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: const Color(0xfff0f9ff), borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.edit_rounded, color: Color(0xff0284c7), size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text('Modifier le Collaborateur', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: 440,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: fNameController,
+                          decoration: const InputDecoration(labelText: 'Prénom *', border: OutlineInputBorder()),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: lNameController,
+                          decoration: const InputDecoration(labelText: 'Nom *', border: OutlineInputBorder()),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(
+                      labelText: 'Numéro Téléphone / WhatsApp *',
+                      hintText: '06XXXXXXXX',
+                      prefixText: '+212 ',
+                      prefixIcon: Icon(Icons.phone_iphone_rounded),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedRole,
+                    decoration: const InputDecoration(labelText: 'Poste & Habilitation *', border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'entree', child: Text('Opérateur Entrée (Gate-In)')),
+                      DropdownMenuItem(value: 'sortie', child: Text('Opérateur Sortie (Gate-Out)')),
+                      DropdownMenuItem(value: 'engin', child: Text('Conducteur Engin (Parc)')),
+                      DropdownMenuItem(value: 'admin', child: Text('SUPERVISEUR TCZ (Admin)')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) update(() => selectedRole = val);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: passwordController,
+                          decoration: const InputDecoration(labelText: 'Mot de passe *', border: OutlineInputBorder()),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Générer code facile',
+                        icon: const Icon(Icons.refresh_rounded, color: Color(0xff0284c7)),
+                        onPressed: () {
+                          final rnd = (100 + (DateTime.now().millisecondsSinceEpoch % 900)).toString();
+                          update(() => passwordController.text = 'tcz$rnd');
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Compte actif', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    value: isActive,
+                    onChanged: (v) => update(() => isActive = v),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: saving ? null : () async {
+                if (fNameController.text.trim().isEmpty || lNameController.text.trim().isEmpty || phoneController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veuillez remplir tous les champs obligatoires')));
+                  return;
+                }
+                update(() => saving = true);
+                try {
+                  await widget.repository.updateAgent(
+                    userId: id,
+                    phone: phoneController.text.trim(),
+                    firstName: fNameController.text.trim(),
+                    lastName: lNameController.text.trim(),
+                    role: selectedRole,
+                    password: passwordController.text.trim(),
+                    active: isActive,
+                  );
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                  }
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Profil de ${fNameController.text} mis à jour avec succès')),
+                    );
+                    refresh();
+                  }
+                } catch (e) {
+                  update(() => saving = false);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red));
+                  }
+                }
+              },
+              child: saving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Enregistrer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> addClient() async {
     final code = TextEditingController(), name = TextEditingController();
     await showDialog(
@@ -1080,6 +1243,11 @@ class _AdminScreenState extends State<AdminScreen> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, color: Color(0xff0284c7), size: 20),
+                              tooltip: 'Modifier ce collaborateur',
+                              onPressed: () => openEditAgentDialog(p),
+                            ),
                             if (p['phone'] != null && (p['phone'] as String).isNotEmpty)
                               IconButton(
                                 icon: const Icon(Icons.message_rounded, color: Color(0xff16a34a), size: 20),

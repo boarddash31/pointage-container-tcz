@@ -218,6 +218,29 @@ class PointageRepository {
     return [for (final r in rows as List) Map<String, dynamic>.from(r as Map)];
   }
 
+  Future<Map<String, dynamic>> updateAgent({
+    required String userId,
+    required String phone,
+    required String firstName,
+    required String lastName,
+    required String role,
+    String? password,
+    bool active = true,
+    String? adminCode,
+  }) async {
+    final res = await client.rpc('admin_update_agent', params: {
+      'p_user_id': userId,
+      'p_phone': phone,
+      'p_first_name': firstName,
+      'p_last_name': lastName,
+      'p_role': role,
+      'p_password': password,
+      'p_active': active,
+      'p_admin_code': adminCode ?? '01010909',
+    });
+    return Map<String, dynamic>.from(res as Map);
+  }
+
   Future<Map<String, dynamic>> dashboardKpis([DateTime? day]) async {
     final target = day ?? DateTime.now();
     final dStr = '${target.year}-${target.month.toString().padLeft(2, '0')}-${target.day.toString().padLeft(2, '0')}';

@@ -58,11 +58,19 @@ $entryCount = $files.Count
 Write-Host "Archive created successfully with $entryCount files."
 
 Write-Host "Uploading to Netlify site $siteId..."
-$result = curl.exe -k -s -X POST `
+$responseFile = "$repoRoot\deploy_resp.json"
+if (Test-Path $responseFile) { Remove-Item -Force $responseFile }
+curl.exe -k -s -S --output "$responseFile" `
     -H "Content-Type: application/zip" `
     -H "Authorization: Bearer $token" `
     --data-binary "@$zipPath" `
     "https://api.netlify.com/api/v1/sites/$siteId/deploys"
+
+if (-not (Test-Path $responseFile)) {
+    throw "Netlify API failed to produce response file"
+}
+$result = Get-Content -Raw -Path $responseFile
+Remove-Item -Force $responseFile -ErrorAction SilentlyContinue
 
 $deployObj = $result | ConvertFrom-Json
 if (-not $deployObj.id) {
