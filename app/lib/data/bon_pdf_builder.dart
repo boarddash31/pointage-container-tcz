@@ -93,6 +93,13 @@ class BonPdfBuilder {
     final lightAmber = PdfColor.fromHex('#fef3c7');
     final lightBlue = PdfColor.fromHex('#e0f2fe');
 
+    final isAnnulation = kind == 'ANNULATION';
+    final cancelReason = (visitData?['cancel_reason'] ??
+            event['reason'] ??
+            snapshot['cancel_reason'] ??
+            'Sortie sans depose de conteneur')
+        .toString();
+
     // Title mapping
     String docTitle;
     PdfColor docColor;
@@ -102,6 +109,9 @@ class BonPdfBuilder {
     } else if (kind == 'SORTIE') {
       docTitle = 'BON DE SORTIE (GATE-OUT)';
       docColor = emerald;
+    } else if (kind == 'ANNULATION') {
+      docTitle = "BON D'ANNULATION (SORTIE SANS DEPOSE)";
+      docColor = PdfColor.fromHex('#dc2626');
     } else {
       docTitle = 'BON TCZ - $kind';
       docColor = navy;
@@ -400,28 +410,32 @@ class BonPdfBuilder {
                     pw.Container(
                       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                       decoration: pw.BoxDecoration(
-                        color: PdfColor.fromHex('#e2e8f0'),
+                        color: isAnnulation ? PdfColor.fromHex('#fee2e2') : PdfColor.fromHex('#e2e8f0'),
                         borderRadius: pw.BorderRadius.circular(4),
                       ),
                       child: pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
                           pw.Text(
-                            'CONTROLE VISUEL DE ROTATION (TERMINAL TCZ ZENATA)',
+                            isAnnulation
+                                ? 'CONTROLE D\'EXCEPTION : SORTIE SANS DEPOSE'
+                                : 'CONTROLE VISUEL DE ROTATION (TERMINAL TCZ ZENATA)',
                             style: pw.TextStyle(
                               fontSize: 6.5,
                               fontWeight: pw.FontWeight.bold,
-                              color: darkNavy,
+                              color: isAnnulation ? PdfColor.fromHex('#991b1b') : darkNavy,
                             ),
                           ),
                           pw.Text(
-                            isEntryEmpty
-                                ? 'MISSION : PRISE DE CONTENEUR'
-                                : 'MISSION : DEPOSE DE CONTENEUR',
+                            isAnnulation
+                                ? 'VISA SUPERVISEUR CODE 01010909 : VALIDE'
+                                : (isEntryEmpty
+                                    ? 'MISSION : PRISE DE CONTENEUR'
+                                    : 'MISSION : DEPOSE DE CONTENEUR'),
                             style: pw.TextStyle(
                               fontSize: 6.5,
                               fontWeight: pw.FontWeight.bold,
-                              color: isEntryEmpty ? amber : emerald,
+                              color: isAnnulation ? PdfColor.fromHex('#dc2626') : (isEntryEmpty ? amber : emerald),
                             ),
                           ),
                         ],
@@ -498,21 +512,27 @@ class BonPdfBuilder {
                             mainAxisAlignment: pw.MainAxisAlignment.center,
                             children: [
                               pw.Text(
-                                'ROTATION',
+                                isAnnulation ? 'ANNULATION' : 'ROTATION',
                                 style: pw.TextStyle(fontSize: 5.5, fontWeight: pw.FontWeight.bold, color: muted),
                               ),
                               pw.SizedBox(height: 1),
                               pw.Text(
-                                '>>>>>',
-                                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: navy),
+                                isAnnulation ? '<<<<<' : '>>>>>',
+                                style: pw.TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: isAnnulation ? PdfColor.fromHex('#dc2626') : navy,
+                                ),
                               ),
                               pw.SizedBox(height: 1),
                               pw.Text(
-                                isEntryEmpty ? 'PRISE' : 'DEPOSE',
+                                isAnnulation
+                                    ? 'RESSORTI'
+                                    : (isEntryEmpty ? 'PRISE' : 'DEPOSE'),
                                 style: pw.TextStyle(
                                   fontSize: 5.5,
                                   fontWeight: pw.FontWeight.bold,
-                                  color: isEntryEmpty ? amber : emerald,
+                                  color: isAnnulation ? PdfColor.fromHex('#dc2626') : (isEntryEmpty ? amber : emerald),
                                 ),
                               ),
                             ],
@@ -527,7 +547,10 @@ class BonPdfBuilder {
                             decoration: pw.BoxDecoration(
                               color: PdfColors.white,
                               borderRadius: pw.BorderRadius.circular(5),
-                              border: pw.Border.all(color: emerald, width: 1.2),
+                              border: pw.Border.all(
+                                color: isAnnulation ? PdfColor.fromHex('#dc2626') : emerald,
+                                width: 1.2,
+                              ),
                             ),
                             child: pw.Column(
                               children: [
@@ -535,38 +558,54 @@ class BonPdfBuilder {
                                   width: double.infinity,
                                   padding: const pw.EdgeInsets.symmetric(vertical: 2),
                                   decoration: pw.BoxDecoration(
-                                    color: lightEmerald,
+                                    color: isAnnulation ? PdfColor.fromHex('#fee2e2') : lightEmerald,
                                     borderRadius: pw.BorderRadius.circular(3),
                                   ),
                                   child: pw.Text(
-                                    '2. CONTROLE SORTIE EXIGE (GATE-OUT)',
+                                    isAnnulation
+                                        ? '2. SORTIE AUTORISEE (ANNULATION)'
+                                        : '2. CONTROLE SORTIE EXIGE (GATE-OUT)',
                                     textAlign: pw.TextAlign.center,
                                     style: pw.TextStyle(
                                       fontSize: 6,
                                       fontWeight: pw.FontWeight.bold,
-                                      color: emerald,
+                                      color: isAnnulation ? PdfColor.fromHex('#dc2626') : emerald,
                                     ),
                                   ),
                                 ),
                                 pw.SizedBox(height: 3),
-                                if (exitImg != null)
-                                  pw.Image(exitImg, height: 35, fit: pw.BoxFit.contain)
+                                if ((isAnnulation ? entryImg : exitImg) != null)
+                                  pw.Image((isAnnulation ? entryImg : exitImg)!, height: 35, fit: pw.BoxFit.contain)
                                 else
                                   pw.Container(
                                     height: 35,
                                     alignment: pw.Alignment.center,
                                     child: pw.Text(
-                                      isEntryEmpty ? '[ DOIT SORTIR CHARGE ]' : '[ DOIT SORTIR VIDE ]',
-                                      style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: emerald),
+                                      isAnnulation
+                                          ? '[ SORTIE SANS DEPOSE ]'
+                                          : (isEntryEmpty ? '[ DOIT SORTIR CHARGE ]' : '[ DOIT SORTIR VIDE ]'),
+                                      style: pw.TextStyle(
+                                        fontSize: 7,
+                                        fontWeight: pw.FontWeight.bold,
+                                        color: isAnnulation ? PdfColor.fromHex('#dc2626') : emerald,
+                                      ),
                                     ),
                                   ),
                                 pw.SizedBox(height: 2),
                                 pw.Text(
-                                  isEntryEmpty ? 'DOIT SORTIR CHARGE' : 'DOIT SORTIR VIDE (CHASSIS NU)',
-                                  style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: emerald),
+                                  isAnnulation
+                                      ? 'SORTIE SANS DEPOSE'
+                                      : (isEntryEmpty ? 'DOIT SORTIR CHARGE' : 'DOIT SORTIR VIDE (CHASSIS NU)'),
+                                  style: pw.TextStyle(
+                                    fontSize: 6.5,
+                                    fontWeight: pw.FontWeight.bold,
+                                    color: isAnnulation ? PdfColor.fromHex('#dc2626') : emerald,
+                                  ),
                                 ),
                                 pw.Text(
-                                  isEntryEmpty ? 'Conteneur assigne + scelle' : 'Plateau verifie vide',
+                                  isAnnulation
+                                      ? 'Ressorti avec son conteneur'
+                                      : (isEntryEmpty ? 'Conteneur assigne + scelle' : 'Plateau verifie vide'),
                                   style: const pw.TextStyle(fontSize: 5, color: PdfColors.grey700),
                                 ),
                               ],
@@ -582,31 +621,43 @@ class BonPdfBuilder {
                     pw.Container(
                       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: pw.BoxDecoration(
-                        color: isEntryEmpty ? lightAmber : lightEmerald,
+                        color: isAnnulation
+                            ? PdfColor.fromHex('#fee2e2')
+                            : (isEntryEmpty ? lightAmber : lightEmerald),
                         borderRadius: pw.BorderRadius.circular(4),
                         border: pw.Border.all(
-                          color: isEntryEmpty ? amber : emerald,
+                          color: isAnnulation
+                              ? PdfColor.fromHex('#dc2626')
+                              : (isEntryEmpty ? amber : emerald),
                           width: 0.6,
                         ),
                       ),
                       child: pw.Row(
                         children: [
                           pw.Text(
-                            '[ DIRECTIVE SORTIE ] : ',
+                            isAnnulation
+                                ? '[ ALERTE SECURITE - SORTIE SANS DEPOSE ] : '
+                                : '[ DIRECTIVE SORTIE ] : ',
                             style: pw.TextStyle(
                               fontSize: 6.5,
                               fontWeight: pw.FontWeight.bold,
-                              color: isEntryEmpty ? PdfColor.fromHex('#92400e') : PdfColor.fromHex('#166534'),
+                              color: isAnnulation
+                                  ? PdfColor.fromHex('#991b1b')
+                                  : (isEntryEmpty ? PdfColor.fromHex('#92400e') : PdfColor.fromHex('#166534')),
                             ),
                           ),
                           pw.Expanded(
                             child: pw.Text(
-                              isEntryEmpty
-                                  ? 'Le camion est entre a vide. Verifier obligatoirement le conteneur charge et le scelle avant barriere.'
-                                  : 'Le camion est entre charge. Verifier imperativement que le plateau est completement vide avant barriere.',
+                              isAnnulation
+                                  ? 'Motif : $cancelReason. Sortie autorisee par Superviseur (Code 01010909). Le camion ressort avec son chargement sans dechargement en yard.'
+                                  : (isEntryEmpty
+                                      ? 'Le camion est entre a vide. Verifier obligatoirement le conteneur charge et le scelle avant barriere.'
+                                      : 'Le camion est entre charge. Verifier imperativement que le plateau est completement vide avant barriere.'),
                               style: pw.TextStyle(
                                 fontSize: 6,
-                                color: isEntryEmpty ? PdfColor.fromHex('#78350f') : PdfColor.fromHex('#14532d'),
+                                color: isAnnulation
+                                    ? PdfColor.fromHex('#7f1d1d')
+                                    : (isEntryEmpty ? PdfColor.fromHex('#78350f') : PdfColor.fromHex('#14532d')),
                               ),
                             ),
                           ),
@@ -633,11 +684,11 @@ class BonPdfBuilder {
                   ),
                   pw.SizedBox(width: 10),
                   _signatureBox(
-                    title: '2. POSTE SORTIE (GATE-OUT)',
-                    subtitle: 'Controle final & autorisation de passage',
-                    field1: 'Heure effective de sortie : ___ : ___',
-                    field2: 'Controle de conformite : [  ] Chassis   [  ] Scelle',
-                    accentColor: emerald,
+                    title: isAnnulation ? '2. VISA SUPERVISEUR TCZ' : '2. POSTE SORTIE (GATE-OUT)',
+                    subtitle: isAnnulation ? 'Autorisation code 01010909' : 'Controle final & autorisation de passage',
+                    field1: isAnnulation ? 'Motif : $cancelReason' : 'Heure effective de sortie : ___ : ___',
+                    field2: isAnnulation ? 'Decision : Sortie sans decharge [ OK ]' : 'Controle de conformite : [  ] Chassis   [  ] Scelle',
+                    accentColor: isAnnulation ? PdfColor.fromHex('#dc2626') : emerald,
                   ),
                 ],
               ),

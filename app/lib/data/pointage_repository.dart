@@ -171,10 +171,15 @@ class PointageRepository {
     });
   }
 
-  Future<void> cancel(String visitId, String reason) async {
-    await client.rpc('cancel_visit', params: {
-      'p_visit': visitId, 'p_reason': reason,
-    });
+  Future<void> cancel(String visitId, String reason, {String? adminCode}) async {
+    final params = <String, dynamic>{
+      'p_visit': visitId,
+      'p_reason': reason,
+    };
+    if (adminCode != null && adminCode.isNotEmpty) {
+      params['p_admin_code'] = adminCode;
+    }
+    await client.rpc('cancel_visit', params: params);
   }
 
   Future<List<Map<String, dynamic>>> events(String visitId) async =>

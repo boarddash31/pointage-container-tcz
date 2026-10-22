@@ -880,6 +880,130 @@ class _EnginScreenState extends State<EnginScreen> {
     canCancel:widget.canCancel,exitMode:false);
 }
 
+class SupervisorApproval {
+  final String code;
+  final String reason;
+  const SupervisorApproval({required this.code, required this.reason});
+}
+
+Future<SupervisorApproval?> showSupervisorApprovalDialog(
+  BuildContext context, {
+  required String title,
+  required String visitPlate,
+  required String defaultReason,
+}) async {
+  final codeCtrl = TextEditingController();
+  final reasonCtrl = TextEditingController(text: defaultReason);
+  String? errorMsg;
+
+  return showDialog<SupervisorApproval>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            icon: const Icon(Icons.shield, color: Color(0xffdc2626), size: 40),
+            title: Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xfffef2f2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xfffecaca)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'CAMION : $visitPlate',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Color(0xff991b1b),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Cette operation exceptionnelle annule la rotation et autorise le camion a sortir avec son chargement. Le visa du superviseur (Code 01010909) est obligatoire.',
+                          style: TextStyle(fontSize: 11, color: Color(0xff7f1d1d)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: reasonCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Motif d\'annulation *',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: codeCtrl,
+                    obscureText: true,
+                    keyboardType: TextInputType.number,
+                    maxLength: 8,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Code Superviseur (01010909) *',
+                      prefixIcon: const Icon(Icons.lock),
+                      errorText: errorMsg,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: const Text('Fermer / Retour'),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xffdc2626),
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.verified_user),
+                label: const Text('Valider l\'annulation'),
+                onPressed: () {
+                  final code = codeCtrl.text.trim();
+                  final reason = reasonCtrl.text.trim();
+                  if (reason.length < 5) {
+                    setDialogState(() {
+                      errorMsg = 'Motif d\'au moins 5 caracteres requis.';
+                    });
+                    return;
+                  }
+                  if (code != '01010909') {
+                    setDialogState(() {
+                      errorMsg = 'Code superviseur incorrect (01010909 requis).';
+                    });
+                    return;
+                  }
+                  Navigator.pop(ctx, SupervisorApproval(code: code, reason: reason));
+                },
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
 class ExitScreen extends StatefulWidget {
   const ExitScreen({super.key, required this.repository, required this.canCancel});
   final PointageRepository repository;
@@ -1204,20 +1328,55 @@ class _ExitScreenState extends State<ExitScreen> {
   }
 
   Future<void> cancelTruckWithoutDeposit(TruckVisit visit) async {
+    final approval = await showSupervisorApprovalDialog(
+      context,
+      title: 'Sortie Sans Dépose (Annulation)',
+      visitPlate: visit.plate,
+      defaultReason: 'Sortie sans décharge de conteneur (ressorti avec son chargement)',
+    );
+    if (approval == null) return;
+
     setState(() => busy = true);
+    DocumentOutcome? outcome;
     try {
       await widget.repository.cancel(
         visit.id,
-        'Sortie sans décharge de conteneur (ressorti avec son chargement)',
+        approval.reason,
+        adminCode: approval.code,
       );
+
+      try {
+        final documents = DocumentService(widget.repository.client);
+        outcome = await documents.finalizeLatest(visit.id, 'ANNULATION');
+      } catch (_) {
+        /* Retry in Bons. */
+      }
+
       if (!mounted) return;
-      message(context, 'Sortie sans dépose enregistrée pour le camion ${visit.plate} (visite annulée).');
+      message(context, 'Sortie sans dépose enregistrée pour le camion ${visit.plate} (Visite annulée).');
+      final visitId = visit.id;
+      final pdfBytes = outcome?.bytes;
+
       setState(() {
         selectedVisit = null;
         currentVisitId = null;
         searchController.clear();
       });
       loadVisits();
+
+      if (mounted && pdfBytes != null) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BonPdfScreen(
+              bytes: pdfBytes,
+              kind: 'ANNULATION',
+              visitId: visitId,
+              autoPrint: true,
+            ),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) message(context, 'Erreur lors de l’annulation : $e');
     } finally {
@@ -1226,15 +1385,35 @@ class _ExitScreenState extends State<ExitScreen> {
   }
 
   Future<void> cancelTruck(TruckVisit visit) async {
-    if (reasonController.text.trim().length < 5) {
-      message(context, 'Motif d’annulation de 5 caractères minimum requis.');
-      return;
-    }
+    final approval = await showSupervisorApprovalDialog(
+      context,
+      title: 'Annuler la visite',
+      visitPlate: visit.plate,
+      defaultReason: reasonController.text.trim().isNotEmpty
+          ? reasonController.text.trim()
+          : 'Annulation demandée par le superviseur',
+    );
+    if (approval == null) return;
+
     setState(() => busy = true);
+    DocumentOutcome? outcome;
     try {
-      await widget.repository.cancel(visit.id, reasonController.text.trim());
+      await widget.repository.cancel(
+        visit.id,
+        approval.reason,
+        adminCode: approval.code,
+      );
+      try {
+        final documents = DocumentService(widget.repository.client);
+        outcome = await documents.finalizeLatest(visit.id, 'ANNULATION');
+      } catch (_) {
+        /* Retry in Bons. */
+      }
       if (!mounted) return;
-      message(context, 'Visite annulée avec trace.');
+      message(context, 'Visite annulée avec visa responsable.');
+      final visitId = visit.id;
+      final pdfBytes = outcome?.bytes;
+
       setState(() {
         selectedVisit = null;
         currentVisitId = null;
@@ -1242,6 +1421,20 @@ class _ExitScreenState extends State<ExitScreen> {
         reasonController.clear();
       });
       loadVisits();
+
+      if (mounted && pdfBytes != null) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BonPdfScreen(
+              bytes: pdfBytes,
+              kind: 'ANNULATION',
+              visitId: visitId,
+              autoPrint: true,
+            ),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) message(context, 'Annulation refusée : $e');
     } finally {
@@ -1250,34 +1443,7 @@ class _ExitScreenState extends State<ExitScreen> {
   }
 
   void showCancelDialog(BuildContext context, TruckVisit v) {
-    reasonController.clear();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Annuler la visite (${v.plate})'),
-        content: TextField(
-          controller: reasonController,
-          decoration: const InputDecoration(
-            labelText: 'Motif d’annulation (requis)',
-            hintText: '5 caractères minimum',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Retour'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () {
-              Navigator.pop(ctx);
-              cancelTruck(v);
-            },
-            child: const Text('Confirmer l’annulation'),
-          ),
-        ],
-      ),
-    );
+    cancelTruck(v);
   }
 
   Widget infoTile({
@@ -2587,10 +2753,40 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
             icon:const Icon(Icons.report_problem_outlined),
             label:const Text('Forcer la prise sans stock')),
         ],
-        TextButton.icon(onPressed:busy?null:(){if(reason.text.trim().length<5){
-          message(context,'Motif détaillé requis.');return;}
-          run(()=>widget.repository.cancel(v.id,reason.text.trim()),'Visite annulée avec trace.');},
-          icon:const Icon(Icons.cancel_outlined),label:const Text('Annuler cette visite')),
+        TextButton.icon(
+          onPressed: busy ? null : () async {
+            final approval = await showSupervisorApprovalDialog(
+              context,
+              title: 'Annuler cette visite',
+              visitPlate: v.plate,
+              defaultReason: reason.text.trim().isNotEmpty ? reason.text.trim() : 'Annulation demandée par le superviseur',
+            );
+            if (approval == null) return;
+            DocumentOutcome? outcome;
+            await run(() async {
+              await widget.repository.cancel(v.id, approval.reason, adminCode: approval.code);
+              try {
+                final documents = DocumentService(widget.repository.client);
+                outcome = await documents.finalizeLatest(v.id, 'ANNULATION');
+              } catch (_) {}
+            }, 'Visite annulée avec visa responsable.');
+            if (context.mounted && outcome?.bytes != null) {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BonPdfScreen(
+                    bytes: outcome!.bytes!,
+                    kind: 'ANNULATION',
+                    visitId: v.id,
+                    autoPrint: true,
+                  ),
+                ),
+              );
+            }
+          },
+          icon: const Icon(Icons.cancel_outlined),
+          label: const Text('Annuler cette visite'),
+        ),
       ],
     ])));
   }
