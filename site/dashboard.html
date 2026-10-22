@@ -932,26 +932,26 @@
       document.getElementById('agentPassword').value = `${word}${num}`;
     }
 
-    // Supabase / Local Bridge RPC Caller
+    // Supabase / Local / Cloudflare Bridge RPC Caller
     async function callRpc(fnName, params = {}) {
-      // 1. Try local server bridge first (for localhost or local network)
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '8085';
-      if (isLocal) {
-        try {
-          const localRes = await fetch(`/api/rpc/${fnName}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(params)
-          });
-          if (localRes.ok) {
+      // 1. Try same-origin /api/rpc/ first (works on localhost, Cloudflare Worker & Netlify, bypasses corporate proxy 416 blocks)
+      try {
+        const localRes = await fetch(`/api/rpc/${fnName}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
+        });
+        if (localRes.ok) {
+          const cType = localRes.headers.get('content-type') || '';
+          if (cType.includes('application/json')) {
             return await localRes.json();
           }
-        } catch (localErr) {
-          console.warn('Local bridge error, trying direct Supabase:', localErr);
         }
+      } catch (proxyErr) {
+        // Fallback to direct Supabase below
       }
 
-      // 2. Direct Supabase call
+      // 2. Direct Supabase call (when outside corporate proxy)
       try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
           method: 'POST',
@@ -967,16 +967,6 @@
         }
       } catch (directErr) {
         console.warn('Direct Supabase error:', directErr);
-      }
-
-      // 3. Fallback to /api/rpc/
-      const fallbackRes = await fetch(`/api/rpc/${fnName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params)
-      });
-      if (fallbackRes.ok) {
-        return await fallbackRes.json();
       }
 
       throw new Error(`Impossible de charger les données pour ${fnName}. Vérifiez votre connexion réseau.`);
