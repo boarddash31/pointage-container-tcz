@@ -150,10 +150,10 @@ void main() {
     ))));
     await tester.pumpAndSettle();
 
-    expect(find.text('Avec 1 conteneur'), findsOneWidget);
-    expect(find.text('Avec 2 conteneurs'), findsOneWidget);
-    expect(find.text('Sans · 1 à prendre'), findsOneWidget);
-    expect(find.text('Sans · 2 à prendre'), findsOneWidget);
+    expect(find.text('Déposer avec 1 conteneur'), findsOneWidget);
+    expect(find.text('Déposer avec 2 conteneurs'), findsOneWidget);
+    expect(find.text('Prendre avec 1 conteneur'), findsOneWidget);
+    expect(find.text('Prendre avec 2 conteneurs'), findsOneWidget);
 
     // Switch to Twin mode
     await tester.ensureVisible(find.byKey(const ValueKey('gate-loaded-true')));
@@ -391,6 +391,57 @@ void main() {
 
     expect(printOverrideCalled, isTrue);
     expect(newTruckCalled, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Mobile F11 mode hides redundant truck titles, pins plate/cin and displays compact bottom bar', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    var fullscreenToggled = false;
+    var processSwitched = false;
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: EntryScreen(
+          repository: QueueFixture(),
+          canCorrect: false,
+          isFullScreen: true,
+          onToggleFullScreen: () => fullscreenToggled = true,
+          onSwitchProcess: () => processSwitched = true,
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    // Redundant titles are hidden in mobile F11
+    expect(find.text('État du camion à l’arrivée'), findsNothing);
+    expect(find.textContaining('Glissez pour changer de mode'), findsNothing);
+
+    // Plaque and CIN are pinned at top in mobile F11
+    expect(find.widgetWithText(TextFormField, 'Plaque camion *'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, 'CIN chauffeur *'), findsOneWidget);
+
+    // Bottom action bar contains page label, Enregistrer button and F11 button
+    expect(find.text('ENTRÉE · GATE IN'), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile-f11-submit-btn')), findsOneWidget);
+    expect(find.text('Enregistrer'), findsOneWidget);
+    expect(find.text('F11'), findsOneWidget);
+
+    // Tapping F11 calls onToggleFullScreen
+    await tester.tap(find.text('F11'));
+    await tester.pumpAndSettle();
+    expect(fullscreenToggled, isTrue);
+
+    // Tapping ENTRÉE badge calls onSwitchProcess
+    await tester.tap(find.text('ENTRÉE · GATE IN'));
+    await tester.pumpAndSettle();
+    expect(processSwitched, isTrue);
+
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }

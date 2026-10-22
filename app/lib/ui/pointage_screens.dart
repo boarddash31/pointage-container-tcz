@@ -11,6 +11,7 @@ import '../domain/container_number.dart';
 import '../domain/container_iso.dart';
 import '../domain/truck_plate.dart';
 import 'truck_diagram.dart';
+import '../utils/fullscreen_helper.dart';
 
 void message(BuildContext context,String text) => ScaffoldMessenger.of(context)
   ..hideCurrentSnackBar()..showSnackBar(SnackBar(content:Text(text)));
@@ -69,8 +70,19 @@ Future<OperatorRecord?> showOperatorPicker(BuildContext context, List<OperatorRe
 }
 
 class EntryScreen extends StatefulWidget {
-  const EntryScreen({super.key,required this.repository,required this.canCorrect,this.isFullScreen=false});
-  final PointageRepository repository;final bool canCorrect;final bool isFullScreen;
+  const EntryScreen({
+    super.key,
+    required this.repository,
+    required this.canCorrect,
+    this.isFullScreen = false,
+    this.onToggleFullScreen,
+    this.onSwitchProcess,
+  });
+  final PointageRepository repository;
+  final bool canCorrect;
+  final bool isFullScreen;
+  final VoidCallback? onToggleFullScreen;
+  final VoidCallback? onSwitchProcess;
   @override State<EntryScreen> createState()=>_EntryScreenState();
 }
 class _EntryScreenState extends State<EntryScreen> {
@@ -476,49 +488,105 @@ class _EntryScreenState extends State<EntryScreen> {
         ],
       ),
       const SizedBox(height:6),
-      CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.keyV, control: true): () => pasteFromClipboard(second: second),
-          const SingleActivator(LogicalKeyboardKey.keyV, meta: true): () => pasteFromClipboard(second: second),
-        },
-        child: SingleChildScrollView(scrollDirection:Axis.horizontal,
-          child:Row(children:List.generate(11,(i){
-            final isLetter = i < 4;
-            final isCheckDigit = i == 10;
-            return Padding(
-              padding: EdgeInsets.only(right: isLetter && i == 3 ? 10 : (isCheckDigit ? 0 : 3)),
-              child: SizedBox(width:32, child: TextFormField(controller:b[i],focusNode:f[i],
-                textAlign:TextAlign.center,
-                textInputAction:TextInputAction.next,
-                inputFormatters:[SingleCharOverrideFormatter(isLetter:isLetter, onAdvance:()=>_advanceBox(i, second))],
-                keyboardType:isLetter?TextInputType.text:TextInputType.number,
-                onTap:(){
-                  b[i].selection=TextSelection(baseOffset:0, extentOffset:b[i].text.length);
-                },
-                onFieldSubmitted:(_)=>_advanceBox(i, second),
-                decoration:InputDecoration(counterText:'',contentPadding:const EdgeInsets.symmetric(vertical:12),
-                  filled:true,
-                  fillColor:isLetter
-                    ? const Color(0xffe9f3fa)
-                    : (isCheckDigit ? const Color(0xfffff8e1) : Colors.white),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    borderSide: BorderSide(
-                      color: isCheckDigit ? Colors.amber.shade700 : Colors.grey.shade400,
-                      width: isCheckDigit ? 1.5 : 1.0,
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = constraints.maxWidth;
+          final bool isCompact = availableWidth < 380;
+          final double intraGap = isCompact ? (availableWidth < 330 ? 1.5 : 2.0) : 3.0;
+          final double sepGap = isCompact ? (availableWidth < 330 ? 5.0 : 7.0) : 10.0;
+          final double totalGaps = (8 * intraGap) + (2 * sepGap);
+          final double computedWidth = ((availableWidth - totalGaps) / 11).floorToDouble();
+          final double boxWidth = computedWidth.clamp(23.0, 34.0);
+          final double boxHeight = isCompact ? 40.0 : 44.0;
+          final double fontSize = isCompact ? 13.0 : 15.0;
+
+          return CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.keyV, control: true): () => pasteFromClipboard(second: second),
+              const SingleActivator(LogicalKeyboardKey.keyV, meta: true): () => pasteFromClipboard(second: second),
+            },
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(11, (i) {
+                  final isLetter = i < 4;
+                  final isCheckDigit = i == 10;
+                  final isSep = (i == 3 || i == 9);
+                  final rightPadding = isCheckDigit ? 0.0 : (isSep ? sepGap : intraGap);
+
+                  return Padding(
+                    padding: EdgeInsets.only(right: rightPadding),
+                    child: SizedBox(
+                      width: boxWidth,
+                      height: boxHeight,
+                      child: TextFormField(
+                        controller: b[i],
+                        focusNode: f[i],
+                        textAlign: TextAlign.center,
+                        textInputAction: TextInputAction.next,
+                        inputFormatters: [
+                          SingleCharOverrideFormatter(
+                            isLetter: isLetter,
+                            onAdvance: () => _advanceBox(i, second),
+                          ),
+                        ],
+                        keyboardType: isLetter ? TextInputType.text : TextInputType.number,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.bold,
+                          color: isCheckDigit ? const Color(0xffb45309) : const Color(0xff0f172a),
+                        ),
+                        onTap: () {
+                          b[i].selection = TextSelection(baseOffset: 0, extentOffset: b[i].text.length);
+                        },
+                        onFieldSubmitted: (_) => _advanceBox(i, second),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          counterText: '',
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                          filled: true,
+                          fillColor: isLetter
+                              ? const Color(0xffe9f3fa)
+                              : (isCheckDigit ? const Color(0xfffff8e1) : Colors.white),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(
+                              color: isCheckDigit ? Colors.amber.shade700 : Colors.grey.shade400,
+                              width: isCheckDigit ? 1.5 : 1.0,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(
+                              color: isCheckDigit ? Colors.amber.shade700 : Colors.grey.shade400,
+                              width: isCheckDigit ? 1.5 : 1.0,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(
+                              color: isCheckDigit ? Colors.amber.shade800 : const Color(0xff075a8d),
+                              width: 2.0,
+                            ),
+                          ),
+                        ),
+                        onChanged: (v) {
+                          if (second ? (lookupHint2 != null) : (lookupHint != null)) {
+                            setState(() => second ? lookupHint2 = null : lookupHint = null);
+                          }
+                          setState(() {});
+                        },
+                      ),
                     ),
-                  ),
-                ),
-                onChanged:(v){
-                  if(second ? (lookupHint2!=null) : (lookupHint!=null)){
-                    setState(() => second ? lookupHint2=null : lookupHint=null);
-                  }
-                  setState((){});
-                },
-              )),
-            );
-          })),
-        ),
+                  );
+                }),
+              ),
+            ),
+          );
+        },
       ),
       const SizedBox(height:6),
       if (isValid)
@@ -589,54 +657,232 @@ class _EntryScreenState extends State<EntryScreen> {
     ]);
   }
 
-  @override Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _buildPlateAndCinRow({bool dense = false}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (!widget.isFullScreen)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Row(
-              children: [
-                Icon(Icons.login, size: 20, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Enregistrement de l’entrée',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        Expanded(
+          flex: 6,
+          child: TextFormField(
+            controller: plate,
+            focusNode: plateFocus,
+            textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(
+              isDense: dense,
+              labelText: 'Plaque camion *',
+              hintText: 'Ex: 12345-A-1',
+              prefixIcon: const Icon(Icons.pin, size: 18),
+              contentPadding: dense
+                  ? const EdgeInsets.symmetric(horizontal: 10, vertical: 9)
+                  : const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            ),
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z -]')), UpperCaseFormatter()],
+            onChanged: (_) => setState(() {}),
+            onFieldSubmitted: (_) {
+              plate.text = TruckPlate.format(plate.text);
+              cinFocus.requestFocus();
+            },
+            validator: (v) => TruckPlate.isValid(v ?? '') ? null : 'Format marocain requis : 12345-A-06',
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 5,
+          child: TextFormField(
+            controller: cin,
+            focusNode: cinFocus,
+            textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.characters,
+            onChanged: (_) => setState(() {}),
+            onFieldSubmitted: (_) {
+              if (kind == 'loaded') {
+                focus[0].requestFocus();
+                boxes[0].selection = TextSelection(baseOffset: 0, extentOffset: boxes[0].text.length);
+              } else {
+                bookingFocus.requestFocus();
+              }
+            },
+            decoration: InputDecoration(
+              isDense: dense,
+              labelText: 'CIN chauffeur *',
+              hintText: 'Ex: AB123456',
+              prefixIcon: const Icon(Icons.badge_outlined, size: 18),
+              contentPadding: dense
+                  ? const EdgeInsets.symmetric(horizontal: 10, vertical: 9)
+                  : const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            ),
+            validator: (v) => (v?.trim().length ?? 0) < 2 ? 'CIN requis' : null,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      decoration: BoxDecoration(
+        color: const Color(0xff063e66),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            offset: const Offset(0, -2),
+            blurRadius: 4,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // 1. Label dial page: ENTRÉE · GATE IN (or switcher if onSwitchProcess != null)
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: widget.onSwitchProcess,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white24, width: 0.8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.login, size: 14, color: Colors.white),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'ENTRÉE · GATE IN',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                      letterSpacing: 0.4,
+                    ),
                   ),
-                ),
-              ],
+                  if (widget.onSwitchProcess != null) ...[
+                    const SizedBox(width: 4),
+                    const Icon(Icons.sync_alt_rounded, size: 12, color: Colors.white70),
+                  ],
+                ],
+              ),
             ),
           ),
-        // PINNED / FIXED TOP: État du camion à l’arrivée (horizontal scroll)
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                offset: const Offset(0, 2),
-                blurRadius: 4,
+          const SizedBox(width: 8),
+
+          // 2. Bouton Enregistrer
+          Expanded(
+            child: SizedBox(
+              height: 38,
+              child: FilledButton.icon(
+                key: const ValueKey('mobile-f11-submit-btn'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xff168dcc),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                ),
+                onPressed: busy ? null : submit,
+                icon: busy
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.check_circle_rounded, size: 17),
+                label: Text(
+                  busy ? 'Enregistrement…' : 'Enregistrer',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.3),
+                ),
               ),
-            ],
-            border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+            ),
           ),
-          padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('État du camion à l’arrivée',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xff063e66))),
-              const SizedBox(height: 2),
-              const Text('↔ Glissez pour changer de mode · Touchez la plaque ou le conteneur pour saisir',
-                style: TextStyle(fontSize: 10, color: Color(0xff49677e), fontWeight: FontWeight.w500)),
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 198,
+          const SizedBox(width: 8),
+
+          // 3. Bouton F11
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () {
+              if (widget.onToggleFullScreen != null) {
+                widget.onToggleFullScreen!();
+              } else {
+                FullscreenHelper.toggleBrowserFullscreen();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.amberAccent.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amberAccent, width: 1.1),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.fullscreen_rounded, size: 16, color: Colors.amberAccent),
+                  SizedBox(width: 3),
+                  Text('F11', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 800;
+    final isMobileF11 = widget.isFullScreen && isMobile;
+
+    return Form(
+      key: form,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!widget.isFullScreen)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Row(
+                children: [
+                  Icon(Icons.login, size: 20, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Enregistrement de l’entrée',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          // PINNED / FIXED TOP: Visualiseur du camion + (Plaque & CIN si Mobile F11)
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  offset: const Offset(0, 2),
+                  blurRadius: 4,
+                ),
+              ],
+              border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+            ),
+            padding: isMobileF11
+                ? const EdgeInsets.fromLTRB(10, 4, 10, 8)
+                : const EdgeInsets.fromLTRB(12, 6, 12, 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!widget.isFullScreen && MediaQuery.sizeOf(context).width >= 600) ...[
+                  const Text('État du camion à l’arrivée',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xff063e66))),
+                  const SizedBox(height: 2),
+                  const Text('↔ Glissez pour changer de mode · Touchez la plaque ou le conteneur pour saisir',
+                    style: TextStyle(fontSize: 10, color: Color(0xff49677e), fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 6),
+                ],
+                SizedBox(
+                  height: (widget.isFullScreen || isMobile) ? 142 : 160,
                 child: Scrollbar(
                   controller: modeScrollController,
                   thumbVisibility: true,
@@ -646,13 +892,13 @@ class _EntryScreenState extends State<EntryScreen> {
                     child: Row(
                       children: [
                         for (final option in [
-                          ('loaded', false, 'Avec 1 conteneur'),
-                          ('loaded', true, 'Avec 2 conteneurs'),
-                          ('empty', false, 'Sans · 1 à prendre'),
-                          ('empty', true, 'Sans · 2 à prendre'),
+                          ('loaded', false, 'Déposer avec 1 conteneur'),
+                          ('loaded', true, 'Déposer avec 2 conteneurs'),
+                          ('empty', false, 'Prendre avec 1 conteneur'),
+                          ('empty', true, 'Prendre avec 2 conteneurs'),
                         ])
                           Padding(
-                            padding: const EdgeInsets.only(right: 8, bottom: 8),
+                            padding: const EdgeInsets.only(right: 8, bottom: 4),
                             child: InkWell(
                               key: ValueKey('gate-${option.$1}-${option.$2}'),
                               borderRadius: BorderRadius.circular(12),
@@ -672,9 +918,9 @@ class _EntryScreenState extends State<EntryScreen> {
                                   }
                                 },
                                 width: kind == option.$1 && isTwin == option.$2
-                                    ? (MediaQuery.sizeOf(context).width < 600 ? 310 : 390)
-                                    : 224,
-                                padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                                    ? (MediaQuery.sizeOf(context).width < 600 ? 300 : 380)
+                                    : 216,
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: kind == option.$1 && isTwin == option.$2
                                       ? const Color(0xfff0f8fd)
@@ -685,48 +931,17 @@ class _EntryScreenState extends State<EntryScreen> {
                                         : const Color(0xffdfe8ef),
                                     width: kind == option.$1 && isTwin == option.$2 ? 1.8 : 1,
                                   ),
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          option.$1 == 'loaded' ? Icons.south_west_rounded : Icons.north_east_rounded,
-                                          size: 15,
-                                          color: const Color(0xff176b93),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          option.$1 == 'loaded' ? 'DÉPOSER' : 'PRENDRE',
-                                          style: const TextStyle(
-                                            fontSize: 10,
-                                            letterSpacing: 1.1,
-                                            fontWeight: FontWeight.w800,
-                                            color: Color(0xff176b93),
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        if (kind == option.$1 && isTwin == option.$2)
-                                          const Icon(Icons.check_circle_rounded, size: 18, color: Color(0xff168dcc))
-                                        else
-                                          Text(
-                                            option.$2 ? '2 × 20′' : '1',
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                              color: Color(0xff71899c),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
                                     Expanded(
                                       child: TruckScene(
                                         kind: option.$1,
                                         isTwin: option.$2,
                                         width: double.infinity,
-                                        height: 120,
+                                        height: (widget.isFullScreen || isMobile) ? 96 : 115,
                                         plate: kind == option.$1 && isTwin == option.$2 ? plate.text : null,
                                         driverCin: kind == option.$1 && isTwin == option.$2 ? cin.text : null,
                                         containerNumber: kind == option.$1 && isTwin == option.$2 && option.$1 == 'loaded' ? number : null,
@@ -767,14 +982,34 @@ class _EntryScreenState extends State<EntryScreen> {
                                         onContainerTap: kind == option.$1 && isTwin == option.$2 ? focusGateField : null,
                                       ),
                                     ),
-                                    Text(
-                                      option.$3,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xff173c5b),
-                                      ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          option.$1 == 'loaded' ? Icons.south_west_rounded : Icons.north_east_rounded,
+                                          size: 13,
+                                          color: kind == option.$1 && isTwin == option.$2 ? const Color(0xff075a8d) : const Color(0xff64748b),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            option.$3,
+                                            textAlign: TextAlign.center,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: kind == option.$1 && isTwin == option.$2 ? FontWeight.w800 : FontWeight.w600,
+                                              color: kind == option.$1 && isTwin == option.$2 ? const Color(0xff075a8d) : const Color(0xff173c5b),
+                                            ),
+                                          ),
+                                        ),
+                                        if (kind == option.$1 && isTwin == option.$2) ...[
+                                          const SizedBox(width: 4),
+                                          const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xff168dcc)),
+                                        ],
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -786,73 +1021,25 @@ class _EntryScreenState extends State<EntryScreen> {
                   ),
                 ),
               ),
-            ],
+              // Plaque camion & CIN chauffeur PINNED en haut en mode mobile F11
+                if (isMobileF11) ...[
+                  const SizedBox(height: 6),
+                  _buildPlateAndCinRow(dense: true),
+                ],
+              ],
+            ),
           ),
-        ),
         // SCROLLABLE FORM AREA
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Form(
-              key: form,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 2. Plaque camion & CIN chauffeur (Même ligne / Same Row)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 6,
-                        child: TextFormField(
-                          controller: plate,
-                          focusNode: plateFocus,
-                          textInputAction: TextInputAction.next,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration: const InputDecoration(
-                            labelText: 'Plaque camion *',
-                            hintText: 'Ex: 12345-A-1',
-                            prefixIcon: Icon(Icons.pin, size: 18),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                          ),
-                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z -]')), UpperCaseFormatter()],
-                          onChanged: (_) => setState(() {}),
-                          onFieldSubmitted: (_) {
-                            plate.text = TruckPlate.format(plate.text);
-                            cinFocus.requestFocus();
-                          },
-                          validator: (v) => TruckPlate.isValid(v ?? '') ? null : 'Format marocain requis : 12345-A-06',
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 5,
-                        child: TextFormField(
-                          controller: cin,
-                          focusNode: cinFocus,
-                          textInputAction: TextInputAction.next,
-                          textCapitalization: TextCapitalization.characters,
-                          onChanged: (_) => setState(() {}),
-                          onFieldSubmitted: (_) {
-                            if (kind == 'loaded') {
-                              focus[0].requestFocus();
-                              boxes[0].selection = TextSelection(baseOffset: 0, extentOffset: boxes[0].text.length);
-                            } else {
-                              bookingFocus.requestFocus();
-                            }
-                          },
-                          decoration: const InputDecoration(
-                            labelText: 'CIN chauffeur *',
-                            hintText: 'Ex: AB123456',
-                            prefixIcon: Icon(Icons.badge_outlined, size: 18),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                          ),
-                          validator: (v) => (v?.trim().length ?? 0) < 2 ? 'CIN requis' : null,
-                        ),
-                      ),
-                    ],
-                  ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!isMobileF11) ...[
+                  _buildPlateAndCinRow(),
                   const SizedBox(height: 12),
+                ],
 
                   // 4. Conteneur 1 (ou Mono)
                   if (isTwin) ...[
@@ -1338,24 +1525,28 @@ class _EntryScreenState extends State<EntryScreen> {
                       ],
                     ),
                   ],
-                  const SizedBox(height: 18),
-
-                  // 7. Bouton enregistrer
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                    onPressed: busy ? null : submit,
-                    icon: const Icon(Icons.save),
-                    label: Text(
-                      busy ? 'Enregistrement…' : 'Enregistrer l’entrée',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  // 7. Bouton enregistrer (quand pas en mobile F11)
+                  if (!isMobileF11) ...[
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                      onPressed: busy ? null : submit,
+                      icon: const Icon(Icons.save),
+                      label: Text(
+                        busy ? 'Enregistrement…' : 'Enregistrer l’entrée',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
           ),
-        ),
-      ],
+          // 8. Fixed Bottom Action Bar (en mode mobile F11)
+          if (isMobileF11)
+            _buildBottomBar(),
+        ],
+      ),
     );
   }
 }
@@ -1560,10 +1751,19 @@ Future<SupervisorApproval?> showSupervisorApprovalDialog(
 }
 
 class ExitScreen extends StatefulWidget {
-  const ExitScreen({super.key, required this.repository, required this.canCancel, this.isFullScreen = false});
+  const ExitScreen({
+    super.key,
+    required this.repository,
+    required this.canCancel,
+    this.isFullScreen = false,
+    this.onToggleFullScreen,
+    this.onSwitchProcess,
+  });
   final PointageRepository repository;
   final bool canCancel;
   final bool isFullScreen;
+  final VoidCallback? onToggleFullScreen;
+  final VoidCallback? onSwitchProcess;
   @override State<ExitScreen> createState() => _ExitScreenState();
 }
 
@@ -2090,9 +2290,13 @@ class _ExitScreenState extends State<ExitScreen> {
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            second ? '2ème Conteneur (20\') · ISO 6346 *' : (isTwin ? '1er Conteneur (20\') · ISO 6346 *' : 'Numéro du conteneur · ISO 6346 *'),
-            style: const TextStyle(fontWeight: FontWeight.w700),
+          Expanded(
+            child: Text(
+              second ? '2ème Conteneur (20\') · ISO 6346 *' : (isTwin ? '1er Conteneur (20\') · ISO 6346 *' : 'Numéro du conteneur · ISO 6346 *'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -2120,61 +2324,102 @@ class _ExitScreenState extends State<ExitScreen> {
         ],
       ),
       const SizedBox(height: 6),
-      CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.keyV, control: true): () => pasteFromClipboard(second: second),
-          const SingleActivator(LogicalKeyboardKey.keyV, meta: true): () => pasteFromClipboard(second: second),
-        },
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: List.generate(11, (i) {
-              final isLetter = i < 4;
-              final isCheckDigit = i == 10;
-              return Padding(
-                padding: EdgeInsets.only(right: isLetter && i == 3 ? 10 : (isCheckDigit ? 0 : 3)),
-                child: SizedBox(
-                  width: 32,
-                  child: TextFormField(
-                    controller: b[i],
-                    focusNode: f[i],
-                    textAlign: TextAlign.center,
-                    textInputAction: TextInputAction.next,
-                    inputFormatters: [
-                      SingleCharOverrideFormatter(
-                        isLetter: isLetter,
-                        onAdvance: () => _advanceExitBox(i, second),
-                      ),
-                    ],
-                    keyboardType: isLetter ? TextInputType.text : TextInputType.number,
-                    onTap: () {
-                      b[i].selection = TextSelection(baseOffset: 0, extentOffset: b[i].text.length);
-                    },
-                    onFieldSubmitted: (_) => _advanceExitBox(i, second),
-                    decoration: InputDecoration(
-                      counterText: '',
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                      filled: true,
-                      fillColor: isLetter
-                          ? const Color(0xffe9f3fa)
-                          : (isCheckDigit ? const Color(0xfffff8e1) : Colors.white),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(
-                          color: isCheckDigit ? Colors.amber.shade700 : Colors.grey.shade400,
-                          width: isCheckDigit ? 1.5 : 1.0,
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = constraints.maxWidth;
+          final bool isCompact = availableWidth < 380;
+          final double intraGap = isCompact ? (availableWidth < 330 ? 1.5 : 2.0) : 3.0;
+          final double sepGap = isCompact ? (availableWidth < 330 ? 5.0 : 7.0) : 10.0;
+          final double totalGaps = (8 * intraGap) + (2 * sepGap);
+          final double computedWidth = ((availableWidth - totalGaps) / 11).floorToDouble();
+          final double boxWidth = computedWidth.clamp(23.0, 34.0);
+          final double boxHeight = isCompact ? 40.0 : 44.0;
+          final double fontSize = isCompact ? 13.0 : 15.0;
+
+          return CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.keyV, control: true): () => pasteFromClipboard(second: second),
+              const SingleActivator(LogicalKeyboardKey.keyV, meta: true): () => pasteFromClipboard(second: second),
+            },
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(11, (i) {
+                  final isLetter = i < 4;
+                  final isCheckDigit = i == 10;
+                  final isSep = (i == 3 || i == 9);
+                  final rightPadding = isCheckDigit ? 0.0 : (isSep ? sepGap : intraGap);
+
+                  return Padding(
+                    padding: EdgeInsets.only(right: rightPadding),
+                    child: SizedBox(
+                      width: boxWidth,
+                      height: boxHeight,
+                      child: TextFormField(
+                        controller: b[i],
+                        focusNode: f[i],
+                        textAlign: TextAlign.center,
+                        textInputAction: TextInputAction.next,
+                        inputFormatters: [
+                          SingleCharOverrideFormatter(
+                            isLetter: isLetter,
+                            onAdvance: () => _advanceExitBox(i, second),
+                          ),
+                        ],
+                        keyboardType: isLetter ? TextInputType.text : TextInputType.number,
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.bold,
+                          color: isCheckDigit ? const Color(0xffb45309) : const Color(0xff0f172a),
                         ),
+                        onTap: () {
+                          b[i].selection = TextSelection(baseOffset: 0, extentOffset: b[i].text.length);
+                        },
+                        onFieldSubmitted: (_) => _advanceExitBox(i, second),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          counterText: '',
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                          filled: true,
+                          fillColor: isLetter
+                              ? const Color(0xffe9f3fa)
+                              : (isCheckDigit ? const Color(0xfffff8e1) : Colors.white),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(
+                              color: isCheckDigit ? Colors.amber.shade700 : Colors.grey.shade400,
+                              width: isCheckDigit ? 1.5 : 1.0,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(
+                              color: isCheckDigit ? Colors.amber.shade700 : Colors.grey.shade400,
+                              width: isCheckDigit ? 1.5 : 1.0,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(
+                              color: isCheckDigit ? Colors.amber.shade800 : const Color(0xff075a8d),
+                              width: 2.0,
+                            ),
+                          ),
+                        ),
+                        onChanged: (v) {
+                          setState(() {});
+                        },
                       ),
                     ),
-                    onChanged: (v) {
-                      setState(() {});
-                    },
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
+                  );
+                }),
+              ),
+            ),
+          );
+        },
       ),
       const SizedBox(height: 6),
       if (isValid)
@@ -2241,6 +2486,128 @@ class _ExitScreenState extends State<ExitScreen> {
     ]);
   }
 
+  Widget _buildExitBottomBar(TruckVisit? activeVisit) {
+    final canSubmit = activeVisit != null;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+      decoration: BoxDecoration(
+        color: const Color(0xff063e66),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            offset: const Offset(0, -2),
+            blurRadius: 4,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // 1. Label dial page: SORTIE · GATE OUT
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: widget.onSwitchProcess,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white24, width: 0.8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.logout, size: 14, color: Colors.white),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'SORTIE · GATE OUT',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  if (widget.onSwitchProcess != null) ...[
+                    const SizedBox(width: 4),
+                    const Icon(Icons.sync_alt_rounded, size: 12, color: Colors.white70),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // 2. Bouton Enregistrer / Valider
+          Expanded(
+            child: SizedBox(
+              height: 38,
+              child: FilledButton.icon(
+                key: const ValueKey('mobile-f11-exit-submit-btn'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: canSubmit ? const Color(0xff168846) : Colors.blueGrey.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                ),
+                onPressed: busy || !canSubmit ? null : () {
+                  if (activeVisit.entryKind == 'loaded') {
+                    if (isDeposited) {
+                      exitTruck(activeVisit);
+                    } else {
+                      cancelTruckWithoutDeposit(activeVisit);
+                    }
+                  } else {
+                    if (isPickedUp) {
+                      exitTruckWithPickup(activeVisit);
+                    } else {
+                      exitEmptyWithoutPickup(activeVisit);
+                    }
+                  }
+                },
+                icon: busy
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.check_circle_rounded, size: 17),
+                label: Text(
+                  busy ? 'Validation…' : (canSubmit ? 'Valider Sortie' : 'Choisir camion'),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.3),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // 3. Bouton F11
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () {
+              if (widget.onToggleFullScreen != null) {
+                widget.onToggleFullScreen!();
+              } else {
+                FullscreenHelper.toggleBrowserFullscreen();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.amberAccent.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amberAccent, width: 1.1),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.fullscreen_rounded, size: 16, color: Colors.amberAccent),
+                  SizedBox(width: 3),
+                  Text('F11', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -2305,7 +2672,10 @@ class _ExitScreenState extends State<ExitScreen> {
             syncVisitState(activeVisit);
           }
 
-          return ListView(
+          final isMobile = MediaQuery.sizeOf(context).width < 800;
+          final isMobileF11 = widget.isFullScreen && isMobile;
+
+          final listView = ListView(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             children: [
               if (!widget.isFullScreen)
@@ -3105,6 +3475,16 @@ class _ExitScreenState extends State<ExitScreen> {
                 ),
             ],
           );
+
+          if (isMobileF11) {
+            return Column(
+              children: [
+                Expanded(child: listView),
+                _buildExitBottomBar(activeVisit),
+              ],
+            );
+          }
+          return listView;
         },
       ),
     );

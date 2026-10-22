@@ -487,9 +487,27 @@ class _PointageShellState extends State<PointageShell> {
 
       final screens = <Widget>[
         switch (activeProcess) {
-          0 => allowed('entree') ? EntryScreen(repository: repo, canCorrect: admin, isFullScreen: isFullScreen)
+          0 => allowed('entree') ? EntryScreen(
+                repository: repo,
+                canCorrect: admin,
+                isFullScreen: isFullScreen,
+                onToggleFullScreen: () {
+                  FullscreenHelper.toggleBrowserFullscreen();
+                  setState(() => _isFullScreenUserPref = !isFullScreen);
+                },
+                onSwitchProcess: (canEnter && canExit) ? () => setState(() => process = 1) : null,
+              )
               : const PermissionScreen(role: 'Entrée'),
-          _ => allowed('sortie') ? ExitScreen(repository: repo, canCancel: admin, isFullScreen: isFullScreen)
+          _ => allowed('sortie') ? ExitScreen(
+                repository: repo,
+                canCancel: admin,
+                isFullScreen: isFullScreen,
+                onToggleFullScreen: () {
+                  FullscreenHelper.toggleBrowserFullscreen();
+                  setState(() => _isFullScreenUserPref = !isFullScreen);
+                },
+                onSwitchProcess: (canEnter && canExit) ? () => setState(() => process = 0) : null,
+              )
               : const PermissionScreen(role: 'Sortie'),
         },
         DataScreen(repository: repo),
@@ -509,10 +527,13 @@ class _PointageShellState extends State<PointageShell> {
 
       Widget content;
       if (isFullScreen) {
-        content = SafeArea(
-          child: Column(
-            children: [
-              Container(
+        if (isMobile && section == 0) {
+          content = SafeArea(child: currentScreen);
+        } else {
+          content = SafeArea(
+            child: Column(
+              children: [
+                Container(
                 height: 44,
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 color: const Color(0xff063e66),
@@ -628,7 +649,8 @@ class _PointageShellState extends State<PointageShell> {
             ],
           ),
         );
-      } else {
+      }
+    } else {
         content = SafeArea(child: currentScreen);
         if (MediaQuery.sizeOf(context).width > 900) {
           content = Row(children: [
