@@ -21,5 +21,11 @@ try {
 Copy-Item -LiteralPath "$AppPath\web\_headers" -Destination "$AppPath\build\web\_headers" -Force
 Copy-Item -LiteralPath "$AppPath\web\_redirects" -Destination "$AppPath\build\web\_redirects" -Force
 
+# Sync to site/ for local server
+$SiteDir = 'E:\pointage_repo\site'
+if (-not (Test-Path $SiteDir)) { New-Item -ItemType Directory -Path $SiteDir -Force | Out-Null }
+Copy-Item -Path "$AppPath\build\web\*" -Destination $SiteDir -Recurse -Force
+
 # Run deployment
 & "$PSScriptRoot\deploy_netlify.ps1"
+

@@ -10,7 +10,7 @@ class BonPdfBuilder {
     if (code.startsWith('2')) {
       if (code.contains('R')) return "20' Reefer (Frigo)";
       if (code.contains('U') || code.contains('T')) return "20' Citerne / Open";
-      return "20' Standard Dry";
+      return "20' Standard Dry (8'6)";
     }
     if (code.startsWith('4')) {
       if (code == '45G1' || code == '45R1' || code.startsWith('45')) {
@@ -24,7 +24,7 @@ class BonPdfBuilder {
   }
 
   static String formatDateTime(String? rawIso) {
-    if (rawIso == null || rawIso.isEmpty) return '—';
+    if (rawIso == null || rawIso.isEmpty) return '-';
     try {
       final dt = DateTime.parse(rawIso).toLocal();
       final day = dt.day.toString().padLeft(2, '0');
@@ -32,7 +32,7 @@ class BonPdfBuilder {
       final year = dt.year.toString();
       final hour = dt.hour.toString().padLeft(2, '0');
       final minute = dt.minute.toString().padLeft(2, '0');
-      return '$day/$month/$year à $hour:$minute';
+      return '$day/$month/$year a $hour:$minute';
     } catch (_) {
       return rawIso.split('.')[0].replaceFirst('T', ' ');
     }
@@ -52,8 +52,8 @@ class BonPdfBuilder {
     final kind = (document['kind'] ?? 'ENTREE').toString().toUpperCase();
     final createdAt = (document['created_at'] ?? snapshot['entered_at'] ?? DateTime.now().toIso8601String()).toString();
 
-    final plate = (visitData?['plate'] ?? snapshot['plate'] ?? '—').toString().toUpperCase();
-    final cin = (visitData?['driver_cin'] ?? snapshot['driver_cin'] ?? '—').toString().toUpperCase();
+    final plate = (visitData?['plate'] ?? snapshot['plate'] ?? '-').toString().toUpperCase();
+    final cin = (visitData?['driver_cin'] ?? snapshot['driver_cin'] ?? '-').toString().toUpperCase();
     final entryKind = (visitData?['entry_kind'] ?? snapshot['entry_kind'] ?? 'empty').toString().toLowerCase();
 
     // Container 1
@@ -72,7 +72,6 @@ class BonPdfBuilder {
             '')
         .toString()
         .trim();
-    final position = (visitData?['position'] ?? event['position'] ?? snapshot['position'] ?? '').toString().trim();
 
     // Twin (Container 2)
     final isTwin = (visitData?['is_twin'] ?? snapshot['is_twin'] ?? false) == true;
@@ -98,14 +97,8 @@ class BonPdfBuilder {
     String docTitle;
     PdfColor docColor;
     if (kind == 'ENTREE') {
-      docTitle = "BON D'ENTRÉE (GATE-IN)";
+      docTitle = "BON D'ENTREE (GATE-IN)";
       docColor = navy;
-    } else if (kind == 'DEPOSE') {
-      docTitle = 'BON DE DÉCHARGE YARD';
-      docColor = PdfColor.fromHex('#0284c7');
-    } else if (kind == 'PRISE') {
-      docTitle = 'BON DE CHARGE YARD';
-      docColor = amber;
     } else if (kind == 'SORTIE') {
       docTitle = 'BON DE SORTIE (GATE-OUT)';
       docColor = emerald;
@@ -115,26 +108,35 @@ class BonPdfBuilder {
     }
 
     // QR Payload for security scanning at gate-out
-    final qrPayload = 'TCZ|DOC:$docId|VISIT:$visitId|PLATE:$plate|KIND:$kind|ARM:$armateur|CONT:${containerNumber.isEmpty ? 'NONE' : containerNumber}';
+    final qrPayload = 'TCZ|ZENATA|DOC:$docId|VISIT:$visitId|PLATE:$plate|KIND:$kind|ARM:$armateur|CONT:${containerNumber.isEmpty ? 'NONE' : containerNumber}';
 
-    // Load visual image asset safely
-    pw.MemoryImage? truckImg;
+    // Safe short visit ID without unicode ellipsis
+    final shortVisitId = visitId.length > 8 ? '${visitId.substring(0, 8)}...' : visitId;
+    final shortDocId = docId.length > 8 ? docId.substring(0, 8).toUpperCase() : docId;
+
+    // Load visual image assets safely (both empty and loaded for dual comparison)
     pw.MemoryImage? logoImg;
+    pw.MemoryImage? truckEmptyImg;
+    pw.MemoryImage? truckLoadedImg;
+
     try {
       final logoBytes = await rootBundle.load('assets/brand/tcz-logo.png');
       logoImg = pw.MemoryImage(logoBytes.buffer.asUint8List());
     } catch (_) {}
 
     try {
-      String assetName;
-      if (entryKind == 'loaded') {
-        assetName = 'assets/truck-loaded.png';
-      } else {
-        assetName = kind == 'PRISE' ? 'assets/truck-prise.png' : 'assets/truck-empty.png';
-      }
-      final truckBytes = await rootBundle.load(assetName);
-      truckImg = pw.MemoryImage(truckBytes.buffer.asUint8List());
+      final emptyBytes = await rootBundle.load('assets/truck-empty.png');
+      truckEmptyImg = pw.MemoryImage(emptyBytes.buffer.asUint8List());
     } catch (_) {}
+
+    try {
+      final loadedBytes = await rootBundle.load('assets/truck-loaded.png');
+      truckLoadedImg = pw.MemoryImage(loadedBytes.buffer.asUint8List());
+    } catch (_) {}
+
+    final bool isEntryEmpty = entryKind == 'empty';
+    final pw.MemoryImage? entryImg = isEntryEmpty ? truckEmptyImg : truckLoadedImg;
+    final pw.MemoryImage? exitImg = isEntryEmpty ? truckLoadedImg : truckEmptyImg;
 
     pdf.addPage(
       pw.Page(
@@ -145,7 +147,7 @@ class BonPdfBuilder {
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
               // ==========================================
-              // 1. HEADER WITH LOGO, TITLE, REF & QR
+              // 1. HEADER: TERMINAL CONTENEURS ZENATA
               // ==========================================
               pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -157,14 +159,14 @@ class BonPdfBuilder {
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         if (logoImg != null)
-                          pw.Image(logoImg, width: 90, height: 26, fit: pw.BoxFit.contain)
+                          pw.Image(logoImg, width: 88, height: 26, fit: pw.BoxFit.contain)
                         else
                           pw.Text('TCZ',
                               style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: navy)),
                         pw.SizedBox(height: 2),
-                        pw.Text('TERMINAL CONTENEURS DE TANGER MED',
-                            style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: darkNavy)),
-                        pw.Text('PORT TANGER MED 2 · GUICHET CONTRÔLE D\'ACCÈS',
+                        pw.Text('TERMINAL CONTENEURS ZENATA',
+                            style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: darkNavy)),
+                        pw.Text('TCZ ZENATA - GUICHET UNIQUE & CONTROLE D\'ACCES',
                             style: pw.TextStyle(fontSize: 5.5, color: muted)),
                       ],
                     ),
@@ -174,7 +176,7 @@ class BonPdfBuilder {
                   pw.Expanded(
                     flex: 5,
                     child: pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
                       decoration: pw.BoxDecoration(
                         color: docColor,
                         borderRadius: pw.BorderRadius.circular(6),
@@ -188,7 +190,7 @@ class BonPdfBuilder {
                           ),
                           pw.SizedBox(height: 2),
                           pw.Text(
-                            'Réf: #${docId.length > 8 ? docId.substring(0, 8).toUpperCase() : docId}',
+                            'Ref: #$shortDocId',
                             style: pw.TextStyle(color: PdfColors.white, fontSize: 7, fontWeight: pw.FontWeight.bold),
                           ),
                           pw.Text(
@@ -229,7 +231,7 @@ class BonPdfBuilder {
                 child: pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    // Camion
+                    // Camion Plate
                     pw.Expanded(
                       flex: 3,
                       child: pw.Column(
@@ -293,17 +295,17 @@ class BonPdfBuilder {
                       ),
                     ),
 
-                    // Visite ID
+                    // Visite ID (clean, no tofu)
                     pw.Expanded(
                       flex: 2,
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text('N° DE VISITE',
+                          pw.Text('NO. DE VISITE',
                               style: pw.TextStyle(fontSize: 6, fontWeight: pw.FontWeight.bold, color: muted)),
                           pw.SizedBox(height: 2),
                           pw.Text(
-                            visitId.length > 8 ? '${visitId.substring(0, 8)}…' : visitId,
+                            shortVisitId,
                             style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: muted),
                           ),
                         ],
@@ -316,7 +318,7 @@ class BonPdfBuilder {
               pw.SizedBox(height: 6),
 
               // ==========================================
-              // 3. TABLEAU DES CONTENEURS & OPÉRATION
+              // 3. TABLEAU DES CONTENEURS (SANS STEP YARD)
               // ==========================================
               pw.Container(
                 decoration: pw.BoxDecoration(
@@ -328,11 +330,11 @@ class BonPdfBuilder {
                     horizontalInside: pw.BorderSide(color: borderGray, width: 0.5),
                   ),
                   columnWidths: const {
-                    0: pw.FlexColumnWidth(3.2), // Container
+                    0: pw.FlexColumnWidth(3.4), // Container
                     1: pw.FlexColumnWidth(1.6), // ISO
-                    2: pw.FlexColumnWidth(2.6), // Description
+                    2: pw.FlexColumnWidth(2.8), // Description
                     3: pw.FlexColumnWidth(2.2), // Booking
-                    4: pw.FlexColumnWidth(2.0), // Position
+                    4: pw.FlexColumnWidth(2.0), // Operation Statut
                   },
                   children: [
                     // Header Row
@@ -343,7 +345,7 @@ class BonPdfBuilder {
                         _th('CODE ISO'),
                         _th('TYPE / FORMAT'),
                         _th('BOOKING / MISSION'),
-                        _th('POSITION YARD'),
+                        _th('STATUT ENTREE'),
                       ],
                     ),
 
@@ -356,8 +358,8 @@ class BonPdfBuilder {
                         _td(decodeIso(isoCode)),
                         _td(booking.isNotEmpty
                             ? booking
-                            : (entryKind == 'loaded' ? 'Dépose directe' : 'Non requis')),
-                        _tdPosition(position, entryKind, kind),
+                            : (entryKind == 'loaded' ? 'Depose directe' : 'Non requis')),
+                        _td(entryKind == 'loaded' ? 'Plein (Depose)' : 'Vide (Prise)', isBold: true),
                       ],
                     ),
 
@@ -371,8 +373,8 @@ class BonPdfBuilder {
                           _td(decodeIso(isoCode2.isNotEmpty ? isoCode2 : '22G1')),
                           _td(booking2.isNotEmpty
                               ? booking2
-                              : (entryKind == 'loaded' ? 'Dépose directe' : 'Non requis')),
-                          _tdPosition(position, entryKind, kind),
+                              : (entryKind == 'loaded' ? 'Depose directe' : 'Non requis')),
+                          _td(entryKind == 'loaded' ? 'Plein (Depose)' : 'Vide (Prise)', isBold: true),
                         ],
                       ),
                   ],
@@ -382,122 +384,233 @@ class BonPdfBuilder {
               pw.SizedBox(height: 6),
 
               // ==========================================
-              // 4. VISUAL SCHÉMA & ÉTAT COMPARATIF ENTRÉE / SORTIE
+              // 4. VISUELS ROTATION TCZ : ENTREE VS SORTIE
               // ==========================================
               pw.Container(
-                padding: const pw.EdgeInsets.all(6),
+                padding: const pw.EdgeInsets.all(5),
                 decoration: pw.BoxDecoration(
                   color: lightBg,
                   borderRadius: pw.BorderRadius.circular(6),
                   border: pw.Border.all(color: borderGray, width: 0.8),
                 ),
-                child: pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                   children: [
-                    // Left: Truck Illustration & Badge
-                    pw.Expanded(
-                      flex: 4,
-                      child: pw.Column(
+                    // Titre Bandeau Rotation
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('#e2e8f0'),
+                        borderRadius: pw.BorderRadius.circular(4),
+                      ),
+                      child: pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         children: [
-                          if (truckImg != null)
-                            pw.Image(truckImg, height: 42, fit: pw.BoxFit.contain)
-                          else
-                            pw.Container(
-                              height: 38,
-                              alignment: pw.Alignment.center,
-                              decoration: pw.BoxDecoration(
-                                color: lightBlue,
-                                borderRadius: pw.BorderRadius.circular(4),
-                              ),
-                              child: pw.Text(
-                                entryKind == 'loaded' ? '🚛 [ CAMION CHARGÉ ]' : '🚛 [ CHÂSSIS NU ]',
-                                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, color: navy),
-                              ),
-                            ),
-                          pw.SizedBox(height: 3),
                           pw.Text(
-                            isTwin
-                                ? 'Configuration : TWIN 2 x 20 PIEDS'
-                                : (entryKind == 'loaded'
-                                    ? 'Configuration : 1x ${decodeIso(isoCode)}'
-                                    : 'Configuration : CHÂSSIS NU POUR PRISE'),
-                            style: pw.TextStyle(fontSize: 6, fontWeight: pw.FontWeight.bold, color: muted),
+                            'CONTROLE VISUEL DE ROTATION (TERMINAL TCZ ZENATA)',
+                            style: pw.TextStyle(
+                              fontSize: 6.5,
+                              fontWeight: pw.FontWeight.bold,
+                              color: darkNavy,
+                            ),
+                          ),
+                          pw.Text(
+                            isEntryEmpty
+                                ? 'MISSION : PRISE DE CONTENEUR'
+                                : 'MISSION : DEPOSE DE CONTENEUR',
+                            style: pw.TextStyle(
+                              fontSize: 6.5,
+                              fontWeight: pw.FontWeight.bold,
+                              color: isEntryEmpty ? amber : emerald,
+                            ),
                           ),
                         ],
                       ),
                     ),
+                    pw.SizedBox(height: 4),
 
-                    pw.SizedBox(width: 8),
-
-                    // Right: Comparison & Security Rule (État d'entrée vs État attendu en sortie)
-                    pw.Expanded(
-                      flex: 6,
-                      child: pw.Container(
-                        padding: const pw.EdgeInsets.all(6),
-                        decoration: pw.BoxDecoration(
-                          color: PdfColors.white,
-                          borderRadius: pw.BorderRadius.circular(5),
-                          border: pw.Border.all(
-                            color: entryKind == 'empty' ? amber : navy,
-                            width: 1,
-                          ),
-                        ),
-                        child: pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            // Constat Entrée
-                            pw.Row(
+                    // Visual Comparison: Left (Constat Entree) -> Center (Arrow) -> Right (Controle Sortie Exige)
+                    pw.Row(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        // 1. CARTE ENTREE (GATE-IN)
+                        pw.Expanded(
+                          flex: 5,
+                          child: pw.Container(
+                            padding: const pw.EdgeInsets.all(4),
+                            decoration: pw.BoxDecoration(
+                              color: PdfColors.white,
+                              borderRadius: pw.BorderRadius.circular(5),
+                              border: pw.Border.all(
+                                color: isEntryEmpty ? amber : navy,
+                                width: 0.8,
+                              ),
+                            ),
+                            child: pw.Column(
                               children: [
-                                pw.Text('1. CONSTAT ENTRÉE : ',
-                                    style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: muted)),
-                                pw.Text(
-                                  entryKind == 'empty'
-                                      ? 'CHÂSSIS NU (VIDE)'
-                                      : 'CHARGÉ (DÉPOSE CONTENEUR)',
-                                  style: pw.TextStyle(
-                                    fontSize: 7,
-                                    fontWeight: pw.FontWeight.bold,
-                                    color: entryKind == 'empty' ? amber : navy,
+                                pw.Container(
+                                  width: double.infinity,
+                                  padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                  decoration: pw.BoxDecoration(
+                                    color: isEntryEmpty ? lightAmber : lightBlue,
+                                    borderRadius: pw.BorderRadius.circular(3),
                                   ),
+                                  child: pw.Text(
+                                    '1. CONSTAT ENTREE (GATE-IN)',
+                                    textAlign: pw.TextAlign.center,
+                                    style: pw.TextStyle(
+                                      fontSize: 6,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: isEntryEmpty ? amber : navy,
+                                    ),
+                                  ),
+                                ),
+                                pw.SizedBox(height: 3),
+                                if (entryImg != null)
+                                  pw.Image(entryImg, height: 35, fit: pw.BoxFit.contain)
+                                else
+                                  pw.Container(
+                                    height: 35,
+                                    alignment: pw.Alignment.center,
+                                    child: pw.Text(
+                                      isEntryEmpty ? '[ CHASSIS NU ]' : '[ CAMION CHARGE ]',
+                                      style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: navy),
+                                    ),
+                                  ),
+                                pw.SizedBox(height: 2),
+                                pw.Text(
+                                  isEntryEmpty ? 'CHASSIS NU (VIDE)' : 'CAMION CHARGE',
+                                  style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: ink),
+                                ),
+                                pw.Text(
+                                  isEntryEmpty ? 'Arrive sans conteneur' : 'Conteneur a decharger',
+                                  style: const pw.TextStyle(fontSize: 5, color: PdfColors.grey700),
                                 ),
                               ],
                             ),
-                            pw.SizedBox(height: 3),
+                          ),
+                        ),
 
-                            // Règle Obligatoire Sortie
-                            pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                              decoration: pw.BoxDecoration(
-                                color: entryKind == 'empty' ? lightAmber : lightEmerald,
-                                borderRadius: pw.BorderRadius.circular(3),
+                        // 2. FLECHE DE ROTATION
+                        pw.Expanded(
+                          flex: 2,
+                          child: pw.Column(
+                            mainAxisAlignment: pw.MainAxisAlignment.center,
+                            children: [
+                              pw.Text(
+                                'ROTATION',
+                                style: pw.TextStyle(fontSize: 5.5, fontWeight: pw.FontWeight.bold, color: muted),
                               ),
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-                                  pw.Text(
-                                    entryKind == 'empty'
-                                        ? '⚠️ CONTRÔLE SORTIE : DOIT SORTIR CHARGÉ'
-                                        : '⚠️ CONTRÔLE SORTIE : DOIT SORTIR VIDE (CHÂSSIS NU)',
-                                    style: pw.TextStyle(
-                                      fontSize: 7.5,
-                                      fontWeight: pw.FontWeight.bold,
-                                      color: entryKind == 'empty' ? PdfColor.fromHex('#92400e') : PdfColor.fromHex('#166534'),
-                                    ),
+                              pw.SizedBox(height: 1),
+                              pw.Text(
+                                '>>>>>',
+                                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: navy),
+                              ),
+                              pw.SizedBox(height: 1),
+                              pw.Text(
+                                isEntryEmpty ? 'PRISE' : 'DEPOSE',
+                                style: pw.TextStyle(
+                                  fontSize: 5.5,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: isEntryEmpty ? amber : emerald,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // 3. CARTE SORTIE EXIGEE (GATE-OUT)
+                        pw.Expanded(
+                          flex: 5,
+                          child: pw.Container(
+                            padding: const pw.EdgeInsets.all(4),
+                            decoration: pw.BoxDecoration(
+                              color: PdfColors.white,
+                              borderRadius: pw.BorderRadius.circular(5),
+                              border: pw.Border.all(color: emerald, width: 1.2),
+                            ),
+                            child: pw.Column(
+                              children: [
+                                pw.Container(
+                                  width: double.infinity,
+                                  padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                                  decoration: pw.BoxDecoration(
+                                    color: lightEmerald,
+                                    borderRadius: pw.BorderRadius.circular(3),
                                   ),
-                                  pw.Text(
-                                    entryKind == 'empty'
-                                        ? 'Le camion doit avoir chargé le conteneur assigné en Yard avant de franchir la porte de sortie.'
-                                        : 'Vérifier que le conteneur a été déposé et que le plateau est vide avant validation.',
+                                  child: pw.Text(
+                                    '2. CONTROLE SORTIE EXIGE (GATE-OUT)',
+                                    textAlign: pw.TextAlign.center,
                                     style: pw.TextStyle(
                                       fontSize: 6,
-                                      color: entryKind == 'empty' ? PdfColor.fromHex('#78350f') : PdfColor.fromHex('#14532d'),
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: emerald,
                                     ),
                                   ),
-                                ],
+                                ),
+                                pw.SizedBox(height: 3),
+                                if (exitImg != null)
+                                  pw.Image(exitImg, height: 35, fit: pw.BoxFit.contain)
+                                else
+                                  pw.Container(
+                                    height: 35,
+                                    alignment: pw.Alignment.center,
+                                    child: pw.Text(
+                                      isEntryEmpty ? '[ DOIT SORTIR CHARGE ]' : '[ DOIT SORTIR VIDE ]',
+                                      style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: emerald),
+                                    ),
+                                  ),
+                                pw.SizedBox(height: 2),
+                                pw.Text(
+                                  isEntryEmpty ? 'DOIT SORTIR CHARGE' : 'DOIT SORTIR VIDE (CHASSIS NU)',
+                                  style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: emerald),
+                                ),
+                                pw.Text(
+                                  isEntryEmpty ? 'Conteneur assigne + scelle' : 'Plateau verifie vide',
+                                  style: const pw.TextStyle(fontSize: 5, color: PdfColors.grey700),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    pw.SizedBox(height: 4),
+
+                    // Directive / Consigne de securite Gate-Out
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: pw.BoxDecoration(
+                        color: isEntryEmpty ? lightAmber : lightEmerald,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(
+                          color: isEntryEmpty ? amber : emerald,
+                          width: 0.6,
+                        ),
+                      ),
+                      child: pw.Row(
+                        children: [
+                          pw.Text(
+                            '[ DIRECTIVE SORTIE ] : ',
+                            style: pw.TextStyle(
+                              fontSize: 6.5,
+                              fontWeight: pw.FontWeight.bold,
+                              color: isEntryEmpty ? PdfColor.fromHex('#92400e') : PdfColor.fromHex('#166534'),
+                            ),
+                          ),
+                          pw.Expanded(
+                            child: pw.Text(
+                              isEntryEmpty
+                                  ? 'Le camion est entre a vide. Verifier obligatoirement le conteneur charge et le scelle avant barriere.'
+                                  : 'Le camion est entre charge. Verifier imperativement que le plateau est completement vide avant barriere.',
+                              style: pw.TextStyle(
+                                fontSize: 6,
+                                color: isEntryEmpty ? PdfColor.fromHex('#78350f') : PdfColor.fromHex('#14532d'),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -507,31 +620,23 @@ class BonPdfBuilder {
               pw.SizedBox(height: 8),
 
               // ==========================================
-              // 5. ZONES D'ÉMARGEMENT & DE CONTRÔLE (3 CADRES)
+              // 5. ZONES D'EMARGEMENT: 2 CADRES (ENTREE & SORTIE NICHAN)
               // ==========================================
               pw.Row(
                 children: [
                   _signatureBox(
-                    title: '1. POSTE ENTRÉE',
-                    subtitle: 'Contrôle accès Gate-In',
-                    field1: 'Date/Heure : ${formatDateTime(createdAt)}',
-                    field2: 'Visa Agent : Conformité OK',
+                    title: '1. POSTE ENTREE (GATE-IN)',
+                    subtitle: 'Controle acces & saisie initiale',
+                    field1: 'Date / Heure : ${formatDateTime(createdAt)}',
+                    field2: 'Visa Agent : Conformite validee [ OK ]',
                     accentColor: navy,
                   ),
-                  pw.SizedBox(width: 6),
+                  pw.SizedBox(width: 10),
                   _signatureBox(
-                    title: '2. OPÉRATION PARC (YARD)',
-                    subtitle: 'Manutention & Levage',
-                    field1: position.isNotEmpty ? 'Position : $position' : 'Emplacement : [            ]',
-                    field2: 'Engin N° : [           ]',
-                    accentColor: amber,
-                  ),
-                  pw.SizedBox(width: 6),
-                  _signatureBox(
-                    title: '3. POSTE SORTIE (GATE-OUT)',
-                    subtitle: 'Contrôle final & Clôture',
-                    field1: 'Heure sortie : ___ : ___',
-                    field2: 'Contrôle : [  ] Châssis  [  ] Scellé',
+                    title: '2. POSTE SORTIE (GATE-OUT)',
+                    subtitle: 'Controle final & autorisation de passage',
+                    field1: 'Heure effective de sortie : ___ : ___',
+                    field2: 'Controle de conformite : [  ] Chassis   [  ] Scelle',
                     accentColor: emerald,
                   ),
                 ],
@@ -540,18 +645,18 @@ class BonPdfBuilder {
               pw.Spacer(),
 
               // ==========================================
-              // 6. FOOTER LÉGAL & SÉCURITÉ
+              // 6. FOOTER: TCZ ZENATA
               // ==========================================
               pw.Divider(thickness: 0.6, color: borderGray),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text(
-                    'Document opérationnel officiel TCZ Tanger Med · Valable pour une seule rotation.',
+                    'Document operationnel officiel TCZ Zenata - Valable pour une seule rotation.',
                     style: pw.TextStyle(fontSize: 5.5, color: muted),
                   ),
                   pw.Text(
-                    'Système N4 TOS · Pointage Sécurisé',
+                    'Terminal Conteneurs Zenata - Pointage Securise',
                     style: pw.TextStyle(fontSize: 5.5, fontWeight: pw.FontWeight.bold, color: navy),
                   ),
                 ],
@@ -602,30 +707,8 @@ class BonPdfBuilder {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: pw.Text(
-        entryKind == 'empty' ? 'EN ATTENTE YARD (PRISE)' : 'NON RENSEIGNÉ',
+        entryKind == 'empty' ? 'EN ATTENTE CHARGEMENT (PRISE)' : 'NON RENSEIGNE',
         style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#d97706')),
-      ),
-    );
-  }
-
-  static pw.Widget _tdPosition(String position, String entryKind, String kind) {
-    if (position.isNotEmpty) {
-      return pw.Padding(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: pw.Text(
-          position,
-          style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#16a34a')),
-        ),
-      );
-    }
-    final label = entryKind == 'empty'
-        ? 'À désigner en Yard'
-        : (kind == 'ENTREE' ? 'En attente engin' : 'N/A');
-    return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      child: pw.Text(
-        label,
-        style: pw.TextStyle(fontSize: 6.5, color: PdfColor.fromHex('#64748b')),
       ),
     );
   }
@@ -639,12 +722,12 @@ class BonPdfBuilder {
   }) {
     return pw.Expanded(
       child: pw.Container(
-        height: 68,
-        padding: const pw.EdgeInsets.all(5),
+        height: 72,
+        padding: const pw.EdgeInsets.all(6),
         decoration: pw.BoxDecoration(
           color: PdfColors.white,
-          borderRadius: pw.BorderRadius.circular(5),
-          border: pw.Border.all(color: PdfColor.fromHex('#cbd5e1'), width: 0.7),
+          borderRadius: pw.BorderRadius.circular(6),
+          border: pw.Border.all(color: PdfColor.fromHex('#cbd5e1'), width: 0.8),
         ),
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -653,25 +736,25 @@ class BonPdfBuilder {
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(title, style: pw.TextStyle(fontSize: 6.5, fontWeight: pw.FontWeight.bold, color: accentColor)),
+                pw.Text(title, style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: accentColor)),
                 pw.Text(subtitle, style: const pw.TextStyle(fontSize: 5.5, color: PdfColors.grey700)),
               ],
             ),
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(field1, style: const pw.TextStyle(fontSize: 6, color: PdfColors.black)),
-                pw.SizedBox(height: 1),
-                pw.Text(field2, style: const pw.TextStyle(fontSize: 6, color: PdfColors.black)),
+                pw.Text(field1, style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.black)),
+                pw.SizedBox(height: 2),
+                pw.Text(field2, style: const pw.TextStyle(fontSize: 6.5, color: PdfColors.black)),
               ],
             ),
             pw.Container(
-              height: 12,
+              height: 14,
               alignment: pw.Alignment.bottomRight,
               decoration: const pw.BoxDecoration(
                 border: pw.Border(top: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
               ),
-              child: pw.Text('Cachet / Visa', style: const pw.TextStyle(fontSize: 5, color: PdfColors.grey500)),
+              child: pw.Text('Cachet / Visa de l\'agent', style: const pw.TextStyle(fontSize: 5.5, color: PdfColors.grey500)),
             ),
           ],
         ),

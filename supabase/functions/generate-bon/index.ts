@@ -12,7 +12,7 @@ const json = (status: number, body: unknown) =>
     headers: { ...cors, 'content-type': 'application/json' },
   });
 
-function printable(input: unknown, fallback = '—'): string {
+function printable(input: unknown, fallback = '-'): string {
   if (input === null || input === undefined || String(input).trim() === '') return fallback;
   return String(input)
     .normalize('NFKD')
@@ -22,13 +22,13 @@ function printable(input: unknown, fallback = '—'): string {
 }
 
 function formatDate(rawIso: unknown): string {
-  if (!rawIso) return '—';
+  if (!rawIso) return '-';
   try {
     const s = String(rawIso);
     const d = new Date(s);
     if (isNaN(d.getTime())) return s.split('.')[0].replace('T', ' ');
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} à ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+    return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} a ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
   } catch {
     return String(rawIso);
   }
@@ -56,8 +56,6 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
   const type = String(document.kind ?? 'ENTREE').toUpperCase();
   const title: Record<string, string> = {
     ENTREE: "BON D'ENTREE (GATE-IN)",
-    DEPOSE: 'BON DE DECHARGE YARD',
-    PRISE: 'BON DE CHARGE YARD',
     SORTIE: 'BON DE SORTIE (GATE-OUT)',
   };
 
@@ -65,7 +63,7 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
   const rawContainer = event.container ?? snapshot.container_number;
   const containerStr = printable(
     rawContainer,
-    entryKind === 'empty' ? 'EN ATTENTE YARD (PRISE)' : 'NON RENSEIGNE'
+    entryKind === 'empty' ? 'EN ATTENTE CHARGEMENT (PRISE)' : 'NON RENSEIGNE'
   );
 
   const rawBooking = event.booking ?? snapshot.booking;
@@ -74,16 +72,10 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
     entryKind === 'loaded' ? 'DEPOSE DIRECTE' : 'NON REQUIS'
   );
 
-  const rawPosition = event.position ?? snapshot.position;
-  const positionStr = printable(
-    rawPosition,
-    entryKind === 'empty' ? 'A DESIGNER EN YARD' : (type === 'ENTREE' ? 'EN ATTENTE ENGIN' : 'N/A')
-  );
-
-  // 1. Header & Terminal Info
+  // 1. Header: Terminal Conteneurs Zenata
   page.drawText('TCZ', { x: 20, y: 562, font: bold, size: 20, color: navy });
-  page.drawText('TERMINAL CONTENEURS DE TANGER MED', { x: 20, y: 550, font: bold, size: 7, color: navy });
-  page.drawText('PORT TANGER MED 2 · GUICHET UNIQUE & CONTROLE D\'ACCES', { x: 20, y: 541, font: normal, size: 5.5, color: muted });
+  page.drawText('TERMINAL CONTENEURS ZENATA', { x: 20, y: 550, font: bold, size: 7, color: navy });
+  page.drawText('TCZ ZENATA - GUICHET UNIQUE & CONTROLE D\'ACCES', { x: 20, y: 541, font: normal, size: 5.5, color: muted });
 
   // Document Title Pill
   const docTitle = title[type] ?? `BON TCZ - ${type}`;
@@ -92,7 +84,7 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
     y: 540,
     width: 170,
     height: 34,
-    color: type === 'SORTIE' ? green : (type === 'PRISE' ? amber : navy),
+    color: type === 'SORTIE' ? green : navy,
   });
   page.drawText(docTitle, { x: 238, y: 560, font: bold, size: 9.5, color: rgb(1, 1, 1) });
   page.drawText(`Ref: #${printable(document.id).slice(0, 8).toUpperCase()}`, { x: 238, y: 549, font: bold, size: 7, color: rgb(1, 1, 1) });
@@ -129,21 +121,21 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
   page.drawText('LIGNE MARITIME', { x: 220, y: 514, font: bold, size: 6.5, color: muted });
   page.drawText(printable(snapshot.armateur_id), { x: 220, y: 495, font: bold, size: 9.5, color: navy });
 
-  page.drawText('N° VISITE', { x: 310, y: 514, font: bold, size: 6.5, color: muted });
+  page.drawText('NO. VISITE', { x: 310, y: 514, font: bold, size: 6.5, color: muted });
   page.drawText(`${printable(document.visit_id).slice(0, 8)}...`, { x: 310, y: 495, font: bold, size: 8, color: muted });
 
-  // 3. Section: Details Conteneur
+  // 3. Section: Details Conteneur (Direct Entree - Sortie sans yard)
   let yTable = 458;
   page.drawText('DETAILS OPERATIONNELS & CONTENEUR', { x: 20, y: yTable, font: bold, size: 7.5, color: navy });
   yTable -= 14;
 
-  const tableHeaders = ['CONTENEUR ISO 6346', 'CODE ISO', 'OPERATION', 'BOOKING / REF', 'POSITION YARD'];
+  const tableHeaders = ['CONTENEUR ISO 6346', 'CODE ISO', 'OPERATION', 'BOOKING / REF', 'STATUT ENTREE'];
   const tableValues = [
     containerStr,
     printable(snapshot.iso_code),
     type,
     bookingStr,
-    positionStr,
+    entryKind === 'loaded' ? 'Plein (Depose)' : 'Vide (Prise)',
   ];
 
   // Header row
@@ -202,7 +194,7 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
     { x: 34, y: yBox + 8, font: bold, size: 6.5, color: muted }
   );
 
-  // Security & Gate-Out Comparison Box
+  // Security & Gate-Out Comparison Box (Clean text without emojis)
   page.drawRectangle({
     x: 180,
     y: yBox + 10,
@@ -215,7 +207,7 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
 
   page.drawText('1. CONSTAT D\'ENTREE (GATE-IN) :', { x: 188, y: yBox + 72, font: bold, size: 6.5, color: muted });
   page.drawText(
-    entryKind === 'empty' ? 'CHASSIS NU (VIDE SANS CONTENEUR)' : 'CHARGÉ (DÉPOSE CONTENEUR)',
+    entryKind === 'empty' ? 'CHASSIS NU (VIDE SANS CONTENEUR)' : 'CHARGE (DEPOSE CONTENEUR)',
     { x: 188, y: yBox + 60, font: bold, size: 7.5, color: entryKind === 'empty' ? amber : navy }
   );
 
@@ -229,8 +221,8 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
 
   page.drawText(
     entryKind === 'empty'
-      ? 'CONTROLE SORTIE : DOIT SORTIR CHARGE'
-      : 'CONTROLE SORTIE : DOIT SORTIR VIDE (CHASSIS NU)',
+      ? '[ CONTROLE SORTIE ] : DOIT SORTIR CHARGE'
+      : '[ CONTROLE SORTIE ] : DOIT SORTIR VIDE (CHASSIS NU)',
     {
       x: 194,
       y: yBox + 40,
@@ -242,7 +234,7 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
 
   page.drawText(
     entryKind === 'empty'
-      ? 'Verifier le conteneur charge en Yard et son scelle avant barriere.'
+      ? 'Verifier le conteneur charge et son scelle avant ouverture barriere.'
       : 'Verifier que le conteneur a ete depose et que le plateau est vide.',
     {
       x: 194,
@@ -253,36 +245,29 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
     }
   );
 
-  // 5. Section: Signatures & 3 Stamps Boxes
+  // 5. Section: Signatures: 2 Boxes (Entree & Sortie Nichan)
   const ySign = yBox - 78;
-  const boxW = 122;
+  const boxW = 186;
   const stampBoxes = [
     {
-      title: '1. POSTE ENTREE',
-      sub: 'Controle Gate-In',
-      f1: `Date : ${formatDate(document.created_at)}`,
-      f2: 'Visa : Conformite OK',
+      title: '1. POSTE ENTREE (GATE-IN)',
+      sub: 'Controle acces & saisie initiale',
+      f1: `Date / Heure : ${formatDate(document.created_at)}`,
+      f2: 'Visa Agent : Conformite validee [ OK ]',
       color: navy,
     },
     {
-      title: '2. MANUTENTION YARD',
-      sub: 'Operation Parc / Engin',
-      f1: positionStr !== 'N/A' ? `Position : ${positionStr}` : 'Position : [          ]',
-      f2: 'Engin N° : [        ]',
-      color: amber,
-    },
-    {
-      title: '3. POSTE SORTIE',
-      sub: 'Controle Final Gate-Out',
-      f1: 'Heure sortie : ___ : ___',
-      f2: 'Controle : [ ] Chassis [ ] Scelle',
+      title: '2. POSTE SORTIE (GATE-OUT)',
+      sub: 'Controle final & autorisation de passage',
+      f1: 'Heure effective de sortie : ___ : ___',
+      f2: 'Controle conformite : [ ] Chassis  [ ] Scelle',
       color: green,
     },
   ];
 
   for (let i = 0; i < stampBoxes.length; i++) {
     const b = stampBoxes[i];
-    const bx = 20 + i * (boxW + 7);
+    const bx = 20 + i * (boxW + 8);
     page.drawRectangle({
       x: bx,
       y: ySign,
@@ -292,17 +277,17 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
       borderColor: borderGray,
       borderWidth: 0.7,
     });
-    page.drawText(b.title, { x: bx + 6, y: ySign + 54, font: bold, size: 6.5, color: b.color });
-    page.drawText(b.sub, { x: bx + 6, y: ySign + 45, font: normal, size: 5.5, color: muted });
-    page.drawText(b.f1, { x: bx + 6, y: ySign + 30, font: normal, size: 5.5, color: ink });
-    page.drawText(b.f2, { x: bx + 6, y: ySign + 20, font: normal, size: 5.5, color: ink });
-    page.drawLine({ start: { x: bx + 6, y: ySign + 12 }, end: { x: bx + boxW - 6, y: ySign + 12 }, thickness: 0.5, color: borderGray });
-    page.drawText('Cachet / Visa', { x: bx + boxW - 40, y: ySign + 4, font: normal, size: 5, color: muted });
+    page.drawText(b.title, { x: bx + 8, y: ySign + 54, font: bold, size: 7, color: b.color });
+    page.drawText(b.sub, { x: bx + 8, y: ySign + 45, font: normal, size: 5.5, color: muted });
+    page.drawText(b.f1, { x: bx + 8, y: ySign + 30, font: normal, size: 6, color: ink });
+    page.drawText(b.f2, { x: bx + 8, y: ySign + 20, font: normal, size: 6, color: ink });
+    page.drawLine({ start: { x: bx + 8, y: ySign + 12 }, end: { x: bx + boxW - 8, y: ySign + 12 }, thickness: 0.5, color: borderGray });
+    page.drawText('Cachet / Visa de l\'agent', { x: bx + boxW - 55, y: ySign + 4, font: normal, size: 5, color: muted });
   }
 
-  // 6. Footer
+  // 6. Footer: TCZ Zenata
   page.drawLine({ start: { x: 20, y: 22 }, end: { x: 400, y: 22 }, thickness: 0.6, color: borderGray });
-  page.drawText('Document d\'exploitation officiel TCZ Tanger Med · Valable pour une seule rotation · TOS Navis N4.', {
+  page.drawText('Document d\'exploitation officiel TCZ Zenata - Valable pour une seule rotation - TOS Navis N4.', {
     x: 20,
     y: 12,
     font: normal,
