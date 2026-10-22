@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Pointage des conteneurs et camions du terminal TCZ.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Pointage TCZ">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Pointage Container · TCZ</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Local PDF.js engine for instantaneous zero-latency preview and printing -->
+  <script>
+    window.dartPdfJsBaseUrl = './';
+  </script>
+  <script src="pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
+    }
+  </script>
+  <style>
+    /* Suppress Netlify badge and drawer */
+    iframe[src*="app.netlify.com"],
+    iframe[src*="netlify"],
+    #netlify-badge,
+    .netlify-badge,
+    [data-netlify-deploy-id],
+    [id*="netlify"],
+    [class*="netlify-drawer"],
+    div[data-netlify-badge],
+    netlify-drawer {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      width: 0 !important;
+      height: 0 !important;
+      position: absolute !important;
+      top: -9999px !important;
+      left: -9999px !important;
+    }
+  </style>
+  <script>
+    (function() {
+      function removeNetlify() {
+        var elements = document.querySelectorAll('iframe[src*="netlify"], #netlify-badge, .netlify-badge, [class*="netlify-drawer"], [id*="netlify"], netlify-drawer');
+        elements.forEach(function(el) { el.remove(); });
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', removeNetlify);
+      } else {
+        removeNetlify();
+      }
+      try {
+        var observer = new MutationObserver(removeNetlify);
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+      } catch (_) {}
+    })();
+  </script>
+</head>
+<body>
+  <div id="tcz-loading" role="status" aria-label="Chargement de TCZ"
+    style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;background:#f2f6fa;z-index:10">
+    <img src="brand/tcz-logo.svg" width="245" height="70" alt="TCZ">
+    <span style="font:14px system-ui,sans-serif;color:#49677e">Ouverture du terminal…</span>
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      document.getElementById('tcz-loading')?.remove();
+    }, {once: true});
+  </script>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (var i = 0; i < registrations.length; i++) {
+          registrations[i].unregister();
+        }
+      });
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (var i = 0; i < names.length; i++) {
+          caches.delete(names[i]);
+        }
+      });
+    }
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
