@@ -9,9 +9,18 @@ import 'ui/pointage_screens.dart';
 import 'ui/admin_screen.dart';
 import 'ui/tcz_brand.dart';
 
-const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-const supabasePublishableKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
-const authSiteUrl = String.fromEnvironment('AUTH_SITE_URL');
+const supabaseUrl = String.fromEnvironment(
+  'SUPABASE_URL',
+  defaultValue: 'https://iparzfqxopcvwqelxlad.supabase.co',
+);
+const supabasePublishableKey = String.fromEnvironment(
+  'SUPABASE_PUBLISHABLE_KEY',
+  defaultValue: 'sb_publishable_AgyGT1cfJz9gkXTpVrLsXg_B3VNWHGs',
+);
+const authSiteUrl = String.fromEnvironment(
+  'AUTH_SITE_URL',
+  defaultValue: 'https://marsa.digital',
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -426,156 +435,294 @@ class PointageShell extends StatefulWidget {
   @override State<PointageShell> createState() => _PointageShellState();
 }
 class _PointageShellState extends State<PointageShell> {
-  int section=0,process=0;
-  bool isFullScreen=false;
+  int section = 0, process = 0;
+  bool? _isFullScreenUserPref;
   late Future<List<String>> roleFuture;
-  @override void initState(){super.initState();roleFuture=widget.repository.roles();}
+  @override void initState() { super.initState(); roleFuture = widget.repository.roles(); }
   @override Widget build(BuildContext context) => FutureBuilder<List<String>>(
-    future:roleFuture,builder:(context,snapshot){
-      if(snapshot.hasError){return Scaffold(
-        appBar:AppBar(title:const Text('Accès indisponible')),
-        body:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
-          const Text('Impossible de vérifier les rôles de ce compte.'),
-          const SizedBox(height:12),
-          FilledButton(onPressed:()=>setState((){roleFuture=widget.repository.roles();}),
-            child:const Text('Réessayer')),
-        ])));}
-      if(!snapshot.hasData) return const Scaffold(body:Center(child:CircularProgressIndicator()));
-      final roles=snapshot.data!;
-      if(roles.isEmpty) {
-        return Scaffold(appBar:AppBar(title:const Text('Accès indisponible'),actions:[
-          IconButton(tooltip:'Déconnexion',icon:const Icon(Icons.logout),
-            onPressed:()=>Supabase.instance.client.auth.signOut()),
-        ]),body:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
-          const Padding(padding:EdgeInsets.symmetric(horizontal:24),
-            child:Text('Ce compte est désactivé ou n’a aucun rôle actif.',textAlign:TextAlign.center)),
-          const SizedBox(height:12),
-          FilledButton.icon(onPressed:()=>Supabase.instance.client.auth.signOut(),
-            icon:const Icon(Icons.logout),label:const Text('Se déconnecter')),
-        ])));
+    future: roleFuture, builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Accès indisponible')),
+          body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Impossible de vérifier les rôles de ce compte.'),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: () => setState(() { roleFuture = widget.repository.roles(); }),
+              child: const Text('Réessayer')),
+          ])),
+        );
       }
-      final admin=roles.contains('admin');
-      bool allowed(String role)=>admin||roles.contains(role);
-      final canEnter=allowed('entree'),canExit=allowed('sortie');
-      final activeProcess=canEnter&&canExit?process:(canEnter?0:1);
-      final repo=widget.repository;
-      final screens=<Widget>[
-        switch(activeProcess){
-          0=>allowed('entree')?EntryScreen(repository:repo,canCorrect:admin,isFullScreen:isFullScreen)
-              :const PermissionScreen(role:'Entrée'),
-          _=>allowed('sortie')?ExitScreen(repository:repo,canCancel:admin,isFullScreen:isFullScreen)
-              :const PermissionScreen(role:'Sortie'),
+      if (!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      final roles = snapshot.data!;
+      if (roles.isEmpty) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Accès indisponible'), actions: [
+            IconButton(tooltip: 'Déconnexion', icon: const Icon(Icons.logout),
+              onPressed: () => Supabase.instance.client.auth.signOut()),
+          ]),
+          body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Text('Ce compte est désactivé ou n’a aucun rôle actif.', textAlign: TextAlign.center)),
+            const SizedBox(height: 12),
+            FilledButton.icon(onPressed: () => Supabase.instance.client.auth.signOut(),
+              icon: const Icon(Icons.logout), label: const Text('Se déconnecter')),
+          ])),
+        );
+      }
+      final admin = roles.contains('admin');
+      bool allowed(String role) => admin || roles.contains(role);
+      final canEnter = allowed('entree'), canExit = allowed('sortie');
+      final activeProcess = canEnter && canExit ? process : (canEnter ? 0 : 1);
+      final repo = widget.repository;
+
+      final isMobile = MediaQuery.sizeOf(context).width < 800;
+      final isFullScreen = _isFullScreenUserPref ?? (isMobile && section == 0);
+
+      final screens = <Widget>[
+        switch (activeProcess) {
+          0 => allowed('entree') ? EntryScreen(repository: repo, canCorrect: admin, isFullScreen: isFullScreen)
+              : const PermissionScreen(role: 'Entrée'),
+          _ => allowed('sortie') ? ExitScreen(repository: repo, canCancel: admin, isFullScreen: isFullScreen)
+              : const PermissionScreen(role: 'Sortie'),
         },
-        DataScreen(repository:repo),
-        BonsScreen(repository:repo),
+        DataScreen(repository: repo),
+        BonsScreen(repository: repo),
       ];
-      final body=SafeArea(child:KeyedSubtree(
-        key:ValueKey('$section-$process'),
-        child:screens[section]));
-      final destinations=const [NavigationDestination(icon:Icon(Icons.rule),label:'Pointage'),
-        NavigationDestination(icon:Icon(Icons.dataset),label:'Data'),
-        NavigationDestination(icon:Icon(Icons.description),label:'Bons')];
 
-      Widget content=LayoutBuilder(builder:(context,c)=>(c.maxWidth>900&&!isFullScreen)?
-        Row(children:[NavigationRail(selectedIndex:section,
-          onDestinationSelected:(i)=>setState(()=>section=i),labelType:NavigationRailLabelType.all,
-          destinations:const [NavigationRailDestination(icon:Icon(Icons.rule),label:Text('Pointage')),
-            NavigationRailDestination(icon:Icon(Icons.dataset),label:Text('Data')),
-            NavigationRailDestination(icon:Icon(Icons.description),label:Text('Bons'))]),
-          const VerticalDivider(width:1),Expanded(child:body)]):body);
+      final currentScreen = KeyedSubtree(
+        key: ValueKey('$section-$process'),
+        child: screens[section],
+      );
 
-      if(isFullScreen){
-        content=Stack(children:[
-          content,
-          Positioned(
-            top:10,right:12,
-            child:Material(
-              elevation:6,
-              borderRadius:BorderRadius.circular(22),
-              color:const Color(0xff063e66),
-              child:InkWell(
-                borderRadius:BorderRadius.circular(22),
-                onTap:()=>setState(()=>isFullScreen=false),
-                child:Container(
-                  padding:const EdgeInsets.symmetric(horizontal:12,vertical:7),
-                  decoration:BoxDecoration(
-                    borderRadius:BorderRadius.circular(22),
-                    border:Border.all(color:Colors.amberAccent.withValues(alpha:0.6),width:1.2)),
-                  child:Row(mainAxisSize:MainAxisSize.min,children:[
-                    const Icon(Icons.fullscreen_exit_rounded,size:18,color:Colors.amberAccent),
-                    const SizedBox(width:5),
-                    Text(activeProcess==0?'Entrée':'Sortie',
-                      style:const TextStyle(color:Colors.white,fontSize:13,fontWeight:FontWeight.bold)),
-                    const SizedBox(width:6),
-                    const Icon(Icons.close_rounded,size:15,color:Colors.white70),
-                  ]),
+      final destinations = const [
+        NavigationDestination(icon: Icon(Icons.rule), label: 'Pointage'),
+        NavigationDestination(icon: Icon(Icons.dataset), label: 'Data'),
+        NavigationDestination(icon: Icon(Icons.description), label: 'Bons'),
+      ];
+
+      Widget content;
+      if (isFullScreen) {
+        content = SafeArea(
+          child: Column(
+            children: [
+              Container(
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                color: const Color(0xff063e66),
+                child: Row(
+                  children: [
+                    // Fullscreen toggle button (prominent amber pill)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => setState(() => _isFullScreenUserPref = false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.amberAccent.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.amberAccent, width: 1.2),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.fullscreen_exit_rounded, size: 18, color: Colors.amberAccent),
+                            SizedBox(width: 4),
+                            Text('Normal', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    // Process toggle (Entrée / Sortie)
+                    if (canEnter && canExit)
+                      Container(
+                        height: 32,
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (var i = 0; i < 2; i++)
+                              InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () => setState(() => process = i),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: activeProcess == i ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    ['Entrée', 'Sortie'][i],
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: activeProcess == i ? FontWeight.bold : FontWeight.w600,
+                                      color: activeProcess == i ? const Color(0xff063e66) : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      )
+                    else
+                      Text(
+                        canEnter ? 'ENTRÉE GATE-IN' : 'SORTIE GATE-OUT',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.8),
+                      ),
+                    const Spacer(),
+                    if (admin && kIsWeb)
+                      IconButton(
+                        tooltip: 'Tableau de Bord',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        icon: const Icon(Icons.dashboard_customize_rounded, size: 19, color: Colors.white),
+                        onPressed: () => launchUrl(Uri.base.resolve('dashboard.html'), mode: LaunchMode.platformDefault),
+                      ),
+                    IconButton(
+                      tooltip: 'Se déconnecter',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.logout, size: 20, color: Colors.white70),
+                      onPressed: () => Supabase.instance.client.auth.signOut(),
+                    ),
+                  ],
                 ),
               ),
-            ),
+              Expanded(child: currentScreen),
+            ],
           ),
-        ]);
+        );
+      } else {
+        content = SafeArea(child: currentScreen);
+        if (MediaQuery.sizeOf(context).width > 900) {
+          content = Row(children: [
+            NavigationRail(
+              selectedIndex: section,
+              onDestinationSelected: (i) => setState(() => section = i),
+              labelType: NavigationRailLabelType.all,
+              destinations: const [
+                NavigationRailDestination(icon: Icon(Icons.rule), label: Text('Pointage')),
+                NavigationRailDestination(icon: Icon(Icons.dataset), label: Text('Data')),
+                NavigationRailDestination(icon: Icon(Icons.description), label: Text('Bons')),
+              ],
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(child: content),
+          ]);
+        }
       }
 
       return Scaffold(
-        appBar:isFullScreen?null:AppBar(
-          leadingWidth:86,
-          leading:const Padding(padding:EdgeInsets.only(left:12,right:4),
-            child:Center(child:TczBrand(width:72,onDark:true))),
-          titleSpacing:8,
-          centerTitle:true,
-          title:section==0
-            ? Row(mainAxisSize:MainAxisSize.min,children:[
-                if(canEnter&&canExit) Container(
-                  height:38,
-                  constraints:const BoxConstraints(maxWidth:220),
-                  padding:const EdgeInsets.all(3),
-                  decoration:BoxDecoration(
-                    color:Colors.black.withValues(alpha:0.25),
-                    borderRadius:BorderRadius.circular(9)),
-                  child:Row(children:[
-                    for(var i=0;i<2;i++)
-                      Expanded(child:InkWell(
-                        borderRadius:BorderRadius.circular(7),
-                        onTap:()=>setState(()=>process=i),
-                        child:Container(
-                          alignment:Alignment.center,
-                          decoration:BoxDecoration(
-                            color:activeProcess==i?Colors.white:Colors.transparent,
-                            borderRadius:BorderRadius.circular(7)),
-                          child:Text(['Entrée','Sortie'][i],
-                            style:TextStyle(
-                              fontSize:13,
-                              fontWeight:activeProcess==i?FontWeight.bold:FontWeight.w500,
-                              color:activeProcess==i?const Color(0xff063e66):Colors.white)),
-                        ))),
-                  ]))
-                else Text(canEnter?'Entrée':'Sortie'),
-                const SizedBox(width:4),
+        appBar: isFullScreen ? null : AppBar(
+          leadingWidth: isMobile ? 54 : 86,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 8, right: 4),
+            child: Center(child: TczBrand(width: isMobile ? 44 : 72, onDark: true)),
+          ),
+          titleSpacing: 4,
+          centerTitle: true,
+          title: section == 0
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (canEnter && canExit)
+                    Container(
+                      height: 34,
+                      constraints: BoxConstraints(maxWidth: isMobile ? 140 : 220),
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          for (var i = 0; i < 2; i++)
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () => setState(() => process = i),
+                                child: Container(
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: activeProcess == i ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    ['Entrée', 'Sortie'][i],
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: activeProcess == i ? FontWeight.bold : FontWeight.w500,
+                                      color: activeProcess == i ? const Color(0xff063e66) : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    )
+                  else
+                    Text(canEnter ? 'Entrée' : 'Sortie'),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => setState(() => _isFullScreenUserPref = true),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.amberAccent.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.amberAccent, width: 1.2),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.fullscreen_rounded, color: Colors.amberAccent, size: 18),
+                          SizedBox(width: 3),
+                          Text('Plein écran', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Text(section == 1 ? 'Data · Référentiel' : 'Bons · Documents'),
+          backgroundColor: const Color(0xff063e66),
+          foregroundColor: Colors.white,
+          actions: [
+            if (admin) ...[
+              if (kIsWeb)
                 IconButton(
-                  tooltip:'Mode Plein Écran Saisie',
-                  icon:const Icon(Icons.fullscreen_rounded,color:Colors.amberAccent,size:26),
-                  onPressed:()=>setState(()=>isFullScreen=true)),
-              ])
-            : Text(section==1?'Data · Référentiel':'Bons · Documents'),
-          backgroundColor:const Color(0xff063e66),foregroundColor:Colors.white,
-          actions:[
-            if(admin)...[
-              if(kIsWeb) IconButton(
-                tooltip:'Tableau de Bord Superviseur (Web)',
-                icon:const Icon(Icons.dashboard_customize_rounded),
-                onPressed:()=>launchUrl(Uri.base.resolve('dashboard.html'),
-                  mode:LaunchMode.platformDefault)),
-              IconButton(tooltip:'Administration',icon:const Icon(Icons.admin_panel_settings),
-                onPressed:()=>Navigator.push(context,MaterialPageRoute(
-                  builder:(_)=>AdminScreen(repository:repo)))),
+                  tooltip: 'Tableau de Bord Superviseur (Web)',
+                  icon: const Icon(Icons.dashboard_customize_rounded),
+                  onPressed: () => launchUrl(Uri.base.resolve('dashboard.html'), mode: LaunchMode.platformDefault),
+                ),
+              if (!isMobile)
+                IconButton(
+                  tooltip: 'Administration',
+                  icon: const Icon(Icons.admin_panel_settings),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AdminScreen(repository: repo))),
+                ),
             ],
-            IconButton(tooltip:'Déconnexion',icon:const Icon(Icons.logout),
-              onPressed:()=>Supabase.instance.client.auth.signOut()),
-          ]),
-        body:content,
-        bottomNavigationBar:(isFullScreen||MediaQuery.sizeOf(context).width>900)?null:
-          NavigationBar(selectedIndex:section,destinations:destinations,
-            onDestinationSelected:(i)=>setState(()=>section=i)),
+            IconButton(
+              tooltip: 'Déconnexion',
+              icon: const Icon(Icons.logout),
+              onPressed: () => Supabase.instance.client.auth.signOut(),
+            ),
+          ],
+        ),
+        body: content,
+        bottomNavigationBar: (isFullScreen || MediaQuery.sizeOf(context).width > 900) ? null :
+          NavigationBar(
+            selectedIndex: section,
+            destinations: destinations,
+            onDestinationSelected: (i) => setState(() => section = i),
+          ),
       );
     });
 }

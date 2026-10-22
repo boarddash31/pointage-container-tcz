@@ -3,9 +3,9 @@ $ErrorActionPreference = 'Stop'
 $FlutterExe = 'E:\flutter_sdk_tcz\bin\flutter.bat'
 $AppPath = 'E:\pointage_repo\app'
 $defines = @(
-  '--dart-define', 'SUPABASE_URL=https://iparzfqxopcvwqelxlad.supabase.co',
-  '--dart-define', 'SUPABASE_PUBLISHABLE_KEY=sb_publishable_AgyGT1cfJz9gkXTpVrLsXg_B3VNWHGs',
-  '--dart-define', 'AUTH_SITE_URL=http://localhost:8085'
+  '--dart-define=SUPABASE_URL=https://iparzfqxopcvwqelxlad.supabase.co',
+  '--dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_AgyGT1cfJz9gkXTpVrLsXg_B3VNWHGs',
+  '--dart-define=AUTH_SITE_URL=http://localhost:8085'
 )
 
 Write-Host "Building Flutter Web for Local Server..."
