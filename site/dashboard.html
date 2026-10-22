@@ -20,6 +20,23 @@
     .border-tcz-navy { border-color: #063e66; }
     .bg-tcz-teal { background-color: #087e79; }
     .text-tcz-teal { color: #087e79; }
+    @media print {
+      body * { visibility: hidden; }
+      #recentVisitsCard, #recentVisitsCard * { visibility: visible; }
+      #recentVisitsCard {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        border: none;
+        box-shadow: none;
+      }
+      .visit-filter-btn, #visitSearch, header, nav, footer, button {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body class="h-full flex flex-col text-slate-800">
@@ -469,6 +486,12 @@
             <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
             <input type="text" id="visitSearch" oninput="filterVisitsTable()" placeholder="Matricule, conteneur, motif..." class="w-full text-xs pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
           </div>
+
+          <!-- Print / PDF Button -->
+          <button type="button" onclick="printVisitsReport()" class="inline-flex items-center space-x-1.5 bg-[#063e66] hover:bg-[#084e7f] text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow-xs hover:shadow-md shrink-0 cursor-pointer" title="Imprimer ou enregistrer en PDF la liste actuelle">
+            <i data-lucide="printer" class="w-3.5 h-3.5 text-emerald-300"></i>
+            <span>Imprimer</span>
+          </button>
         </div>
       </div>
 
@@ -1218,6 +1241,357 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
       }
 
       renderVisitsTable(list);
+    }
+
+    // Print Visits Report Document
+    function printVisitsReport() {
+      const q = (document.getElementById('visitSearch')?.value || '').toLowerCase().trim();
+      let list = rawVisitsData || [];
+
+      if (currentVisitFilter !== 'ALL') {
+        list = list.filter(v => v.status === currentVisitFilter);
+      }
+
+      if (q) {
+        list = list.filter(v =>
+          (v.truck_plate && v.truck_plate.toLowerCase().includes(q)) ||
+          (v.driver_cin && v.driver_cin.toLowerCase().includes(q)) ||
+          (v.container_number && v.container_number.toLowerCase().includes(q)) ||
+          (v.container_number_2 && v.container_number_2.toLowerCase().includes(q)) ||
+          (v.armateur && v.armateur.toLowerCase().includes(q)) ||
+          (v.cancel_reason && v.cancel_reason.toLowerCase().includes(q)) ||
+          (v.iso_code && v.iso_code.toLowerCase().includes(q))
+        );
+      }
+
+      const selectedDay = document.getElementById('selectedDate')?.value || new Date().toISOString().split('T')[0];
+      const printTime = new Date().toLocaleTimeString('fr-FR', { timeZone: 'Africa/Casablanca', hour: '2-digit', minute: '2-digit' });
+      const printDate = new Date().toLocaleDateString('fr-FR', { timeZone: 'Africa/Casablanca', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+      // Title determination
+      let reportTitle = 'REGISTRE GÉNÉRAL DU FLUX DES VISITES (GATE-IN / YARD / GATE-OUT)';
+      let reportSubtitle = 'Suivi opérationnel des mouvements camions et conteneurs';
+      if (currentVisitFilter === 'AU_PARC') {
+        reportTitle = 'INVENTAIRE DES CAMIONS ACTUELLEMENT AU PARC';
+        reportSubtitle = 'Liste des véhicules présents dans l’enceinte du terminal';
+      } else if (currentVisitFilter === 'SORTI') {
+        reportTitle = 'REGISTRE DES SORTIES EFFECTIVES (GATE-OUT)';
+        reportSubtitle = 'Visites clôturées avec bons de sortie délivrés';
+      } else if (currentVisitFilter === 'ANNULE') {
+        reportTitle = 'RAPPORT DES VISITES ANNULÉES (SORTIES SANS DÉCHARGE)';
+        reportSubtitle = 'Camions sortis sans dépose de conteneur (Code superviseur 01010909)';
+      }
+
+      // Filter summary counts
+      const totalAll = rawVisitsData.length;
+      const countAuParc = rawVisitsData.filter(v => v.status === 'AU_PARC').length;
+      const countSorti = rawVisitsData.filter(v => v.status === 'SORTI').length;
+      const countAnnule = rawVisitsData.filter(v => v.status === 'ANNULE').length;
+
+      // Table rows HTML
+      const rowsHtml = list.length === 0 ? `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 25px; color: #64748b; font-style: italic;">
+            Aucune visite enregistrée pour les critères sélectionnés.
+          </td>
+        </tr>` : list.map((v, idx) => {
+          let statusLabel = 'SORTI';
+          let statusStyle = 'background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0;';
+          if (v.status === 'AU_PARC') {
+            statusLabel = 'AU PARC';
+            statusStyle = 'background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; font-weight: bold;';
+          } else if (v.status === 'ANNULE') {
+            statusLabel = 'ANNULÉ';
+            statusStyle = 'background:#fff1f2; color:#9f1239; border:1px solid #fecdd3; font-weight: bold;';
+          }
+
+          let contStr = v.container_number || (v.entry_kind === 'empty' ? 'CHÂSSIS VIDE' : '—');
+          if (v.iso_code) contStr += ` (${v.iso_code})`;
+          if (v.is_twin) {
+            contStr += ` + ${v.container_number_2 || '—'} [TWIN 2x20']`;
+          }
+
+          const entered = v.entered_at ? new Date(v.entered_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—';
+          
+          let exitStr = '—';
+          if (v.status === 'AU_PARC') {
+            if (v.entered_at) {
+              const diffMin = Math.max(0, Math.floor((new Date() - new Date(v.entered_at)) / 60000));
+              const h = Math.floor(diffMin / 60);
+              const m = diffMin % 60;
+              exitStr = `En cours (${h > 0 ? h + 'h ' : ''}${m}m)`;
+            } else {
+              exitStr = 'En cours';
+            }
+          } else if (v.status === 'SORTI') {
+            const exited = v.exited_at ? new Date(v.exited_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—';
+            let dur = '';
+            if (v.entered_at && v.exited_at) {
+              const diff = Math.max(0, Math.floor((new Date(v.exited_at) - new Date(v.entered_at)) / 60000));
+              const h = Math.floor(diff / 60);
+              const m = diff % 60;
+              dur = ` (${h > 0 ? h + 'h ' : ''}${m}m)`;
+            }
+            exitStr = `${exited}${dur}`;
+          } else if (v.status === 'ANNULE') {
+            const cancelTime = v.canceled_at || v.exited_at ? new Date(v.canceled_at || v.exited_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+            const reason = v.cancel_reason || 'Sortie sans décharge (01010909)';
+            exitStr = `ANNULÉ ${cancelTime ? 'à ' + cancelTime + ' : ' : ': '}${reason}`;
+          }
+
+          return `
+            <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+              <td style="padding: 6px 8px; text-align: center; color: #64748b; font-family: monospace;">${idx + 1}</td>
+              <td style="padding: 6px 8px; text-align: center;">
+                <span style="display:inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; ${statusStyle}">
+                  ${statusLabel}
+                </span>
+              </td>
+              <td style="padding: 6px 8px; font-family: monospace; font-weight: bold; color: #0f172a; white-space: nowrap;">
+                ${v.truck_plate || '—'}
+              </td>
+              <td style="padding: 6px 8px; font-family: monospace; color: #334155;">${v.driver_cin || '—'}</td>
+              <td style="padding: 6px 8px; font-family: monospace; font-weight: 600; color: #0f172a;">${contStr}</td>
+              <td style="padding: 6px 8px; font-weight: 600; color: #1e293b;">${v.armateur || '—'}</td>
+              <td style="padding: 6px 8px; font-family: monospace; text-align: center; color: #334155;">${entered}</td>
+              <td style="padding: 6px 8px; color: ${v.status === 'ANNULE' ? '#be123c; font-weight: bold;' : '#334155;'}">${exitStr}</td>
+            </tr>
+          `;
+        }).join('');
+
+      const printHtml = \`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>\${reportTitle} - TCZ</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 12mm 10mm 15mm 10mm;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #0f172a;
+      margin: 0;
+      padding: 15px;
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .header-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #063e66;
+      padding-bottom: 8px;
+    }
+    .header-table td {
+      vertical-align: top;
+    }
+    .title-block {
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .report-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #063e66;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0 0 4px 0;
+    }
+    .report-subtitle {
+      font-size: 11px;
+      color: #64748b;
+      margin: 0;
+    }
+    .kpi-box {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 6px 10px;
+      text-align: center;
+      background: #f8fafc;
+    }
+    .kpi-num {
+      font-size: 16px;
+      font-weight: 800;
+      color: #063e66;
+      font-family: monospace;
+    }
+    .kpi-lbl {
+      font-size: 9px;
+      text-transform: uppercase;
+      font-weight: bold;
+      color: #64748b;
+    }
+    .main-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 5px;
+    }
+    .main-table th {
+      background: #063e66;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 7px 6px;
+      border: 1px solid #063e66;
+      text-align: left;
+    }
+    .main-table td {
+      border: 1px solid #cbd5e1;
+    }
+    .main-table tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+    .signatures {
+      margin-top: 25px;
+      width: 100%;
+      border-collapse: collapse;
+      page-break-inside: avoid;
+    }
+    .sig-box {
+      border: 1px dashed #94a3b8;
+      height: 65px;
+      vertical-align: top;
+      padding: 6px 10px;
+      font-size: 10px;
+      font-weight: bold;
+      color: #475569;
+      background: #fafafa;
+    }
+    .no-print-bar {
+      background: #1e293b;
+      color: white;
+      padding: 10px 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+    .btn-action {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      font-size: 11px;
+    }
+    .btn-print { background: #10b981; color: white; }
+    .btn-close { background: #475569; color: white; margin-left: 8px; }
+    @media print {
+      .no-print-bar { display: none !important; }
+      body { padding: 0 !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-bar">
+    <div>
+      <strong>🖨️ Aperçu Avant Impression / Export PDF</strong> · \${list.length} visite(s) sélectionnée(s)
+    </div>
+    <div>
+      <button class="btn-action btn-print" onclick="window.print()">Imprimer / Sauvegarder en PDF</button>
+      <button class="btn-action btn-close" onclick="window.close()">Fermer</button>
+    </div>
+  </div>
+
+  <table class="header-table">
+    <tr>
+      <td style="width: 50%;">
+        <div style="font-size: 15px; font-weight: 900; color: #063e66; letter-spacing: 0.5px;">TERMINAL CONTENEUR ZENATA (TCZ)</div>
+        <div style="font-size: 10px; color: #475569; font-weight: 600;">Plateforme Logistique & Gestion de Parc Conteneurs</div>
+        <div style="font-size: 9px; color: #64748b;">Zenata, Maroc · Système de Pointage v2.4</div>
+      </td>
+      <td style="width: 50%; text-align: right;">
+        <div style="font-size: 11px; font-weight: bold; color: #063e66;">RAPPORT OFFICIEL D'EXPLOITATION</div>
+        <div style="font-size: 10px; color: #334155;">Date d'activité : <strong>\${selectedDay}</strong></div>
+        <div style="font-size: 9px; color: #64748b;">Généré le \${printDate} à \${printTime}</div>
+        \${q ? \`<div style="font-size: 9px; color: #087e79; font-weight: bold;">Recherche appliquée : "\${q}"</div>\` : ''}
+      </td>
+    </tr>
+  </table>
+
+  <div class="title-block">
+    <h1 class="report-title">\${reportTitle}</h1>
+    <p class="report-subtitle">\${reportSubtitle}</p>
+  </div>
+
+  <table style="width: 100%; border-collapse: separate; border-spacing: 6px; margin-bottom: 10px;">
+    <tr>
+      <td class="kpi-box" style="width: 25%;">
+        <div class="kpi-num">\${list.length} <span style="font-size: 10px; color: #64748b;">/ \${totalAll}</span></div>
+        <div class="kpi-lbl">Visites Sélectionnées</div>
+      </td>
+      <td class="kpi-box" style="width: 25%;">
+        <div class="kpi-num" style="color: #0284c7;">\${countAuParc}</div>
+        <div class="kpi-lbl">Présents Au Parc</div>
+      </td>
+      <td class="kpi-box" style="width: 25%;">
+        <div class="kpi-num" style="color: #0d9488;">\${countSorti}</div>
+        <div class="kpi-lbl">Sorties Clôturées</div>
+      </td>
+      <td class="kpi-box" style="width: 25%;">
+        <div class="kpi-num" style="color: #e11d48;">\${countAnnule}</div>
+        <div class="kpi-lbl">Sorties Annulées</div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="main-table">
+    <thead>
+      <tr>
+        <th style="width: 3%; text-align: center;">#</th>
+        <th style="width: 8%; text-align: center;">Statut</th>
+        <th style="width: 13%;">Matricule Camion</th>
+        <th style="width: 9%;">CIN Chauffeur</th>
+        <th style="width: 25%;">Conteneur(s) & Type</th>
+        <th style="width: 10%;">Armateur</th>
+        <th style="width: 9%; text-align: center;">Gate-In</th>
+        <th style="width: 23%;">Gate-Out / Motif Annulation</th>
+      </tr>
+    </thead>
+    <tbody>
+      \${rowsHtml}
+    </tbody>
+  </table>
+
+  <table class="signatures">
+    <tr>
+      <td class="sig-box" style="width: 33%;">
+        VISA AGENT GATE (ENTRÉE/SORTIE)
+      </td>
+      <td class="sig-box" style="width: 33%;">
+        RESPONSABLE YARD / MANUTENTION
+      </td>
+      <td class="sig-box" style="width: 33%;">
+        SUPERVISEUR D'EXPLOITATION TCZ
+      </td>
+    </tr>
+  </table>
+
+  <div style="margin-top: 15px; font-size: 8px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 4px;">
+    Document officiel généré automatiquement par la solution TCZ Pointage & Gestion de Parc · Page 1/1
+  </div>
+</body>
+</html>\`;
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert("Veuillez autoriser les fenêtres pop-up dans votre navigateur pour pouvoir imprimer le rapport.");
+        return;
+      }
+      printWindow.document.open();
+      printWindow.document.write(printHtml);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
     }
 
     // Initialize on page load
