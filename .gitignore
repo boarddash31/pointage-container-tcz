@@ -22,3 +22,5 @@ supabase/.branches/
 
 # Local Netlify folder
 .netlify
+*.zip
+site_deploy.zip
