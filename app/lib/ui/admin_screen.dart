@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/pointage_repository.dart';
 import '../domain/container_number.dart';
 import 'pointage_screens.dart';
@@ -37,7 +39,7 @@ class _AdminScreenState extends State<AdminScreen> {
     setState(() {
       activity = db.rpc('hourly_activity', params: {'p_day': dateString(day)})
           .then((x) => List<Map<String, dynamic>>.from(x as List));
-      profiles = db.from('profiles').select('id,display_name,active,user_roles(role)').order('display_name')
+      profiles = db.from('profiles').select('id,display_name,first_name,last_name,phone,avatar_url,initial_password,active,created_at,user_roles(role)').order('created_at', ascending: false)
           .then((x) => List<Map<String, dynamic>>.from(x));
       clients = db.from('clients').select('id,code,name').order('name')
           .then((x) => List<Map<String, dynamic>>.from(x));
@@ -77,11 +79,36 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  void sendWhatsAppInvite({
+    required String name,
+    required String phone,
+    required String role,
+    required String password,
+  }) {
+    final cleanPhone = PointageRepository.normalizePhone(phone).replaceAll(RegExp(r'^0'), '');
+    final msg = Uri.encodeComponent(
+      '🇲🇦 *Terminal Conteneur Zenata (TCZ)*\n'
+      'Bonjour *$name*,\n\n'
+      'Voici vos identifiants d\'accès au système de Pointage Container TCZ :\n'
+      '📱 *Téléphone :* $phone\n'
+      '🔑 *Mot de passe :* $password\n'
+      '🏢 *Poste affecté :* ${role.toUpperCase()}\n'
+      '🌐 *Lien d\'accès :* http://localhost:8085 (ou https://pointage-tcz-test.netlify.app)\n\n'
+      'Connectez-vous directement avec votre numéro de téléphone et votre mot de passe.'
+    );
+    launchUrl(Uri.parse('https://wa.me/212$cleanPhone?text=$msg'), mode: LaunchMode.externalApplication);
+  }
+
   Future<void> inviteUser() async {
-    final email = TextEditingController(), name = TextEditingController();
+    final firstName = TextEditingController();
+    final lastName = TextEditingController();
+    final phone = TextEditingController();
+    final password = TextEditingController(text: 'tcz123');
+    final avatar = TextEditingController();
     String role = 'entree';
+
     try {
-      final invited = await showDialog<bool>(
+      final res = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (dialog) => StatefulBuilder(
           builder: (dialog, update) => AlertDialog(
@@ -90,7 +117,7 @@ class _AdminScreenState extends State<AdminScreen> {
               children: [
                 Icon(Icons.person_add_rounded, color: Color(0xff075a8d)),
                 SizedBox(width: 8),
-                Text('Inviter un agent'),
+                Text('Ajouter un collaborateur'),
               ],
             ),
             content: SingleChildScrollView(
@@ -98,80 +125,182 @@ class _AdminScreenState extends State<AdminScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Renseignez les détails du collaborateur pour lui envoyer ses accès.',
+                  const Text('Renseignez les détails du collaborateur. Le numéro de téléphone servira d\'identifiant.',
                     style: TextStyle(fontSize: 12, color: Color(0xff64748b))),
                   const SizedBox(height: 14),
-                  TextField(
-                    controller: email,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email professionnel *',
-                      prefixIcon: Icon(Icons.email_outlined, size: 20),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: firstName,
+                          decoration: const InputDecoration(
+                            labelText: 'Prénom *',
+                            prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: lastName,
+                          decoration: const InputDecoration(
+                            labelText: 'Nom *',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: name,
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
-                      labelText: 'Nom affiché',
-                      prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                      labelText: 'Téléphone (WhatsApp) *',
+                      hintText: 'Ex: 0661998877',
+                      prefixIcon: Icon(Icons.phone_android_rounded, size: 20),
                     ),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: role,
                     decoration: const InputDecoration(
-                      labelText: 'Premier rôle *',
+                      labelText: 'Poste / Habilitation *',
                       prefixIcon: Icon(Icons.shield_outlined, size: 20),
                     ),
-                    items: [
-                      for (final value in ['entree', 'engin', 'sortie', 'viewer', 'admin'])
-                        DropdownMenuItem(
-                          value: value,
-                          child: Text(value.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w600)),
-                        )
+                    items: const [
+                      DropdownMenuItem(value: 'entree', child: Text('AGENT ENTRÉE (Gate-In)')),
+                      DropdownMenuItem(value: 'sortie', child: Text('AGENT SORTIE (Gate-Out)')),
+                      DropdownMenuItem(value: 'admin', child: Text('SUPERVISEUR TCZ (Admin)')),
+                      DropdownMenuItem(value: 'engin', child: Text('AGENT ENGIN (Manutention)')),
                     ],
-                    onChanged: (value) {
-                      if (value != null) update(() => role = value);
+                    onChanged: (val) {
+                      if (val != null) update(() => role = val);
                     },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: password,
+                          decoration: const InputDecoration(
+                            labelText: 'Mot de passe initial *',
+                            prefixIcon: Icon(Icons.key_rounded, size: 20),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        tooltip: 'Générer mot de passe facile',
+                        icon: const Icon(Icons.refresh_rounded, color: Color(0xff075a8d)),
+                        onPressed: () {
+                          final rnd = 100 + (DateTime.now().millisecondsSinceEpoch % 900);
+                          update(() => password.text = 'tcz$rnd');
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: avatar,
+                    decoration: const InputDecoration(
+                      labelText: 'Photo / Avatar URL (Optionnel)',
+                      prefixIcon: Icon(Icons.image_outlined, size: 20),
+                    ),
                   ),
                 ],
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Annuler')),
+              TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Annuler')),
               FilledButton.icon(
-                icon: const Icon(Icons.send_rounded, size: 16),
+                icon: const Icon(Icons.save_rounded, size: 16),
                 style: FilledButton.styleFrom(backgroundColor: const Color(0xff075a8d)),
                 onPressed: () async {
-                  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
-                    message(dialog, 'Adresse email invalide.');
+                  if (firstName.text.trim().isEmpty || lastName.text.trim().isEmpty) {
+                    message(dialog, 'Nom et Prénom obligatoires.');
+                    return;
+                  }
+                  if (phone.text.trim().length < 8) {
+                    message(dialog, 'Numéro de téléphone invalide.');
+                    return;
+                  }
+                  if (password.text.trim().length < 4) {
+                    message(dialog, 'Mot de passe trop court.');
                     return;
                   }
                   try {
-                    await widget.repository.client.functions.invoke('invite-user', body: {
-                      'email': email.text.trim(),
-                      'name': name.text.trim(),
-                      'role': role,
-                    });
-                    if (dialog.mounted) Navigator.pop(dialog, true);
+                    final agentRes = await widget.repository.createAgent(
+                      phone: phone.text.trim(),
+                      firstName: firstName.text.trim(),
+                      lastName: lastName.text.trim(),
+                      role: role,
+                      password: password.text.trim(),
+                      avatarUrl: avatar.text.trim().isNotEmpty ? avatar.text.trim() : null,
+                      adminCode: '01010909',
+                    );
+                    if (dialog.mounted) Navigator.pop(dialog, agentRes);
                   } catch (e) {
-                    if (dialog.mounted) message(dialog, 'Invitation refusée : $e');
+                    if (dialog.mounted) message(dialog, 'Erreur création : $e');
                   }
                 },
-                label: const Text('Envoyer invitation'),
+                label: const Text('Enregistrer'),
               ),
             ],
           ),
         ),
       );
-      if (invited == true && mounted) {
-        message(context, 'Invitation envoyée avec succès.');
+
+      if (res != null && mounted) {
         refresh();
+        final agentName = res['full_name'] as String? ?? '${firstName.text} ${lastName.text}';
+        final agentPhone = res['phone'] as String? ?? phone.text;
+        final agentRole = res['role'] as String? ?? role;
+        final agentPwd = res['password'] as String? ?? password.text;
+
+        await showDialog(
+          context: context,
+          builder: (waDialog) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Color(0xff16a34a)),
+                SizedBox(width: 8),
+                Text('Collaborateur enregistré !'),
+              ],
+            ),
+            content: Text(
+              'Le collaborateur $agentName ($agentPhone) a été créé avec succès.\n\n'
+              'Mot de passe : $agentPwd\n'
+              'Rôle : ${agentRole.toUpperCase()}\n\n'
+              'Souhaitez-vous lui envoyer ses accès sur WhatsApp dès maintenant ?',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(waDialog), child: const Text('Plus tard')),
+              FilledButton.icon(
+                icon: const Icon(Icons.message_rounded, size: 16),
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xff16a34a)),
+                onPressed: () {
+                  Navigator.pop(waDialog);
+                  sendWhatsAppInvite(
+                    name: agentName,
+                    phone: agentPhone,
+                    role: agentRole,
+                    password: agentPwd,
+                  );
+                },
+                label: const Text('Envoyer sur WhatsApp'),
+              ),
+            ],
+          ),
+        );
       }
     } finally {
-      email.dispose();
-      name.dispose();
+      firstName.dispose();
+      lastName.dispose();
+      phone.dispose();
+      password.dispose();
+      avatar.dispose();
     }
   }
 
@@ -478,6 +607,21 @@ class _AdminScreenState extends State<AdminScreen> {
                 icon: const Icon(Icons.table_chart_rounded, size: 18),
                 label: const Text('Freepool (Stock)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
               ),
+              if (kIsWeb)
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xff063e66),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                  ),
+                  onPressed: () => launchUrl(
+                    Uri.base.resolve('dashboard.html'),
+                    mode: LaunchMode.platformDefault,
+                  ),
+                  icon: const Icon(Icons.dashboard_customize_rounded, size: 18),
+                  label: const Text('Dashboard Web Externe', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                ),
             ],
           ),
         ),
@@ -891,10 +1035,32 @@ class _AdminScreenState extends State<AdminScreen> {
                             runSpacing: 4,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Text(
-                                '${(p['id'] as String).substring(0, 8)}…',
-                                style: const TextStyle(fontSize: 11, color: Color(0xff94a3b8), fontFamily: 'monospace'),
-                              ),
+                              if (p['phone'] != null && (p['phone'] as String).isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xfff0fdf4),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xffbbf7d0)),
+                                  ),
+                                  child: Text(
+                                    '📱 ${p['phone']}',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xff166534)),
+                                  ),
+                                ),
+                              if (p['initial_password'] != null && (p['initial_password'] as String).isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xfff8fafc),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xffe2e8f0)),
+                                  ),
+                                  child: Text(
+                                    '🔑 ${p['initial_password']}',
+                                    style: const TextStyle(fontSize: 10, color: Color(0xff475569)),
+                                  ),
+                                ),
                               for (final r in (p['user_roles'] as List))
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
@@ -910,6 +1076,26 @@ class _AdminScreenState extends State<AdminScreen> {
                                 ),
                             ],
                           ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (p['phone'] != null && (p['phone'] as String).isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.message_rounded, color: Color(0xff16a34a), size: 20),
+                                tooltip: 'Envoyer identifiants sur WhatsApp',
+                                onPressed: () {
+                                  final roles = (p['user_roles'] as List).map((x) => x['role'].toString()).join(', ');
+                                  sendWhatsAppInvite(
+                                    name: p['display_name'] ?? 'Agent',
+                                    phone: p['phone'] ?? '',
+                                    role: roles.isNotEmpty ? roles : 'entree',
+                                    password: p['initial_password'] ?? 'tcz123',
+                                  );
+                                },
+                              ),
+                            const Icon(Icons.expand_more_rounded, color: Color(0xff94a3b8)),
+                          ],
                         ),
                         children: [
                           const Divider(height: 1, color: Color(0xfff1f5f9)),

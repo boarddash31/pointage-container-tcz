@@ -30,7 +30,9 @@ const server = http.createServer((req, res) => {
   let safePath = path.normalize(urlPath).replace(/^(\.\.[\/\\])+/, '');
   let filePath = path.join(PUBLIC_DIR, safePath);
 
-  if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+  if (urlPath === '/dashboard' || urlPath === '/admin') {
+    filePath = path.join(PUBLIC_DIR, 'dashboard.html');
+  } else if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
     filePath = path.join(filePath, 'index.html');
   }
 

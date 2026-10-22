@@ -191,6 +191,51 @@ class PointageRepository {
       List<Map<String, dynamic>>.from(await client.from('generated_documents')
           .select('id,visit_id,kind,status,storage_path,created_at,snapshot')
           .order('created_at', ascending: false).limit(200));
+
+  Future<Map<String, dynamic>> createAgent({
+    required String phone,
+    required String firstName,
+    required String lastName,
+    required String role,
+    required String password,
+    String? avatarUrl,
+    String? adminCode,
+  }) async {
+    final res = await client.rpc('admin_create_agent', params: {
+      'p_phone': phone,
+      'p_first_name': firstName,
+      'p_last_name': lastName,
+      'p_role': role,
+      'p_password': password,
+      'p_avatar_url': avatarUrl,
+      'p_admin_code': adminCode ?? '01010909',
+    });
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> listAgents() async {
+    final rows = await client.rpc('admin_list_agents');
+    return [for (final r in rows as List) Map<String, dynamic>.from(r as Map)];
+  }
+
+  Future<Map<String, dynamic>> dashboardKpis([DateTime? day]) async {
+    final target = day ?? DateTime.now();
+    final dStr = '${target.year}-${target.month.toString().padLeft(2, '0')}-${target.day.toString().padLeft(2, '0')}';
+    final res = await client.rpc('admin_dashboard_kpis', params: {'p_day': dStr});
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  static String normalizePhone(String input) {
+    final digits = input.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 9 && (digits.startsWith('6') || digits.startsWith('7'))) {
+      return '0$digits';
+    } else if (digits.length == 12 && digits.startsWith('212')) {
+      return '0${digits.substring(3)}';
+    } else if (digits.length == 10 && digits.startsWith('0')) {
+      return digits;
+    }
+    return digits;
+  }
 }
 
 class DataTransaction {

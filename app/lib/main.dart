@@ -194,23 +194,46 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override void dispose() { email.dispose(); password.dispose(); passwordFocus.dispose(); super.dispose(); }
   Future<void> signIn() async {
-    final targetEmail = email.text.trim();
+    final rawInput = email.text.trim();
     final targetPassword = password.text;
-    setState(() { busy=true; error=null; notice=null; });
+    if (rawInput.isEmpty || targetPassword.isEmpty) {
+      setState(() => error = 'Veuillez renseigner votre téléphone (ou e-mail) et mot de passe.');
+      return;
+    }
+    setState(() { busy = true; error = null; notice = null; });
     try {
+      String targetEmail = rawInput;
+      // If user provided a phone number (no @ symbol)
+      if (!rawInput.contains('@')) {
+        final clean = PointageRepository.normalizePhone(rawInput);
+        try {
+          final res = await Supabase.instance.client.rpc('get_login_identifier', params: {
+            'p_identifier': rawInput,
+          });
+          if (res is Map && res['email'] != null && res['email'].toString().isNotEmpty) {
+            targetEmail = res['email'].toString();
+          } else {
+            targetEmail = '$clean@tcz.local';
+          }
+        } catch (_) {
+          targetEmail = '$clean@tcz.local';
+        }
+      }
+
       await Supabase.instance.client.auth.signInWithPassword(
         email: targetEmail, password: targetPassword);
     } catch (e) {
       if (mounted) {
         final raw = e.toString();
         if (raw.contains('Invalid login credentials')) {
-          setState(() => error = 'Identifiants incorrects. Vérifiez l’e-mail et le mot de passe.');
+          setState(() => error = 'Identifiants incorrects. Vérifiez votre numéro de téléphone et votre mot de passe.');
         } else {
           setState(() => error = raw);
         }
       }
+    } finally {
+      if (mounted) setState(() => busy = false);
     }
-    finally { if (mounted) setState(() => busy=false); }
   }
   Future<void> requestRecovery() async {
     final address=email.text.trim();
@@ -343,14 +366,19 @@ class _LoginScreenState extends State<LoginScreen> {
       ]),
       const SizedBox(height:14),
       Column(children:[
-        TextField(controller:email,keyboardType:TextInputType.emailAddress,
+        TextField(controller:email,keyboardType:TextInputType.text,
           onChanged:(_){if(selectedProfile!=null)setState(()=>selectedProfile=null);},
-          decoration:const InputDecoration(labelText:'E-mail professionnel')),
+          decoration:const InputDecoration(
+            labelText:'Numéro de téléphone ou e-mail',
+            hintText:'Ex: 0661998877 ou agent@tcz.ma',
+            prefixIcon:Icon(Icons.person_pin_rounded,size:20),
+          )),
         const SizedBox(height:12),
         TextField(controller:password,
           obscureText:obscurePassword,onSubmitted:(_)=>signIn(),
           decoration:InputDecoration(
             labelText:'Mot de passe',
+            prefixIcon:const Icon(Icons.lock_outline,size:20),
             suffixIcon:IconButton(
               tooltip: obscurePassword ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
               icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility, size: 20),
@@ -366,8 +394,23 @@ class _LoginScreenState extends State<LoginScreen> {
       FilledButton(onPressed:busy?null:()=>signIn(),child:Text(busy?'Connexion…':'Se connecter')),
       TextButton(onPressed:busy?null:requestRecovery,
         child:const Text('Mot de passe oublié ?')),
-      const SizedBox(height:10),
-      const Text('Utilisez le compte et le rôle attribués par votre administrateur.',
+      const SizedBox(height:8),
+      if(kIsWeb) Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xff063e66),
+            side: const BorderSide(color: Color(0xffc5d9e8)),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () => launchUrl(Uri.base.resolve('dashboard.html'), mode: LaunchMode.platformDefault),
+          icon: const Icon(Icons.dashboard_customize_rounded, size: 18),
+          label: const Text('Tableau de Bord Superviseur (Web)',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+        ),
+      ),
+      const Text('Saisissez votre numéro de téléphone (ou email) et votre mot de passe attribué.',
         textAlign:TextAlign.center,style:TextStyle(fontSize:12,color:Color(0xff49677e))),
       if(kIsWeb) Padding(padding:const EdgeInsets.only(top:10),
         child:TextButton.icon(onPressed:()=>launchUrl(
@@ -466,9 +509,16 @@ class _PointageShellState extends State<PointageShell> {
             : Text(section==1?'Data · Référentiel':'Bons · Documents'),
           backgroundColor:const Color(0xff063e66),foregroundColor:Colors.white,
           actions:[
-            if(admin)IconButton(tooltip:'Administration',icon:const Icon(Icons.admin_panel_settings),
-              onPressed:()=>Navigator.push(context,MaterialPageRoute(
-                builder:(_)=>AdminScreen(repository:repo)))),
+            if(admin)...[
+              if(kIsWeb) IconButton(
+                tooltip:'Tableau de Bord Superviseur (Web)',
+                icon:const Icon(Icons.dashboard_customize_rounded),
+                onPressed:()=>launchUrl(Uri.base.resolve('dashboard.html'),
+                  mode:LaunchMode.platformDefault)),
+              IconButton(tooltip:'Administration',icon:const Icon(Icons.admin_panel_settings),
+                onPressed:()=>Navigator.push(context,MaterialPageRoute(
+                  builder:(_)=>AdminScreen(repository:repo)))),
+            ],
             IconButton(tooltip:'Déconnexion',icon:const Icon(Icons.logout),
               onPressed:()=>Supabase.instance.client.auth.signOut()),
           ]),

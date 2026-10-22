@@ -5,7 +5,7 @@ import 'package:pointage_container/main.dart';
 void main() {
   testWidgets('quick access selects Admin, Entrée and Sortie with test password', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
-    final emailField = find.widgetWithText(TextField, 'E-mail professionnel');
+    final emailField = find.widgetWithText(TextField, 'Numéro de téléphone ou e-mail');
     final passwordField = find.widgetWithText(TextField, 'Mot de passe');
     expect(find.widgetWithText(SelectableText, 'AdminTCZ2026!'), findsOneWidget);
     for(final profile in [
@@ -24,7 +24,7 @@ void main() {
 
   testWidgets('password recovery asks for an email before contacting Auth', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
-    final emailField = find.widgetWithText(TextField, 'E-mail professionnel');
+    final emailField = find.widgetWithText(TextField, 'Numéro de téléphone ou e-mail');
     await tester.enterText(emailField, '');
     await tester.ensureVisible(find.text('Mot de passe oublié ?'));
     await tester.pumpAndSettle();
