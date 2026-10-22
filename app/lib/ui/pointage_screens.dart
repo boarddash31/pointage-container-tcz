@@ -77,7 +77,8 @@ class _EntryScreenState extends State<EntryScreen> {
   final form=GlobalKey<FormState>();
   final plate=TextEditingController(),cin=TextEditingController(),booking=TextEditingController();
   final booking2=TextEditingController();
-  final plateFocus=FocusNode(),bookingFocus=FocusNode(),bookingFocus2=FocusNode();
+  final plateFocus=FocusNode(),cinFocus=FocusNode(),bookingFocus=FocusNode(),bookingFocus2=FocusNode();
+  final isoFocus=FocusNode(),iso2Focus=FocusNode();
   final modeScrollController=ScrollController();
   final boxes=List.generate(11,(_)=>TextEditingController());
   final focus=List.generate(11,(_)=>FocusNode());
@@ -165,12 +166,25 @@ class _EntryScreenState extends State<EntryScreen> {
     }
   }
   @override void dispose(){for(final c in [plate,cin,booking,booking2,isoController,iso2Controller,...boxes,...boxes2]){c.dispose();}
-    for(final f in [plateFocus,bookingFocus,bookingFocus2,...focus,...focus2]){f.dispose();}
+    for(final f in [plateFocus,cinFocus,bookingFocus,bookingFocus2,isoFocus,iso2Focus,...focus,...focus2]){f.dispose();}
     modeScrollController.dispose();super.dispose();}
+  void _focusAndScroll(FocusNode node) {
+    node.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (node.context != null) {
+        Scrollable.ensureVisible(
+          node.context!,
+          duration: const Duration(milliseconds: 260),
+          alignment: 0.25,
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
   void focusGateField(int index){
     final target=kind=='loaded'?(index==0?focus[0]:focus2[0]):
       (index==0?bookingFocus:bookingFocus2);
-    target.requestFocus();
+    _focusAndScroll(target);
   }
   String get number=>boxes.map((x)=>x.text).join().toUpperCase();
   String get number2=>boxes2.map((x)=>x.text).join().toUpperCase();
@@ -592,15 +606,23 @@ class _EntryScreenState extends State<EntryScreen> {
                               driverCin:kind==option.$1&&isTwin==option.$2?cin.text:null,
                               containerNumber:kind==option.$1&&isTwin==option.$2&&option.$1=='loaded'?number:null,
                               iso:kind==option.$1&&isTwin==option.$2?iso:null,
-                              operator:kind==option.$1&&isTwin==option.$2?operator?.id:null,
+                              operator:kind==option.$1&&isTwin==option.$2?(operator?.name??operator?.id):null,
                               containerNumber2:kind==option.$1&&isTwin==option.$2&&option.$2&&option.$1=='loaded'?number2:null,
                               iso2:kind==option.$1&&isTwin==option.$2&&option.$2?iso2:null,
-                              operator2:kind==option.$1&&isTwin==option.$2&&option.$2?operator2?.id:null,
+                              operator2:kind==option.$1&&isTwin==option.$2&&option.$2?(operator2?.name??operator2?.id):null,
                               booking:kind==option.$1&&isTwin==option.$2&&option.$1=='empty'?booking.text:null,
                               booking2:kind==option.$1&&isTwin==option.$2&&option.$2&&option.$1=='empty'?booking2.text:null,
                               highlightMissing:kind==option.$1&&isTwin==option.$2,
                               onPlateTap:kind==option.$1&&isTwin==option.$2
-                                ?()=>plateFocus.requestFocus():null,
+                                ?()=>_focusAndScroll(plateFocus):null,
+                              onCinTap:kind==option.$1&&isTwin==option.$2
+                                ?()=>_focusAndScroll(cinFocus):null,
+                              onContainerNumberTap:kind==option.$1&&isTwin==option.$2
+                                ?focusGateField:null,
+                              onIsoTap:kind==option.$1&&isTwin==option.$2
+                                ?(idx)=>_focusAndScroll(idx==0?isoFocus:iso2Focus):null,
+                              onLineTap:kind==option.$1&&isTwin==option.$2
+                                ?(idx)=>pickOperator(forSecond: idx==1):null,
                               onContainerTap:kind==option.$1&&isTwin==option.$2
                                 ?focusGateField:null)),
                             Text(option.$3,textAlign:TextAlign.center,
@@ -632,7 +654,7 @@ class _EntryScreenState extends State<EntryScreen> {
                 const SizedBox(height:12),
 
                 // 3. CIN chauffeur
-                TextFormField(controller:cin, textCapitalization:TextCapitalization.characters,
+                TextFormField(controller:cin, focusNode:cinFocus, textCapitalization:TextCapitalization.characters,
                   onChanged:(_)=>setState((){}),
                   decoration:const InputDecoration(
                     labelText:'CIN chauffeur *',
@@ -670,6 +692,7 @@ class _EntryScreenState extends State<EntryScreen> {
                       const SizedBox(height:10),
                       TextFormField(
                         controller: isoController,
+                        focusNode: isoFocus,
                         decoration:const InputDecoration(
                           labelText:'Code ISO Conteneur 1 *',
                           helperText:'Ex: 22G1',
@@ -718,6 +741,7 @@ class _EntryScreenState extends State<EntryScreen> {
                       const SizedBox(height:10),
                       TextFormField(
                         controller: iso2Controller,
+                        focusNode: iso2Focus,
                         decoration:const InputDecoration(
                           labelText:'Code ISO Conteneur 2 *',
                           helperText:'Ex: 22G1',
@@ -764,6 +788,7 @@ class _EntryScreenState extends State<EntryScreen> {
                   // 5. Code ISO
                   TextFormField(
                     controller: isoController,
+                    focusNode: isoFocus,
                     decoration:const InputDecoration(
                       labelText:'Code ISO *',
                       helperText:'4 caractères alphanumériques (ex: 22G1, 45G1, 45R1)',
