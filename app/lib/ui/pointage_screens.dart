@@ -90,12 +90,18 @@ class _EntryScreenState extends State<EntryScreen> {
   final iso2Controller = TextEditingController();
   String iso='', iso2='', kind='loaded';
   bool isTwin=false, busy=false;
+  int _activeTwinIndex = 0;
+  final PageController _twinPageController = PageController();
   bool _isPickerOpen=false;
   String? lookupHint, lookupHint2;
   void selectGateMode(String selectedKind, bool selectedTwin) {
     setState(() {
       kind = selectedKind;
       isTwin = selectedTwin;
+      if (selectedTwin) {
+        _activeTwinIndex = 0;
+        if (_twinPageController.hasClients) _twinPageController.jumpToPage(0);
+      }
     });
   }
   @override void initState(){
@@ -171,6 +177,7 @@ class _EntryScreenState extends State<EntryScreen> {
   }
   @override void dispose(){for(final c in [plate,cin,booking,booking2,isoController,iso2Controller,...boxes,...boxes2]){c.dispose();}
     for(final f in [plateFocus,cinFocus,bookingFocus,bookingFocus2,isoFocus,iso2Focus,...focus,...focus2]){f.dispose();}
+    _twinPageController.dispose();
     modeScrollController.dispose();super.dispose();}
   void _focusAndScroll(FocusNode node) {
     node.requestFocus();
@@ -186,6 +193,12 @@ class _EntryScreenState extends State<EntryScreen> {
     });
   }
   void focusGateField(int index){
+    if (isTwin) {
+      if (_twinPageController.hasClients && _activeTwinIndex != index) {
+        _twinPageController.animateToPage(index, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+      }
+      setState(() => _activeTwinIndex = index);
+    }
     final target=kind=='loaded'?(index==0?focus[0]:focus2[0]):
       (index==0?bookingFocus:bookingFocus2);
     _focusAndScroll(target);
@@ -296,6 +309,10 @@ class _EntryScreenState extends State<EntryScreen> {
         setState(() => forSecond ? operator2 = chosen : operator = chosen);
         if (!forSecond && isTwin) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_twinPageController.hasClients) {
+              _twinPageController.animateToPage(1, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+            }
+            setState(() => _activeTwinIndex = 1);
             if (kind == 'loaded') {
               focus2[0].requestFocus();
             } else {
@@ -707,11 +724,32 @@ class _EntryScreenState extends State<EntryScreen> {
                                         booking: kind == option.$1 && isTwin == option.$2 && option.$1 == 'empty' ? booking.text : null,
                                         booking2: kind == option.$1 && isTwin == option.$2 && option.$2 && option.$1 == 'empty' ? booking2.text : null,
                                         highlightMissing: kind == option.$1 && isTwin == option.$2,
+                                        activeContainerIndex: (kind == option.$1 && isTwin == option.$2 && option.$2) ? _activeTwinIndex : null,
                                         onPlateTap: kind == option.$1 && isTwin == option.$2 ? () => _focusAndScroll(plateFocus) : null,
                                         onCinTap: kind == option.$1 && isTwin == option.$2 ? () => _focusAndScroll(cinFocus) : null,
                                         onContainerNumberTap: kind == option.$1 && isTwin == option.$2 ? focusGateField : null,
-                                        onIsoTap: kind == option.$1 && isTwin == option.$2 ? (idx) => _focusAndScroll(idx == 0 ? isoFocus : iso2Focus) : null,
-                                        onLineTap: kind == option.$1 && isTwin == option.$2 ? (idx) => pickOperator(forSecond: idx == 1) : null,
+                                        onIsoTap: kind == option.$1 && isTwin == option.$2
+                                            ? (idx) {
+                                                if (isTwin) {
+                                                  if (_twinPageController.hasClients && _activeTwinIndex != idx) {
+                                                    _twinPageController.animateToPage(idx, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                                                  }
+                                                  setState(() => _activeTwinIndex = idx);
+                                                }
+                                                _focusAndScroll(idx == 0 ? isoFocus : iso2Focus);
+                                              }
+                                            : null,
+                                        onLineTap: kind == option.$1 && isTwin == option.$2
+                                            ? (idx) {
+                                                if (isTwin) {
+                                                  if (_twinPageController.hasClients && _activeTwinIndex != idx) {
+                                                    _twinPageController.animateToPage(idx, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                                                  }
+                                                  setState(() => _activeTwinIndex = idx);
+                                                }
+                                                pickOperator(forSecond: idx == 1);
+                                              }
+                                            : null,
                                         onContainerTap: kind == option.$1 && isTwin == option.$2 ? focusGateField : null,
                                       ),
                                     ),
@@ -746,50 +784,61 @@ class _EntryScreenState extends State<EntryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 2. Plaque camion
-                  TextFormField(
-                    controller: plate,
-                    focusNode: plateFocus,
-                    textInputAction: TextInputAction.next,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: const InputDecoration(
-                      labelText: 'Plaque camion *',
-                      hintText: 'Ex: 12345-A-1',
-                      prefixIcon: Icon(Icons.pin, size: 20),
-                    ),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z -]')), UpperCaseFormatter()],
-                    onChanged: (_) => setState(() {}),
-                    onFieldSubmitted: (_) {
-                      plate.text = TruckPlate.format(plate.text);
-                      cinFocus.requestFocus();
-                    },
-                    validator: (v) => TruckPlate.isValid(v ?? '') ? null : 'Format marocain requis : 12345-A-06',
+                  // 2. Plaque camion & CIN chauffeur (Même ligne / Same Row)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 6,
+                        child: TextFormField(
+                          controller: plate,
+                          focusNode: plateFocus,
+                          textInputAction: TextInputAction.next,
+                          textCapitalization: TextCapitalization.characters,
+                          decoration: const InputDecoration(
+                            labelText: 'Plaque camion *',
+                            hintText: 'Ex: 12345-A-1',
+                            prefixIcon: Icon(Icons.pin, size: 18),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                          ),
+                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z -]')), UpperCaseFormatter()],
+                          onChanged: (_) => setState(() {}),
+                          onFieldSubmitted: (_) {
+                            plate.text = TruckPlate.format(plate.text);
+                            cinFocus.requestFocus();
+                          },
+                          validator: (v) => TruckPlate.isValid(v ?? '') ? null : 'Format marocain requis : 12345-A-06',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 5,
+                        child: TextFormField(
+                          controller: cin,
+                          focusNode: cinFocus,
+                          textInputAction: TextInputAction.next,
+                          textCapitalization: TextCapitalization.characters,
+                          onChanged: (_) => setState(() {}),
+                          onFieldSubmitted: (_) {
+                            if (kind == 'loaded') {
+                              focus[0].requestFocus();
+                              boxes[0].selection = TextSelection(baseOffset: 0, extentOffset: boxes[0].text.length);
+                            } else {
+                              bookingFocus.requestFocus();
+                            }
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'CIN chauffeur *',
+                            hintText: 'Ex: AB123456',
+                            prefixIcon: Icon(Icons.badge_outlined, size: 18),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                          ),
+                          validator: (v) => (v?.trim().length ?? 0) < 2 ? 'CIN requis' : null,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
-
-                  // 3. CIN chauffeur
-                  TextFormField(
-                    controller: cin,
-                    focusNode: cinFocus,
-                    textInputAction: TextInputAction.next,
-                    textCapitalization: TextCapitalization.characters,
-                    onChanged: (_) => setState(() {}),
-                    onFieldSubmitted: (_) {
-                      if (kind == 'loaded') {
-                        focus[0].requestFocus();
-                        boxes[0].selection = TextSelection(baseOffset: 0, extentOffset: boxes[0].text.length);
-                      } else {
-                        bookingFocus.requestFocus();
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'CIN chauffeur *',
-                      hintText: 'Ex: AB123456',
-                      prefixIcon: Icon(Icons.badge_outlined, size: 20),
-                    ),
-                    validator: (v) => (v?.trim().length ?? 0) < 2 ? 'CIN requis' : null,
-                  ),
-                  const SizedBox(height: 14),
 
                   // 4. Conteneur 1 (ou Mono)
                   if (isTwin) ...[
@@ -799,7 +848,10 @@ class _EntryScreenState extends State<EntryScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xfff8fafc),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blueGrey.shade200),
+                          border: Border.all(
+                            color: (space.maxWidth < 900 && _activeTwinIndex == 0) ? const Color(0xff0284c7) : Colors.blueGrey.shade200,
+                            width: (space.maxWidth < 900 && _activeTwinIndex == 0) ? 1.5 : 1.0,
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -869,6 +921,22 @@ class _EntryScreenState extends State<EntryScreen> {
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
+                            if (space.maxWidth < 900) ...[
+                              const SizedBox(height: 6),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton.icon(
+                                  onPressed: () {
+                                    if (_twinPageController.hasClients) {
+                                      _twinPageController.animateToPage(1, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                                    }
+                                    setState(() => _activeTwinIndex = 1);
+                                  },
+                                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                  label: const Text('2ème Conteneur →', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       );
@@ -879,7 +947,10 @@ class _EntryScreenState extends State<EntryScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xfff8fafc),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blueGrey.shade200),
+                          border: Border.all(
+                            color: (space.maxWidth < 900 && _activeTwinIndex == 1) ? const Color(0xff0284c7) : Colors.blueGrey.shade200,
+                            width: (space.maxWidth < 900 && _activeTwinIndex == 1) ? 1.5 : 1.0,
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -949,6 +1020,22 @@ class _EntryScreenState extends State<EntryScreen> {
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
+                            if (space.maxWidth < 900) ...[
+                              const SizedBox(height: 6),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () {
+                                    if (_twinPageController.hasClients) {
+                                      _twinPageController.animateToPage(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                                    }
+                                    setState(() => _activeTwinIndex = 0);
+                                  },
+                                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                                  label: const Text('← 1er Conteneur', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       );
@@ -962,7 +1049,140 @@ class _EntryScreenState extends State<EntryScreen> {
                           ],
                         );
                       }
-                      return Column(children: [first, const SizedBox(height: 14), second]);
+
+                      final tabs = Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xffe2e8f0),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.all(3),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                key: const ValueKey('twin-tab-0'),
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () {
+                                  if (_twinPageController.hasClients) {
+                                    _twinPageController.animateToPage(0, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                                  }
+                                  setState(() => _activeTwinIndex = 0);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: _activeTwinIndex == 0 ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: _activeTwinIndex == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        (number.length == 11 && iso.length == 4 && operator != null)
+                                            ? Icons.check_circle_rounded
+                                            : Icons.looks_one_rounded,
+                                        size: 16,
+                                        color: _activeTwinIndex == 0
+                                            ? const Color(0xff075a8d)
+                                            : ((number.length == 11 && iso.length == 4 && operator != null) ? const Color(0xff16a34a) : const Color(0xff64748b)),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          '1er Conteneur (Av.)',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: _activeTwinIndex == 0 ? FontWeight.bold : FontWeight.w600,
+                                            color: _activeTwinIndex == 0 ? const Color(0xff075a8d) : const Color(0xff64748b),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: InkWell(
+                                key: const ValueKey('twin-tab-1'),
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () {
+                                  if (_twinPageController.hasClients) {
+                                    _twinPageController.animateToPage(1, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+                                  }
+                                  setState(() => _activeTwinIndex = 1);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: _activeTwinIndex == 1 ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: _activeTwinIndex == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : null,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        (number2.length == 11 && iso2.length == 4 && operator2 != null)
+                                            ? Icons.check_circle_rounded
+                                            : Icons.looks_two_rounded,
+                                        size: 16,
+                                        color: _activeTwinIndex == 1
+                                            ? const Color(0xff075a8d)
+                                            : ((number2.length == 11 && iso2.length == 4 && operator2 != null) ? const Color(0xff16a34a) : const Color(0xff64748b)),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          '2ème Conteneur (Ar.)',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: _activeTwinIndex == 1 ? FontWeight.bold : FontWeight.w600,
+                                            color: _activeTwinIndex == 1 ? const Color(0xff075a8d) : const Color(0xff64748b),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          tabs,
+                          SizedBox(
+                            height: 380,
+                            child: PageView(
+                              controller: _twinPageController,
+                              onPageChanged: (page) => setState(() => _activeTwinIndex = page),
+                              children: [
+                                SingleChildScrollView(
+                                  key: const ValueKey('twin-page-0'),
+                                  physics: const ClampingScrollPhysics(),
+                                  child: first,
+                                ),
+                                SingleChildScrollView(
+                                  key: const ValueKey('twin-page-1'),
+                                  physics: const ClampingScrollPhysics(),
+                                  child: second,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
                     }),
                   ] else ...[
                     // 4. Numéro de conteneur ou Booking (Mono)

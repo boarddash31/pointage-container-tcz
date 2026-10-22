@@ -23,6 +23,7 @@ class TruckScene extends StatelessWidget {
     this.operator2,
     this.booking,
     this.booking2,
+    this.activeContainerIndex,
     this.showUnknown = false,
     this.highlightMissing = false,
     this.onPlateTap,
@@ -37,6 +38,7 @@ class TruckScene extends StatelessWidget {
   final double height;
   final double? width;
   final bool isTwin, showUnknown, highlightMissing;
+  final int? activeContainerIndex;
   final String? plate;
   final String? driverCin;
   final String? containerNumber, iso, operator, containerNumber2, iso2, operator2;
@@ -65,6 +67,7 @@ class TruckScene extends StatelessWidget {
             empty: empty, twin: twin, compact: height <= 85,
             unknown: showUnknown, plate: plate, driverCin: driverCin,
             highlightMissing: highlightMissing,
+            activeContainerIndex: activeContainerIndex,
             numbers: [containerNumber, containerNumber2],
             bookings: [booking, booking2],
             codes: [iso, iso2], lines: [operator, operator2],
@@ -123,6 +126,7 @@ class _TruckPainter extends CustomPainter {
     required this.unknown,
     required this.plate,
     this.driverCin,
+    this.activeContainerIndex,
     required this.numbers,
     required this.codes,
     required this.lines,
@@ -131,6 +135,7 @@ class _TruckPainter extends CustomPainter {
   });
 
   final bool empty, twin, compact, unknown, highlightMissing;
+  final int? activeContainerIndex;
   final String? plate;
   final String? driverCin;
   final List<String?> numbers, bookings, codes, lines;
@@ -276,16 +281,29 @@ class _TruckPainter extends CustomPainter {
     final hasLine = line.isNotEmpty;
 
     final missing = highlightMissing && (!empty ? (!has11Chars || !has4Iso || !hasLine) : (value == null || value.isEmpty || !has4Iso || !hasLine));
-    final borderColor = empty ? const Color(0xff0284c7) : const Color(0xff991b1b);
+    final isActive = twin && activeContainerIndex == index;
+    final borderColor = isActive
+        ? const Color(0xff38bdf8)
+        : (empty ? const Color(0xff0284c7) : const Color(0xff991b1b));
+
+    if (isActive) {
+      final glowRing = RRect.fromRectAndRadius(rect.inflate(2.5), const Radius.circular(5.5));
+      canvas.drawRRect(glowRing, Paint()
+        ..color = const Color(0xff38bdf8)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4);
+    }
 
     if (!empty) {
       // Corrugated metallic red container
-      canvas.drawRRect(outline, Paint()..shader = const LinearGradient(
+      canvas.drawRRect(outline, Paint()..shader = LinearGradient(
         begin: Alignment.topCenter, end: Alignment.bottomCenter,
-        colors: [Color(0xffdc2626), Color(0xff991b1b)],
+        colors: isActive
+          ? const [Color(0xfff87171), Color(0xffb91c1c)]
+          : const [Color(0xffdc2626), Color(0xff991b1b)],
       ).createShader(rect));
       canvas.drawRRect(outline, Paint()..color = borderColor
-        ..style = PaintingStyle.stroke..strokeWidth = missing ? 1.5 : 1.0);
+        ..style = PaintingStyle.stroke..strokeWidth = isActive ? 2.0 : (missing ? 1.5 : 1.0));
 
       // Corrugation ribs
       for (var x = rect.left + 7; x < rect.right - 4; x += 8) {
@@ -302,8 +320,11 @@ class _TruckPainter extends CustomPainter {
       }
     } else {
       // Empty container chassis outline
-      canvas.drawRRect(outline, Paint()..color = const Color(0xfff0f9ff));
-      final stroke = Paint()..color = borderColor..strokeWidth = 1.3..style = PaintingStyle.stroke;
+      canvas.drawRRect(outline, Paint()..color = isActive ? const Color(0xffe0f2fe) : const Color(0xfff0f9ff));
+      final stroke = Paint()
+        ..color = borderColor
+        ..strokeWidth = isActive ? 2.0 : 1.3
+        ..style = PaintingStyle.stroke;
       const dash = 6.0;
       for (var x = rect.left + 4; x < rect.right - 4; x += dash * 1.5) {
         canvas.drawLine(Offset(x, rect.top), Offset(math.min(x + dash, rect.right - 4), rect.top), stroke);
@@ -313,8 +334,17 @@ class _TruckPainter extends CustomPainter {
       canvas.drawLine(rect.topRight, rect.bottomRight, stroke);
     }
 
-    // Top warning pill if incomplete
-    if (missing) {
+    // Dim inactive slot in twin mode so active slot pops out
+    if (twin && activeContainerIndex != null && !isActive) {
+      canvas.drawRRect(outline, Paint()..color = Colors.black.withValues(alpha: 0.16));
+    }
+
+    // Top indicator pill (Active or Missing)
+    if (isActive) {
+      final activeBadge = Rect.fromLTWH(rect.center.dx - 22, rect.top - 5.5, 44, 6.5);
+      _box(canvas, activeBadge, const Color(0xff0284c7), 2);
+      _text(canvas, 'EN SAISIE ⛶', activeBadge, Colors.white, 4.0, 0.5, bold: true);
+    } else if (missing) {
       final pill = Rect.fromLTWH(rect.center.dx - 18, rect.top - 4, 36, 5);
       _box(canvas, pill, const Color(0xffef4444), 2);
       _text(canvas, 'INCOMPLET *', pill, Colors.white, 3.8, 0.5, bold: true);

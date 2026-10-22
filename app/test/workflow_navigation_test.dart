@@ -162,12 +162,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Premier Conteneur (20\')'), findsOneWidget);
+    if (find.byKey(const ValueKey('twin-tab-1')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const ValueKey('twin-tab-1')));
+      await tester.pumpAndSettle();
+    }
     expect(find.text('Deuxième Conteneur (20\') · Compagnie différente autorisée'), findsOneWidget);
     await tester.ensureVisible(find.byKey(const ValueKey('gate-empty-true')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('gate-empty-true')));
     await tester.pumpAndSettle();
+    if (find.byKey(const ValueKey('twin-tab-0')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const ValueKey('twin-tab-0')));
+      await tester.pumpAndSettle();
+    }
     expect(find.text('Booking Conteneur 1 *'), findsOneWidget);
+    if (find.byKey(const ValueKey('twin-tab-1')).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(const ValueKey('twin-tab-1')));
+      await tester.pumpAndSettle();
+    }
     expect(find.text('Booking Conteneur 2 *'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -200,7 +212,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('Twin container forms are side by side on web and stacked on mobile', (tester) async {
+  testWidgets('Twin container forms are side by side on web and slide tabs on mobile', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(1200, 1000);
     addTearDown(() {
@@ -228,8 +240,17 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('gate-loaded-true')));
     await tester.pumpAndSettle();
-    expect((tester.getTopLeft(second).dx - tester.getTopLeft(first).dx).abs(), lessThan(10));
-    expect(tester.getTopLeft(second).dy, greaterThan(tester.getTopLeft(first).dy + 100));
+
+    // On mobile: tabs are shown, first container is on page 0
+    expect(find.byKey(const ValueKey('twin-tab-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('twin-tab-1')), findsOneWidget);
+    expect(find.text("Premier Conteneur (20')"), findsOneWidget);
+
+    // Tapping tab 1 slides to second container
+    await tester.tap(find.byKey(const ValueKey('twin-tab-1')));
+    await tester.pumpAndSettle();
+    expect(find.text("Deuxième Conteneur (20') · Compagnie différente autorisée"), findsOneWidget);
+
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
