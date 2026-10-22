@@ -395,6 +395,10 @@ class _EntryScreenState extends State<EntryScreen> {
       }catch(error){
         if(mounted)message(context,'Entrée enregistrée. Bon PDF à réessayer dans Bons : $error');
       }
+      final savedPlate = TruckPlate.format(plate.text);
+      final savedContainer1 = kind == 'loaded' ? number : (booking.text.isNotEmpty ? booking.text : null);
+      final savedContainer2 = isTwin ? (kind == 'loaded' ? number2 : (booking2.text.isNotEmpty ? booking2.text : null)) : null;
+
       form.currentState!.reset();for(final c in [plate,cin,booking,booking2,isoController,iso2Controller,...boxes,...boxes2]){c.clear();}
       setState((){
         operator=null;
@@ -402,13 +406,23 @@ class _EntryScreenState extends State<EntryScreen> {
         lookupHint=null;lookupHint2=null;kind='loaded';isTwin=false;iso='';iso2='';
       });
       if(mounted && outcome?.bytes != null){
-        await Navigator.push(context, MaterialPageRoute(
-          builder: (_) => BonPdfScreen(
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => BonConfirmationDialog(
             bytes: outcome!.bytes!,
             kind: 'ENTRÉE',
             visitId: visitId,
+            plate: savedPlate,
+            containerNumber: savedContainer1,
+            containerNumber2: savedContainer2,
+            onNewTruck: () {
+              if (mounted) {
+                plateFocus.requestFocus();
+              }
+            },
           ),
-        ));
+        );
       }
     }catch(e){
       if(mounted){
@@ -1683,15 +1697,19 @@ class _ExitScreenState extends State<ExitScreen> {
       loadVisits();
 
       if (mounted && pdfBytes != null) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BonPdfScreen(
-              bytes: pdfBytes,
-              kind: 'SORTIE',
-              visitId: visitId,
-              autoPrint: true,
-            ),
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => BonConfirmationDialog(
+            bytes: pdfBytes,
+            kind: 'SORTIE',
+            visitId: visitId,
+            plate: visit.plate,
+            containerNumber: visit.container,
+            containerNumber2: visit.container2,
+            onNewTruck: () {
+              if (mounted) searchController.clear();
+            },
           ),
         );
       }
@@ -1771,6 +1789,9 @@ class _ExitScreenState extends State<ExitScreen> {
       message(context, 'Sortie et prise conteneur confirmées pour le camion ${visit.plate}.');
       final visitId = visit.id;
       final pdfBytes = outcome?.bytes;
+      final savedPlate = visit.plate;
+      final savedContainer1 = c1.isNotEmpty ? c1 : visit.container;
+      final savedContainer2 = isTwin ? c2 : visit.container2;
       setState(() {
         selectedVisit = null;
         currentVisitId = null;
@@ -1779,15 +1800,19 @@ class _ExitScreenState extends State<ExitScreen> {
       loadVisits();
 
       if (mounted && pdfBytes != null) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BonPdfScreen(
-              bytes: pdfBytes,
-              kind: 'SORTIE',
-              visitId: visitId,
-              autoPrint: true,
-            ),
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => BonConfirmationDialog(
+            bytes: pdfBytes,
+            kind: 'SORTIE',
+            visitId: visitId,
+            plate: savedPlate,
+            containerNumber: savedContainer1,
+            containerNumber2: savedContainer2,
+            onNewTruck: () {
+              if (mounted) searchController.clear();
+            },
           ),
         );
       }
@@ -1858,15 +1883,19 @@ class _ExitScreenState extends State<ExitScreen> {
       loadVisits();
 
       if (mounted && pdfBytes != null) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BonPdfScreen(
-              bytes: pdfBytes,
-              kind: 'ANNULATION',
-              visitId: visitId,
-              autoPrint: true,
-            ),
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => BonConfirmationDialog(
+            bytes: pdfBytes,
+            kind: 'ANNULATION',
+            visitId: visitId,
+            plate: visit.plate,
+            containerNumber: visit.container,
+            containerNumber2: visit.container2,
+            onNewTruck: () {
+              if (mounted) searchController.clear();
+            },
           ),
         );
       }
@@ -1916,15 +1945,22 @@ class _ExitScreenState extends State<ExitScreen> {
       loadVisits();
 
       if (mounted && pdfBytes != null) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BonPdfScreen(
-              bytes: pdfBytes,
-              kind: 'ANNULATION',
-              visitId: visitId,
-              autoPrint: true,
-            ),
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => BonConfirmationDialog(
+            bytes: pdfBytes,
+            kind: 'ANNULATION',
+            visitId: visitId,
+            plate: visit.plate,
+            containerNumber: visit.container,
+            containerNumber2: visit.container2,
+            onNewTruck: () {
+              if (mounted) {
+                searchController.clear();
+                reasonController.clear();
+              }
+            },
           ),
         );
       }
@@ -2956,6 +2992,273 @@ class _ExitScreenState extends State<ExitScreen> {
   }
 }
 
+class BonConfirmationDialog extends StatelessWidget {
+  const BonConfirmationDialog({
+    super.key,
+    required this.bytes,
+    required this.kind,
+    required this.visitId,
+    this.plate,
+    this.containerNumber,
+    this.containerNumber2,
+    this.onNewTruck,
+    this.onPrintOverride,
+  });
+
+  final Uint8List bytes;
+  final String kind;
+  final String visitId;
+  final String? plate;
+  final String? containerNumber;
+  final String? containerNumber2;
+  final VoidCallback? onNewTruck;
+  final Future<void> Function()? onPrintOverride;
+
+  Future<void> _print() async {
+    if (onPrintOverride != null) {
+      await onPrintOverride!();
+      return;
+    }
+    final fileName = 'TCZ-$kind-$visitId.pdf';
+    try {
+      final printed = await Printing.layoutPdf(
+        onLayout: (_) => bytes,
+        name: fileName,
+      );
+      if (!printed) {
+        await Printing.sharePdf(bytes: bytes, filename: fileName);
+      }
+    } catch (_) {
+      await Printing.sharePdf(bytes: bytes, filename: fileName);
+    }
+  }
+
+  Future<void> _download() async {
+    final fileName = 'TCZ-$kind-$visitId.pdf';
+    await Printing.sharePdf(bytes: bytes, filename: fileName);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      backgroundColor: Colors.white,
+      insetPadding: EdgeInsets.symmetric(horizontal: isMobile ? 14 : 36, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header with success icon and title
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: const Color(0xff16a34a).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check_circle_rounded, color: Color(0xff16a34a), size: 28),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${kind == 'ENTRÉE' ? 'Entrée' : (kind == 'SORTIE' ? 'Sortie' : kind)} enregistrée !',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xff063e66),
+                          ),
+                        ),
+                        Text(
+                          'Bon #${visitId.length > 8 ? visitId.substring(0, 8) : visitId}',
+                          style: const TextStyle(fontSize: 12, color: Color(0xff64748b)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20, color: Color(0xff94a3b8)),
+                    tooltip: 'Fermer',
+                    onPressed: () {
+                      Navigator.pop(context);
+                      onNewTruck?.call();
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Summary Card (Plate, Container, Time)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xfff8fafc),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xffe2e8f0)),
+                ),
+                child: Column(
+                  children: [
+                    if (plate != null && plate!.isNotEmpty)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Plaque camion', style: TextStyle(fontSize: 12, color: Color(0xff64748b))),
+                          Text(plate!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xff0f172a))),
+                        ],
+                      ),
+                    if (containerNumber != null && containerNumber!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Conteneur 1', style: TextStyle(fontSize: 12, color: Color(0xff64748b))),
+                          Text(containerNumber!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xff075a8d))),
+                        ],
+                      ),
+                    ],
+                    if (containerNumber2 != null && containerNumber2!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Conteneur 2 (Twin)', style: TextStyle(fontSize: 12, color: Color(0xff64748b))),
+                          Text(containerNumber2!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xff075a8d))),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Button 1: Lancer l'impression et nouveau (Primary action)
+              FilledButton.icon(
+                key: const ValueKey('btn-print-and-new'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xff16a34a),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 1,
+                ),
+                icon: const Icon(Icons.print_rounded, size: 20),
+                label: const Text(
+                  'Lancer l\'impression & Nouveau',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _print();
+                  onNewTruck?.call();
+                },
+              ),
+              const SizedBox(height: 10),
+
+              // Button 2: Lancer l'impression seule
+              FilledButton.tonalIcon(
+                key: const ValueKey('btn-print-only'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xff075a8d).withValues(alpha: 0.12),
+                  foregroundColor: const Color(0xff075a8d),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.print_outlined, size: 19),
+                label: const Text(
+                  'Lancer l\'impression',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+                onPressed: _print,
+              ),
+              const SizedBox(height: 10),
+
+              // Button 3: Télécharger le PDF
+              OutlinedButton.icon(
+                key: const ValueKey('btn-download-pdf'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  side: const BorderSide(color: Color(0xffcbd5e1)),
+                ),
+                icon: const Icon(Icons.download_rounded, size: 19, color: Color(0xff334155)),
+                label: const Text(
+                  'Télécharger le PDF',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xff334155)),
+                ),
+                onPressed: _download,
+              ),
+              const SizedBox(height: 12),
+
+              // Secondary actions: Aperçu PDF & Nouveau camion
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => BonPdfScreen(
+                              bytes: bytes,
+                              kind: kind,
+                              visitId: visitId,
+                              autoPrint: false,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 16, color: Color(0xff64748b)),
+                      label: const Text(
+                        'Aperçu PDF',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: Color(0xff64748b)),
+                      ),
+                    ),
+                  ),
+                  Flexible(
+                    child: TextButton(
+                      key: const ValueKey('btn-new-truck-dismiss'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onNewTruck?.call();
+                      },
+                      child: const Text(
+                        'Nouveau camion →',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xff075a8d)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class BonPdfScreen extends StatefulWidget {
   const BonPdfScreen({
     super.key,
@@ -3093,13 +3396,18 @@ class VisitQueue extends StatelessWidget {
       builder:(_)=>VisitActionSheet(repository:repository,visit:visit,canCancel:canCancel,exitMode:exitMode));
     onRefresh();
     if(context.mounted && outcome?.bytes != null){
-      await Navigator.push(context, MaterialPageRoute(
-        builder: (_) => BonPdfScreen(
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => BonConfirmationDialog(
           bytes: outcome!.bytes!,
           kind: 'SORTIE',
           visitId: visit.id,
+          plate: visit.plate,
+          containerNumber: visit.container,
+          containerNumber2: visit.container2,
         ),
-      ));
+      );
     }
   }
   @override Widget build(BuildContext context)=>RefreshIndicator(onRefresh:()async {onRefresh();await queue;},
@@ -3296,15 +3604,16 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
               } catch (_) {}
             }, 'Visite annulée avec visa responsable.');
             if (context.mounted && outcome?.bytes != null) {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => BonPdfScreen(
-                    bytes: outcome!.bytes!,
-                    kind: 'ANNULATION',
-                    visitId: v.id,
-                    autoPrint: true,
-                  ),
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => BonConfirmationDialog(
+                  bytes: outcome!.bytes!,
+                  kind: 'ANNULATION',
+                  visitId: v.id,
+                  plate: v.plate,
+                  containerNumber: v.container,
+                  containerNumber2: v.container2,
                 ),
               );
             }

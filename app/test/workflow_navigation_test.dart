@@ -350,4 +350,47 @@ void main() {
     expect(find.text('15262-H-1'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('BonConfirmationDialog presents print-and-new, print, download and triggers onNewTruck', (tester) async {
+    final samplePdf = Uint8List.fromList([0x25, 0x50, 0x44, 0x46]); // %PDF
+    var printOverrideCalled = false;
+    var newTruckCalled = false;
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: BonConfirmationDialog(
+          bytes: samplePdf,
+          kind: 'ENTRÉE',
+          visitId: 'test-visit-42',
+          plate: '12345-A-1',
+          containerNumber: 'MSCU1234567',
+          containerNumber2: 'TGHU7654321',
+          onPrintOverride: () async {
+            printOverrideCalled = true;
+          },
+          onNewTruck: () {
+            newTruckCalled = true;
+          },
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Entrée enregistrée !'), findsOneWidget);
+    expect(find.text('12345-A-1'), findsOneWidget);
+    expect(find.text('MSCU1234567'), findsOneWidget);
+    expect(find.text('TGHU7654321'), findsOneWidget);
+
+    expect(find.byKey(const ValueKey('btn-print-and-new')), findsOneWidget);
+    expect(find.byKey(const ValueKey('btn-print-only')), findsOneWidget);
+    expect(find.byKey(const ValueKey('btn-download-pdf')), findsOneWidget);
+    expect(find.text('Aperçu PDF'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('btn-print-and-new')));
+    await tester.pumpAndSettle();
+
+    expect(printOverrideCalled, isTrue);
+    expect(newTruckCalled, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }
