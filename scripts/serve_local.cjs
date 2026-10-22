@@ -30,7 +30,9 @@ const MIME_TYPES = {
 // RPC Cache
 const rpcCache = {
   kpis: { data: null, ts: 0, day: '' },
-  agents: { data: null, ts: 0 }
+  agents: { data: null, ts: 0 },
+  clients_armateurs: { data: null, ts: 0 },
+  armateurs: { data: null, ts: 0 }
 };
 
 function executeRpc(fnName, params = {}) {
@@ -89,6 +91,97 @@ function executeRpc(fnName, params = {}) {
       timeout: 20000
     });
     rpcCache.agents.ts = 0; // invalidate cache
+    return { success: true };
+  }
+
+  if (fnName === 'admin_list_clients_armateurs') {
+    if (rpcCache.clients_armateurs.data && (now - rpcCache.clients_armateurs.ts < 5000)) {
+      return rpcCache.clients_armateurs.data;
+    }
+    const out = execSync(`npx.cmd supabase db query "SELECT public.admin_list_clients_armateurs();" --linked`, {
+      cwd: REPO_ROOT,
+      env,
+      timeout: 20000
+    }).toString();
+    const jsonMatch = out.match(/\{[\s\S]*"rows":\s*\[([\s\S]*?)\][\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const res = parsed.rows[0].admin_list_clients_armateurs;
+      rpcCache.clients_armateurs = { data: res, ts: now };
+      return res;
+    }
+    throw new Error('Erreur de lecture clients_armateurs');
+  }
+
+  if (fnName === 'admin_list_all_armateurs') {
+    if (rpcCache.armateurs.data && (now - rpcCache.armateurs.ts < 30000)) {
+      return rpcCache.armateurs.data;
+    }
+    const out = execSync(`npx.cmd supabase db query "SELECT public.admin_list_all_armateurs();" --linked`, {
+      cwd: REPO_ROOT,
+      env,
+      timeout: 20000
+    }).toString();
+    const jsonMatch = out.match(/\{[\s\S]*"rows":\s*\[([\s\S]*?)\][\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const res = parsed.rows[0].admin_list_all_armateurs;
+      rpcCache.armateurs = { data: res, ts: now };
+      return res;
+    }
+    throw new Error('Erreur de lecture all_armateurs');
+  }
+
+  if (fnName === 'admin_assign_client_armateur') {
+    const { p_client, p_armateur } = params;
+    const sql = `SELECT public.admin_assign_client_armateur('${p_client}', '${(p_armateur || '').replace(/'/g, "''")}');`;
+    execSync(`npx.cmd supabase db query "${sql}" --linked`, {
+      cwd: REPO_ROOT,
+      env,
+      timeout: 20000
+    });
+    rpcCache.clients_armateurs.ts = 0; // invalidate cache
+    return { success: true };
+  }
+
+  if (fnName === 'admin_unassign_client_armateur') {
+    const { p_client, p_armateur } = params;
+    const sql = `SELECT public.admin_unassign_client_armateur('${p_client}', '${(p_armateur || '').replace(/'/g, "''")}');`;
+    execSync(`npx.cmd supabase db query "${sql}" --linked`, {
+      cwd: REPO_ROOT,
+      env,
+      timeout: 20000
+    });
+    rpcCache.clients_armateurs.ts = 0; // invalidate cache
+    return { success: true };
+  }
+
+  if (fnName === 'admin_create_client') {
+    const { p_code, p_name } = params;
+    const sql = `SELECT public.admin_create_client('${(p_code || '').replace(/'/g, "''")}', '${(p_name || '').replace(/'/g, "''")}');`;
+    const out = execSync(`npx.cmd supabase db query "${sql}" --linked`, {
+      cwd: REPO_ROOT,
+      env,
+      timeout: 20000
+    }).toString();
+    rpcCache.clients_armateurs.ts = 0; // invalidate cache
+    const jsonMatch = out.match(/\{[\s\S]*"rows":\s*\[([\s\S]*?)\][\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return parsed.rows[0].admin_create_client;
+    }
+    return { success: true };
+  }
+
+  if (fnName === 'admin_delete_client') {
+    const { p_client } = params;
+    const sql = `SELECT public.admin_delete_client('${p_client}');`;
+    execSync(`npx.cmd supabase db query "${sql}" --linked`, {
+      cwd: REPO_ROOT,
+      env,
+      timeout: 20000
+    });
+    rpcCache.clients_armateurs.ts = 0; // invalidate cache
     return { success: true };
   }
 
