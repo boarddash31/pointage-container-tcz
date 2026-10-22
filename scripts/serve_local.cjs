@@ -35,9 +35,31 @@ const rpcCache = {
   armateurs: { data: null, ts: 0 }
 };
 
-function executeRpc(fnName, params = {}) {
+const SUPABASE_URL = 'https://iparzfqxopcvwqelxlad.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwYXJ6ZnF4b3BjdndxZWx4bGFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTE3MjMsImV4cCI6MjEwNzk4NzcyM30.3hCnAHLQ8KRNRmaXCAMO8POWIRrjdeqMtqs8EavIbBs';
+
+async function executeRpc(fnName, params = {}) {
   const env = { ...process.env, NODE_TLS_REJECT_UNAUTHORIZED: '0' };
   const now = Date.now();
+
+  // 1. Try fast direct HTTPS REST RPC (100-200ms)
+  try {
+    const directRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params),
+      signal: AbortSignal.timeout(4000)
+    });
+    if (directRes.ok) {
+      return await directRes.json();
+    }
+  } catch (directErr) {
+    // If corporate proxy blocks or times out, proceed to CLI fallback below
+  }
 
   if (fnName === 'admin_dashboard_kpis') {
     const day = params.p_day || new Date().toISOString().split('T')[0];
@@ -206,14 +228,14 @@ const server = http.createServer((req, res) => {
     const fnName = urlPath.replace('/api/rpc/', '');
     let bodyStr = '';
     req.on('data', chunk => bodyStr += chunk);
-    req.on('end', () => {
+    req.on('end', async () => {
       let params = {};
       try {
         if (bodyStr) params = JSON.parse(bodyStr);
       } catch (_) {}
 
       try {
-        const result = executeRpc(fnName, params);
+        const result = await executeRpc(fnName, params);
         res.writeHead(200, {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache'

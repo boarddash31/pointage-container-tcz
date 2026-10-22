@@ -1,4 +1,0 @@
-/api/rpc/:splat  https://iparzfqxopcvwqelxlad.supabase.co/rest/v1/rpc/:splat  200!
-/admin  /dashboard  301
-/dashboard  /dashboard.html  200
-/*  /index.html  200

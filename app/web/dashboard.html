@@ -888,6 +888,9 @@
     </div>
   </div>
 
+  <!-- GLOBAL FLOATING TOAST NOTIFICATION -->
+  <div id="globalToast" class="fixed bottom-5 right-5 z-50 hidden max-w-md p-4 rounded-2xl text-xs font-bold shadow-2xl border transition-all flex items-center gap-3"></div>
+
   <!-- FOOTER -->
   <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400 mt-auto">
     <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -934,6 +937,8 @@
 
     // Supabase / Local / Cloudflare Bridge RPC Caller
     async function callRpc(fnName, params = {}) {
+      let lastError = null;
+
       // 1. Try same-origin /api/rpc/ first (works on localhost, Cloudflare Worker & Netlify, bypasses corporate proxy 416 blocks)
       try {
         const localRes = await fetch(`/api/rpc/${fnName}`, {
@@ -946,9 +951,11 @@
           if (cType.includes('application/json')) {
             return await localRes.json();
           }
+        } else {
+          lastError = `Proxy local HTTP ${localRes.status}`;
         }
       } catch (proxyErr) {
-        // Fallback to direct Supabase below
+        lastError = proxyErr.message;
       }
 
       // 2. Direct Supabase call (when outside corporate proxy)
@@ -965,11 +972,14 @@
         if (res.ok) {
           return await res.json();
         }
+        const errText = await res.text().catch(() => '');
+        lastError = `Supabase HTTP ${res.status}: ${errText}`;
       } catch (directErr) {
+        lastError = directErr.message;
         console.warn('Direct Supabase error:', directErr);
       }
 
-      throw new Error(`Impossible de charger les données pour ${fnName}. Vérifiez votre connexion réseau.`);
+      throw new Error(`Impossible de charger les données pour ${fnName}. (${lastError || 'Erreur réseau'})`);
     }
 
     // Direct Supabase Query
@@ -991,18 +1001,24 @@
     // Load All Dashboard Data
     async function loadAllData() {
       const refreshIcon = document.getElementById('refreshIcon');
-      refreshIcon.classList.add('animate-spin');
+      if (refreshIcon) refreshIcon.classList.add('animate-spin');
 
-      const day = document.getElementById('selectedDate').value || new Date().toISOString().split('T')[0];
+      const day = document.getElementById('selectedDate')?.value || new Date().toISOString().split('T')[0];
 
       try {
         // 1. Fetch KPIs
         const kpis = await callRpc('admin_dashboard_kpis', { p_day: day });
         renderKpis(kpis);
 
-        // 2. Render Charts
-        renderHourlyChart(kpis.hourly_entries || [], kpis.hourly_exits || []);
-        renderArmateurChart(kpis.armateurs_breakdown || []);
+        // 2. Render Charts (safeguarded)
+        try {
+          if (typeof Chart !== 'undefined') {
+            renderHourlyChart(kpis.hourly_entries || [], kpis.hourly_exits || []);
+            renderArmateurChart(kpis.armateurs_breakdown || []);
+          }
+        } catch (chartErr) {
+          console.warn('Erreur rendu graphiques:', chartErr);
+        }
 
         // 3. Render Recent Visits
         rawVisitsData = kpis.recent_visits || [];
@@ -1010,30 +1026,48 @@
         filterVisitsTable();
 
         // 4. Fetch Agents
-        await loadAgentsList();
+        try {
+          await loadAgentsList();
+        } catch (agentErr) {
+          console.warn('Erreur chargement agents:', agentErr);
+        }
 
       } catch (err) {
         console.error('Erreur chargement données:', err);
+        showGlobalToast(`Erreur chargement données : ${err.message}`, 'error');
       } finally {
-        setTimeout(() => refreshIcon.classList.remove('animate-spin'), 600);
+        if (refreshIcon) {
+          setTimeout(() => refreshIcon.classList.remove('animate-spin'), 600);
+        }
       }
     }
 
     // Render KPI Metrics
     function renderKpis(data) {
-      document.getElementById('kpiTrucksInside').textContent = data.trucks_inside ?? 0;
-      document.getElementById('kpiEntriesToday').textContent = data.entries_today ?? 0;
-      document.getElementById('kpiExitsToday').textContent = data.exits_today ?? 0;
-      document.getElementById('kpiCancellationsToday').textContent = data.cancellations_today ?? 0;
-      document.getElementById('kpiNeedsEngin').textContent = data.needs_engin_inside ?? 0;
-      document.getElementById('kpiContainersTotal').textContent = data.total_containers_today ?? 0;
-      document.getElementById('kpiTwinCount').textContent = `${data.twin_today ?? 0} Twin 2x20'`;
+      if (!data) return;
+      const elTrucks = document.getElementById('kpiTrucksInside');
+      const elEntries = document.getElementById('kpiEntriesToday');
+      const elExits = document.getElementById('kpiExitsToday');
+      const elCancel = document.getElementById('kpiCancellationsToday');
+      const elEngin = document.getElementById('kpiNeedsEngin');
+      const elContainers = document.getElementById('kpiContainersTotal');
+      const elTwin = document.getElementById('kpiTwinCount');
+
+      if (elTrucks) elTrucks.textContent = data.trucks_inside ?? 0;
+      if (elEntries) elEntries.textContent = data.entries_today ?? 0;
+      if (elExits) elExits.textContent = data.exits_today ?? 0;
+      if (elCancel) elCancel.textContent = data.cancellations_today ?? 0;
+      if (elEngin) elEngin.textContent = data.needs_engin_inside ?? 0;
+      if (elContainers) elContainers.textContent = data.total_containers_today ?? 0;
+      if (elTwin) elTwin.textContent = `${data.twin_today ?? 0} Twin 2x20'`;
     }
 
     // Render Hourly Activity Chart
     function renderHourlyChart(entries, exits) {
-      const ctx = document.getElementById('hourlyChart').getContext('2d');
-      const hours = Array.from({ length: 24 }, (_, i) => `${i.toString().padLeft ? i.toString().padStart(2, '0') : i}h`);
+      const canvas = document.getElementById('hourlyChart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      const ctx = canvas.getContext('2d');
+      const hours = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}h`);
 
       const entryCounts = entries.map(x => x.count);
       const exitCounts = exits.map(x => x.count);
@@ -1073,7 +1107,9 @@
 
     // Render Armateurs Doughnut Chart
     function renderArmateurChart(data) {
-      const ctx = document.getElementById('armateurChart').getContext('2d');
+      const canvas = document.getElementById('armateurChart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      const ctx = canvas.getContext('2d');
       if (armateurChartInstance) armateurChartInstance.destroy();
 
       const labels = data.map(x => x.name || 'AUTRE');
@@ -1670,11 +1706,11 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
           `;
         }).join('');
 
-      const printHtml = \`<!DOCTYPE html>
+      const printHtml = `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>\${reportTitle} - TCZ</title>
+  <title>${reportTitle} - TCZ</title>
   <style>
     @page {
       size: A4 landscape;
@@ -1803,7 +1839,7 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
 <body>
   <div class="no-print-bar">
     <div>
-      <strong>🖨️ Aperçu Avant Impression / Export PDF</strong> · \${list.length} visite(s) sélectionnée(s)
+      <strong>🖨️ Aperçu Avant Impression / Export PDF</strong> · ${list.length} visite(s) sélectionnée(s)
     </div>
     <div>
       <button class="btn-action btn-print" onclick="window.print()">Imprimer / Sauvegarder en PDF</button>
@@ -1820,34 +1856,34 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
       </td>
       <td style="width: 50%; text-align: right;">
         <div style="font-size: 11px; font-weight: bold; color: #063e66;">RAPPORT OFFICIEL D'EXPLOITATION</div>
-        <div style="font-size: 10px; color: #334155;">Date d'activité : <strong>\${selectedDay}</strong></div>
-        <div style="font-size: 9px; color: #64748b;">Généré le \${printDate} à \${printTime}</div>
-        \${q ? \`<div style="font-size: 9px; color: #087e79; font-weight: bold;">Recherche appliquée : "\${q}"</div>\` : ''}
+        <div style="font-size: 10px; color: #334155;">Date d'activité : <strong>${selectedDay}</strong></div>
+        <div style="font-size: 9px; color: #64748b;">Généré le ${printDate} à ${printTime}</div>
+        ${q ? `<div style="font-size: 9px; color: #087e79; font-weight: bold;">Recherche appliquée : "${q}"</div>` : ''}
       </td>
     </tr>
   </table>
 
   <div class="title-block">
-    <h1 class="report-title">\${reportTitle}</h1>
-    <p class="report-subtitle">\${reportSubtitle}</p>
+    <h1 class="report-title">${reportTitle}</h1>
+    <p class="report-subtitle">${reportSubtitle}</p>
   </div>
 
   <table style="width: 100%; border-collapse: separate; border-spacing: 6px; margin-bottom: 10px;">
     <tr>
       <td class="kpi-box" style="width: 25%;">
-        <div class="kpi-num">\${list.length} <span style="font-size: 10px; color: #64748b;">/ \${totalAll}</span></div>
+        <div class="kpi-num">${list.length} <span style="font-size: 10px; color: #64748b;">/ ${totalAll}</span></div>
         <div class="kpi-lbl">Visites Sélectionnées</div>
       </td>
       <td class="kpi-box" style="width: 25%;">
-        <div class="kpi-num" style="color: #0284c7;">\${countAuParc}</div>
+        <div class="kpi-num" style="color: #0284c7;">${countAuParc}</div>
         <div class="kpi-lbl">Présents Au Parc</div>
       </td>
       <td class="kpi-box" style="width: 25%;">
-        <div class="kpi-num" style="color: #0d9488;">\${countSorti}</div>
+        <div class="kpi-num" style="color: #0d9488;">${countSorti}</div>
         <div class="kpi-lbl">Sorties Clôturées</div>
       </td>
       <td class="kpi-box" style="width: 25%;">
-        <div class="kpi-num" style="color: #e11d48;">\${countAnnule}</div>
+        <div class="kpi-num" style="color: #e11d48;">${countAnnule}</div>
         <div class="kpi-lbl">Sorties Annulées</div>
       </td>
     </tr>
@@ -1867,7 +1903,7 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
       </tr>
     </thead>
     <tbody>
-      \${rowsHtml}
+      ${rowsHtml}
     </tbody>
   </table>
 
@@ -1889,7 +1925,7 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
     Document officiel généré automatiquement par la solution TCZ Pointage & Gestion de Parc · Page 1/1
   </div>
 </body>
-</html>\`;
+</html>`;
 
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
@@ -2409,6 +2445,38 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
       setTimeout(() => {
         alertBox.classList.add('hidden');
       }, 5000);
+    }
+
+    // Global Toast Notification
+    function showGlobalToast(message, type = 'info') {
+      const toast = document.getElementById('globalToast');
+      if (!toast) return;
+
+      const styles = {
+        success: 'bg-emerald-950/95 text-emerald-100 border-emerald-500 shadow-emerald-950/40',
+        error: 'bg-rose-950/95 text-rose-100 border-rose-500 shadow-rose-950/40',
+        info: 'bg-slate-900/95 text-slate-100 border-slate-600 shadow-black/40'
+      };
+
+      const icons = {
+        success: 'check-circle-2',
+        error: 'alert-triangle',
+        info: 'info'
+      };
+
+      toast.className = `fixed bottom-5 right-5 z-50 max-w-md p-4 rounded-2xl text-xs font-bold shadow-2xl border backdrop-blur-md transition-all flex items-center gap-3 ${styles[type] || styles.info}`;
+      toast.innerHTML = `
+        <i data-lucide="${icons[type] || 'info'}" class="w-5 h-5 shrink-0"></i>
+        <div class="flex-1 leading-snug">${message}</div>
+        <button type="button" onclick="document.getElementById('globalToast').classList.add('hidden')" class="opacity-70 hover:opacity-100 ml-2 text-sm">✕</button>
+      `;
+      toast.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+
+      clearTimeout(window._toastTimeout);
+      window._toastTimeout = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 6000);
     }
 
     // Initialize on page load
