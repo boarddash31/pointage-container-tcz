@@ -42,6 +42,41 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
     }
   </script>
+  <!-- Native Fullscreen (F11 / Immersive) Bridge for Mobile & Web -->
+  <script>
+    window.tczToggleFullscreen = function(enable) {
+      try {
+        var isFull = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+        if (enable === true || (enable === undefined && !isFull)) {
+          var el = document.documentElement;
+          if (el.requestFullscreen) {
+            el.requestFullscreen();
+          } else if (el.webkitRequestFullscreen) {
+            el.webkitRequestFullscreen();
+          } else if (el.mozRequestFullScreen) {
+            el.mozRequestFullScreen();
+          } else if (el.msRequestFullscreen) {
+            el.msRequestFullscreen();
+          }
+        } else if (enable === false || isFull) {
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+          } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+          }
+        }
+      } catch (err) {
+        console.warn('Native Fullscreen request error:', err);
+      }
+    };
+    window.tczIsFullscreen = function() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    };
+  </script>
   <style>
     /* Suppress Netlify badge and drawer */
     iframe[src*="app.netlify.com"],

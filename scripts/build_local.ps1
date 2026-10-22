@@ -11,7 +11,7 @@ $defines = @(
 Write-Host "Building Flutter Web for Local Server..."
 Push-Location $AppPath
 try {
-  & $FlutterExe build web --release @defines
+  & $FlutterExe build web --release --no-pub @defines
   if ($LASTEXITCODE -ne 0) { throw 'Flutter web build failed' }
 } finally {
   Pop-Location

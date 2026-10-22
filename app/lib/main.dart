@@ -8,6 +8,7 @@ import 'data/pointage_repository.dart';
 import 'ui/pointage_screens.dart';
 import 'ui/admin_screen.dart';
 import 'ui/tcz_brand.dart';
+import 'utils/fullscreen_helper.dart';
 
 const supabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
@@ -169,6 +170,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> quickSignIn(String label, String address, String pwd) async {
+    if (kIsWeb && MediaQuery.sizeOf(context).width < 800) {
+      FullscreenHelper.requestBrowserFullscreen();
+    }
     setState(() {
       selectedProfile = label;
       email.value = TextEditingValue(
@@ -208,6 +212,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (rawInput.isEmpty || targetPassword.isEmpty) {
       setState(() => error = 'Veuillez renseigner votre téléphone (ou e-mail) et mot de passe.');
       return;
+    }
+    if (kIsWeb && MediaQuery.sizeOf(context).width < 800) {
+      FullscreenHelper.requestBrowserFullscreen();
     }
     setState(() { busy = true; error = null; notice = null; });
     try {
@@ -511,23 +518,47 @@ class _PointageShellState extends State<PointageShell> {
                 color: const Color(0xff063e66),
                 child: Row(
                   children: [
-                    // Fullscreen toggle button (prominent amber pill)
+                    // Fullscreen toggle buttons
                     InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () => setState(() => _isFullScreenUserPref = false),
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () {
+                        FullscreenHelper.exitBrowserFullscreen();
+                        setState(() => _isFullScreenUserPref = false);
+                      },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.amberAccent.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(16),
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white38, width: 1),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.arrow_back_rounded, size: 15, color: Colors.white),
+                            SizedBox(width: 3),
+                            Text('Menu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => FullscreenHelper.toggleBrowserFullscreen(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.amberAccent.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: Colors.amberAccent, width: 1.2),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.fullscreen_exit_rounded, size: 18, color: Colors.amberAccent),
-                            SizedBox(width: 4),
-                            Text('Normal', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                            Icon(Icons.fullscreen_rounded, size: 16, color: Colors.amberAccent),
+                            SizedBox(width: 3),
+                            Text('F11', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
                           ],
                         ),
                       ),
@@ -671,7 +702,10 @@ class _PointageShellState extends State<PointageShell> {
                   const SizedBox(width: 6),
                   InkWell(
                     borderRadius: BorderRadius.circular(14),
-                    onTap: () => setState(() => _isFullScreenUserPref = true),
+                    onTap: () {
+                      FullscreenHelper.requestBrowserFullscreen();
+                      setState(() => _isFullScreenUserPref = true);
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -684,7 +718,7 @@ class _PointageShellState extends State<PointageShell> {
                         children: [
                           Icon(Icons.fullscreen_rounded, color: Colors.amberAccent, size: 18),
                           SizedBox(width: 3),
-                          Text('Plein écran', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                          Text('Plein écran F11', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 11)),
                         ],
                       ),
                     ),
