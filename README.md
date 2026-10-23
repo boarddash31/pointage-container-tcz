@@ -2,7 +2,7 @@
 
 Flutter mobile/web application backed by Supabase Auth, PostgreSQL, private PDF Storage and Edge Functions. The Node bridge is optional for archiving PDFs to a Windows network share and submitting print jobs to a Windows printer.
 
-The current web release is [Pointage Container TCZ](https://stalwart-travesseiro-1e8045.netlify.app/), with a [signed Android APK](https://stalwart-travesseiro-1e8045.netlify.app/downloads/pointage-tcz.apk) and [SHA-256 checksum](https://stalwart-travesseiro-1e8045.netlify.app/downloads/SHA256SUMS.txt). The source is in the private GitHub repository `boarddash31/pointage-container-tcz`. The first admin must complete the Supabase password-recovery email sent after the Auth URL was configured; never share that link or password in this repository.
+The web app is deployed at [pointage-container-tcz.pages.dev](https://pointage-container-tcz.pages.dev/). The custom domain `https://marsa.digital` is attached and awaits DNS delegation. The public site is web-only; no APK is linked or included in the release. Source is in the private GitHub repository `boarddash31/pointage-container-tcz`. The first admin must complete the Supabase password-recovery flow; never share its link or password in this repository.
 
 ## Repository layout
 
@@ -15,9 +15,9 @@ The current web release is [Pointage Container TCZ](https://stalwart-travesseiro
 
 ## Build and verification
 
-Create a local `.env.local` from `.env.example` with the **publishable** Supabase key. Never put a service-role/secret key in Flutter or Git. Configure `app/android/key.properties` and keep the release keystore outside this repository. On the TCZ Windows build machine, `scripts/build_release.ps1` runs analysis/tests, creates a signed APK and web build, copies the APK to `app/build/web/downloads/`, and writes its SHA-256 checksum.
+Create a local `.env.local` from `.env.example` with the **publishable** Supabase key and `AUTH_SITE_URL=https://marsa.digital`. Never put a service-role/secret key in Flutter or Git. On the TCZ Windows build machine, `scripts/build_release.ps1` runs analysis/tests, builds the Flutter web release, and copies only the web files into `site/`.
 
-The build machine uses the Flutter, Android SDK and JDK already present under `E:\recovred\COMPLETED PROJECT\final project`, via no-space junctions `E:\flutter_sdk_tcz`, `E:\android_sdk_tcz`, `E:\jdk_tcz` and `E:\pointage_tcz`. The release signing key and backup configuration are in `E:\pointage_release_secrets`; **back up that directory securely** before distributing updates. Losing the key prevents installing an update over an existing APK.
+The build machine uses the Flutter SDK under `E:\recovred\COMPLETED PROJECT\final project`, through the no-space junction `E:\flutter_sdk_tcz` and app junction `E:\pointage_tcz`.
 
 ```powershell
 npm ci
@@ -26,7 +26,7 @@ npm run test:bridge
 & 'scripts/build_release.ps1'
 ```
 
-The release script copies the generated web app and APK into `site/`. Netlify publishes that directory from the private GitHub repository, so a commit of the verified release files triggers the web deployment without a Flutter SDK on Netlify. Its `downloads/pointage-tcz.apk` file is linked from the web login screen. Keep the Netlify site URL in Supabase Auth's Site URL and redirect allowlist so invitation and recovery links land on the web app.
+The release script copies only the generated web app into `site/`. Run `scripts/deploy_cloudflare.ps1` to upload that folder to Cloudflare Pages. Keep `https://marsa.digital` in Supabase Auth's Site URL and redirect allowlist so invitation and recovery links return to the web app. The custom domain must resolve publicly before it can be considered live.
 
 The bridge must run on a Windows machine that can reach the PDF folder and printer. `\\172.16.3.98\TCR PrintM` is a **printer share**, not a writable PDF directory. The archive folder is separately configured using `PDF_SHARE_PATH`. Read `bridge/README.md` for TLS, JWT validation, idempotency and printer configuration.
 

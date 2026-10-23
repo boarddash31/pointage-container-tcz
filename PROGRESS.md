@@ -1,6 +1,6 @@
 # Pointage Container — progress
 
-Updated: 2026-10-20 (Africa/Casablanca)
+Updated: 2026-10-23 (Africa/Casablanca)
 
 ## Source audit
 
@@ -15,11 +15,11 @@ Updated: 2026-10-20 (Africa/Casablanca)
 |---|---|---|---|
 | M0 | Source audit, architecture, executable plan | Partial | Source inventory and XLSX layouts reviewed; legacy XLS formulas pending |
 | M1 | Supabase schema, roles, RLS, transactional Entrée/Engin/Sortie, 95 armateurs | Deployed to TCZ; authenticated E2E pending | Six migrations applied. Table Editor lists tables; service-role count is 95 armateurs, anonymous read returns zero; anonymous function calls return 401. Isolated PGlite lifecycle/RLS tests pass. Authenticated live workflow and concurrency tests pending |
-| M2 | Native Flutter Entrée/Engin/Sortie + Auth, FIFO and checksum | Release builds pass; device validation pending | Flutter 3.47.2 `analyze` and 3 widget/unit tests pass. Configured web build succeeds; 56.1 MB Android release APK built and its v2 signature verified with package `ma.tcz.pointage_container`. Android/iOS device runs pending |
+| M2 | Flutter Entrée/Engin/Sortie + Auth, FIFO and checksum | Web release tested; Android out of current scope | Flutter 3.47.2 analyze and 22 tests pass. Web release succeeds. Android/iOS device runs remain outside the current web-only delivery request |
 | M3 | Data, Bons PDF + private Storage and safe print flow | Partial | `generate-bon` deployed and anonymous calls denied. UI, Flutter-to-Node authenticated bridge, preferred-printer direct-print path and document-action audit present; two bridge tests pass. Authenticated PDF generation/share/printer verification pending |
 | M4 | Web admin, clients, RBAC, assignments, analytics | Partial | Admin UI can invite agents with initial role through deployed `invite-user` Edge Function; first admin invitation and role created. Role matrix and browser acceptance pending |
 | M5 | Freepool historical stock and Excel export | Partial | SQL report and workbook source present; synthetic XLSX round-trip test passes. Historical opening stock and source-report reconciliation pending |
-| M6 | Deployment hardening and end-to-end acceptance | Partial | Netlify site and APK are public; external GET/HEAD return HTTP 200 and downloaded APK SHA-256 matches the signed local artifact. Supabase Auth Site URL and redirect allowlist point to Netlify. Admin activation, authenticated device and printer acceptance remain open |
+| M6 | Deployment hardening and end-to-end acceptance | Web deployed; custom domain DNS pending | Public Cloudflare Pages production URL returns HTTP 200; API health returns 200 and retired APK paths return 404. `marsa.digital` is attached to Pages but public DNS does not resolve until registrar nameservers point to Cloudflare. Authenticated workflow and printer acceptance remain open |
 
 ## Architecture and implementation
 
@@ -129,3 +129,11 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 - Redrew the truck cab, plate, trailer and red corrugated containers. Live container/booking, ISO and line values sit inside the container; empty slots use pale cyan outlines. Required data uses an amber marker and readable prompts. The selected gate card expands, remains in the horizontal row, and scrolls into view. Tap-to-focus and Twin layouts are preserved.
 - Reviewed rendered desktop (1320 px) and mobile (390 px) previews with live plate, container and ISO values. Fixed card overflow; Flutter analyze and all 20 tests passed. Retained the existing character-editing changes already present in the working tree.
 - Release build and publication verification are in progress. This visual update does not establish production-security readiness: the current branch contains pre-existing test-account shortcuts.
+
+## Web-only release and marsa.digital (2026-10-23)
+
+- Per the latest request, stopped the Android/APK release path and focused delivery on the web app. Removed the APK download action from login and removed the old APK and checksum from `site/`; the Cloudflare worker now explicitly returns 404 for `/downloads/*`.
+- The web-only release script now runs Flutter analyze, the full 22-test suite and a web release build, then stages only web files. `flutter analyze --no-pub` passed with no issues; all 22 Flutter tests passed; the production web build succeeded. Flutter's optional WebAssembly dry run reports the existing transitive `image` package lint incompatibility, while JavaScript web output still compiles successfully; the script skips that non-blocking dry run.
+- Deployed to Cloudflare Pages. The stable `https://pointage-container-tcz.pages.dev/` URL returned HTTP 200; `/api/health` returned HTTP 200; `/downloads/pointage-tcz.apk` returned HTTP 404. Added the Cloudflare Pages deployment credentials as GitHub Actions secrets so future pushes can deploy the web files.
+- Attached `marsa.digital` to the Pages project; Cloudflare reports the domain status as `initializing`. Public DNS currently returns no records. The Cloudflare zone is active and requires registrar delegation to `arturo.ns.cloudflare.com` and `holly.ns.cloudflare.com` before the custom domain can resolve. Until then, use the stable `pages.dev` URL.
+- The legacy Netlify URL remains a separate stale deployment; Netlify previously reported exhausted operational credits. The current supported web release is the Cloudflare Pages deployment.

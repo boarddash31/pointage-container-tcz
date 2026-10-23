@@ -24,7 +24,8 @@ function Load-EnvFile($path) {
 Load-EnvFile "$repoRoot\.env"
 Load-EnvFile "$repoRoot\.env.local"
 
-$token = if ($env:NETLIFY_AUTH_TOKEN) { $env:NETLIFY_AUTH_TOKEN } else { 'nfc_Cw3TmmPSkf4TXAKw8NUjiWqdjdoi73JT5cd5' }
+$token = $env:NETLIFY_AUTH_TOKEN
+if (-not $token) { throw 'Set NETLIFY_AUTH_TOKEN in an ignored .env file before deploying to Netlify.' }
 $siteId = if ($env:NETLIFY_SITE_ID) { $env:NETLIFY_SITE_ID } else { '4f8fd024-ea53-4a85-83c0-faeac73a04f6' }
 
 $sourceDir = "$repoRoot\site"

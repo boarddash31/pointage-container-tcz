@@ -45,14 +45,43 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('Pointage opens focused and Menu reveals Data and Bons navigation', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1200, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(MaterialApp(home: PointageShell(repository: QueueFixture())));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Menu'), findsOneWidget);
+    expect(find.text('Data'), findsNothing);
+    expect(find.text('Bons'), findsNothing);
+    expect(find.text('Enregistrement de l’entrée'), findsNothing);
+
+    await tester.tap(find.text('Menu'));
+    await tester.pumpAndSettle();
+    expect(find.text('Data'), findsOneWidget);
+    expect(find.text('Bons'), findsOneWidget);
+    expect(find.text('Enregistrement de l’entrée'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('single-role agents open only their permitted gate', (tester) async {
     await tester.pumpWidget(MaterialApp(home: PointageShell(key: const ValueKey('sortie'),
       repository: SingleRoleFixture('sortie'))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Menu'));
     await tester.pumpAndSettle();
     expect(find.text('Validation de la sortie'), findsOneWidget);
     expect(find.text('Enregistrement de l’entrée'), findsNothing);
     await tester.pumpWidget(MaterialApp(home: PointageShell(key: const ValueKey('entree'),
       repository: SingleRoleFixture('entree'))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Menu'));
     await tester.pumpAndSettle();
     expect(find.text('Enregistrement de l’entrée'), findsOneWidget);
     expect(find.text('Validation de la sortie'), findsNothing);
@@ -77,6 +106,9 @@ void main() {
     );
     final repository = QueueFixtureWithTrucks([sampleVisit]);
     await tester.pumpWidget(MaterialApp(home: PointageShell(repository: repository)));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Menu'));
     await tester.pumpAndSettle();
 
     expect(find.text('Enregistrement de l’entrée'), findsOneWidget);

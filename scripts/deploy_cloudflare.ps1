@@ -88,6 +88,14 @@ if (-not $projectObj.success) {
     Write-Host "Projet Pages trouve : $($projectObj.result.subdomain)" -ForegroundColor Green
 }
 
+$siteDirectory = Join-Path $repoRoot 'site'
+if (-not (Test-Path (Join-Path $siteDirectory 'index.html'))) {
+    throw "Web release missing at $siteDirectory. Run scripts/build_release.ps1 first."
+}
+
 Write-Host ""
-Write-Host "Poussez vers GitHub pour deployer instantanement via GitHub Actions :" -ForegroundColor Cyan
-Write-Host "  git push origin main" -ForegroundColor White
+Write-Host "Deploiement de la version web uniquement vers Cloudflare Pages..." -ForegroundColor Cyan
+& npx.cmd --yes wrangler@4.151.3 pages deploy $siteDirectory --project-name $projectName --branch main
+if ($LASTEXITCODE -ne 0) {
+    throw 'Cloudflare Pages deployment failed.'
+}

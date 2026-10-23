@@ -76,6 +76,14 @@ export default {
       });
     }
 
+    // Explicitly retire the APK/checksum links from the previous mobile release.
+    if (url.pathname.startsWith('/downloads/')) {
+      return new Response('Not found', {
+        status: 404,
+        headers: { 'Cache-Control': 'no-store' }
+      });
+    }
+
     // 3. Fallback to static assets
     if (env && env.ASSETS) {
       if (url.pathname === '/dashboard' || url.pathname === '/admin') {

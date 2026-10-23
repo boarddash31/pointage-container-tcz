@@ -9,9 +9,6 @@ $settingsFile = Join-Path $repo '.env.local'
 if (-not (Test-Path -LiteralPath $settingsFile)) {
   throw 'Create ignored .env.local with SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.'
 }
-if (-not (Test-Path -LiteralPath (Join-Path $repo 'app/android/key.properties'))) {
-  throw 'A release signing configuration is required at app/android/key.properties.'
-}
 $settings = Get-Content -LiteralPath $settingsFile | ConvertFrom-StringData
 if (-not $settings.SUPABASE_URL -or -not $settings.SUPABASE_PUBLISHABLE_KEY -or -not $settings.AUTH_SITE_URL) {
   throw 'Supabase URL, publishable key and public Auth site URL are required.'
@@ -19,11 +16,6 @@ if (-not $settings.SUPABASE_URL -or -not $settings.SUPABASE_PUBLISHABLE_KEY -or 
 if (-not (Test-Path -LiteralPath $FlutterExe) -or -not (Test-Path -LiteralPath $AppPath)) {
   throw 'Flutter SDK or app path unavailable.'
 }
-if (Test-Path -LiteralPath 'E:\android_sdk_tcz') {
-  $env:ANDROID_SDK_ROOT = 'E:\android_sdk_tcz'
-  $env:ANDROID_HOME = 'E:\android_sdk_tcz'
-}
-if (Test-Path -LiteralPath 'E:\jdk_tcz') { $env:JAVA_HOME = 'E:\jdk_tcz' }
 
 Push-Location -LiteralPath $AppPath
 try {
@@ -33,26 +25,33 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Flutter analyze failed' }
   & $FlutterExe test --no-pub
   if ($LASTEXITCODE -ne 0) { throw 'Flutter tests failed' }
+
   $defines = @(
     '--dart-define', "SUPABASE_URL=$($settings.SUPABASE_URL)",
     '--dart-define', "SUPABASE_PUBLISHABLE_KEY=$($settings.SUPABASE_PUBLISHABLE_KEY)",
     '--dart-define', "AUTH_SITE_URL=$($settings.AUTH_SITE_URL)"
   )
-  & $FlutterExe build apk --release @defines
-  if ($LASTEXITCODE -ne 0) { throw 'Signed APK build failed' }
-  & $FlutterExe build web --release @defines
+  & $FlutterExe build web --release --no-wasm-dry-run @defines
   if ($LASTEXITCODE -ne 0) { throw 'Flutter web build failed' }
-  $apk = Join-Path $AppPath 'build/app/outputs/flutter-apk/app-release.apk'
-  $downloads = Join-Path $AppPath 'build/web/downloads'
-  New-Item -ItemType Directory -Path $downloads -Force | Out-Null
-  $publishedApk = Join-Path $downloads 'pointage-tcz.apk'
-  Copy-Item -LiteralPath $apk -Destination $publishedApk -Force
-  $hash = (Get-FileHash -LiteralPath $publishedApk -Algorithm SHA256).Hash.ToLowerInvariant()
-  Set-Content -LiteralPath (Join-Path $downloads 'SHA256SUMS.txt') -Value "$hash  pointage-tcz.apk" -Encoding ascii
+
+  $web = Join-Path $AppPath 'build/web'
   $site = Join-Path $repo 'site'
+  if (-not (Test-Path -LiteralPath (Join-Path $web 'index.html'))) {
+    throw 'Flutter did not produce a web index.html.'
+  }
   New-Item -ItemType Directory -Path $site -Force | Out-Null
-  Copy-Item -Path (Join-Path $AppPath 'build/web/*') -Destination $site -Recurse -Force
-  [pscustomobject]@{ WebDirectory=$site; Apk=(Join-Path $site 'downloads/pointage-tcz.apk'); Sha256=$hash }
+  Copy-Item -Path (Join-Path $web '*') -Destination $site -Recurse -Force
+
+  # The public site is web-only. Remove files left by older APK-enabled builds.
+  $downloads = Join-Path $site 'downloads'
+  foreach ($name in @('pointage-tcz.apk', 'SHA256SUMS.txt')) {
+    $artifact = Join-Path $downloads $name
+    if (Test-Path -LiteralPath $artifact -PathType Leaf) {
+      Remove-Item -LiteralPath $artifact -Force
+    }
+  }
+
+  [pscustomobject]@{ WebDirectory=$site; EntryPoint=(Join-Path $site 'index.html'); ApkPublished=$false }
 } finally {
   Pop-Location
 }
