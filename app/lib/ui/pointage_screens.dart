@@ -504,8 +504,9 @@ class _EntryScreenState extends State<EntryScreen> {
           final double totalGaps = (8 * intraGap) + (2 * sepGap);
           final double computedWidth = ((availableWidth - totalGaps) / 11).floorToDouble();
           final double boxWidth = computedWidth.clamp(23.0, 34.0);
-          final double boxHeight = isCompact ? 40.0 : 44.0;
-          final double fontSize = isCompact ? 13.0 : 15.0;
+          final bool isFull = widget.isFullScreen;
+          final double boxHeight = isFull ? (isCompact ? 33.0 : 36.0) : (isCompact ? 40.0 : 44.0);
+          final double fontSize = isFull ? (isCompact ? 12.0 : 13.5) : (isCompact ? 13.0 : 15.0);
 
           return CallbackShortcuts(
             bindings: {
@@ -553,7 +554,7 @@ class _EntryScreenState extends State<EntryScreen> {
                         decoration: InputDecoration(
                           isDense: true,
                           counterText: '',
-                          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                          contentPadding: EdgeInsets.symmetric(vertical: isFull ? 4 : 8, horizontal: 0),
                           filled: true,
                           fillColor: isLetter
                               ? const Color(0xffe9f3fa)
@@ -659,12 +660,13 @@ class _EntryScreenState extends State<EntryScreen> {
             ),
           ],
         )
-      else
+      else if (!widget.isFullScreen)
         const Text('4 lettres + 7 chiffres, avec chiffre de contrôle',style:TextStyle(fontSize:11, color: Colors.grey)),
     ]);
   }
 
   Widget _buildPlateAndCinRow({bool dense = false}) {
+    final isDense = dense || widget.isFullScreen;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -675,13 +677,14 @@ class _EntryScreenState extends State<EntryScreen> {
             focusNode: plateFocus,
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.characters,
+            style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
             decoration: InputDecoration(
-              isDense: dense,
+              isDense: true,
               labelText: 'Plaque camion *',
               hintText: 'Ex: 12345-A-1',
-              prefixIcon: const Icon(Icons.pin, size: 18),
-              contentPadding: dense
-                  ? const EdgeInsets.symmetric(horizontal: 10, vertical: 9)
+              prefixIcon: Icon(Icons.pin, size: widget.isFullScreen ? 16 : 18),
+              contentPadding: isDense
+                  ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
                   : const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             ),
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9A-Za-z -]')), UpperCaseFormatter()],
@@ -701,6 +704,7 @@ class _EntryScreenState extends State<EntryScreen> {
             focusNode: cinFocus,
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.characters,
+            style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
             onChanged: (_) => setState(() {}),
             onFieldSubmitted: (_) {
               if (kind == 'loaded') {
@@ -711,12 +715,12 @@ class _EntryScreenState extends State<EntryScreen> {
               }
             },
             decoration: InputDecoration(
-              isDense: dense,
+              isDense: true,
               labelText: 'CIN chauffeur *',
               hintText: 'Ex: AB123456',
-              prefixIcon: const Icon(Icons.badge_outlined, size: 18),
-              contentPadding: dense
-                  ? const EdgeInsets.symmetric(horizontal: 10, vertical: 9)
+              prefixIcon: Icon(Icons.badge_outlined, size: widget.isFullScreen ? 16 : 18),
+              contentPadding: isDense
+                  ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
                   : const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             ),
             validator: (v) => (v?.trim().length ?? 0) < 2 ? 'CIN requis' : null,
@@ -1208,13 +1212,16 @@ class _EntryScreenState extends State<EntryScreen> {
                                   isoController.selection = TextSelection(baseOffset: 0, extentOffset: isoController.text.length);
                                 },
                                 textCapitalization: TextCapitalization.characters,
-                                decoration: const InputDecoration(
+                                style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
+                                decoration: InputDecoration(
+                                  isDense: true,
                                   labelText: 'Booking Conteneur 1 *',
-                                  prefixIcon: Icon(Icons.receipt_long, size: 20),
+                                  prefixIcon: Icon(Icons.receipt_long, size: widget.isFullScreen ? 18 : 20),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 7 : 12),
                                 ),
                                 validator: (v) => v == null || v.trim().isEmpty ? 'Booking requis' : null,
                               ),
-                            if (lookupHint != null)
+                            if (!widget.isFullScreen && lookupHint != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 6),
                                 child: Text(lookupHint!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
@@ -1230,12 +1237,14 @@ class _EntryScreenState extends State<EntryScreen> {
                                     controller: isoController,
                                     focusNode: isoFocus,
                                     textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
+                                    style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
+                                    decoration: InputDecoration(
+                                      isDense: true,
                                       labelText: 'Code ISO 1 *',
                                       hintText: 'Ex: 22G1',
                                       counterText: '',
-                                      prefixIcon: Icon(Icons.qr_code, size: 18),
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                      prefixIcon: Icon(Icons.qr_code, size: widget.isFullScreen ? 16 : 18),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 6 : 12),
                                     ),
                                     maxLength: 4,
                                     textCapitalization: TextCapitalization.characters,
@@ -1258,11 +1267,12 @@ class _EntryScreenState extends State<EntryScreen> {
                                     onTap: () => pickOperator(forSecond: false),
                                     borderRadius: BorderRadius.circular(11),
                                     child: InputDecorator(
-                                      decoration: const InputDecoration(
+                                      decoration: InputDecoration(
+                                        isDense: true,
                                         labelText: 'Armateur 1 *',
-                                        prefixIcon: Icon(Icons.business, size: 18),
-                                        suffixIcon: Icon(Icons.arrow_drop_down, size: 20),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                        prefixIcon: Icon(Icons.business, size: widget.isFullScreen ? 16 : 18),
+                                        suffixIcon: Icon(Icons.arrow_drop_down, size: widget.isFullScreen ? 18 : 20),
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 6 : 12),
                                       ),
                                       child: Text(
                                         operator == null ? 'Armateur Conteneur 1 *' : '${operator!.name} (${operator!.id})',
@@ -1331,13 +1341,16 @@ class _EntryScreenState extends State<EntryScreen> {
                                   iso2Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso2Controller.text.length);
                                 },
                                 textCapitalization: TextCapitalization.characters,
-                                decoration: const InputDecoration(
+                                style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
+                                decoration: InputDecoration(
+                                  isDense: true,
                                   labelText: 'Booking Conteneur 2 *',
-                                  prefixIcon: Icon(Icons.receipt_long, size: 20),
+                                  prefixIcon: Icon(Icons.receipt_long, size: widget.isFullScreen ? 18 : 20),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 7 : 12),
                                 ),
                                 validator: (v) => v == null || v.trim().isEmpty ? 'Booking requis' : null,
                               ),
-                            if (lookupHint2 != null)
+                            if (!widget.isFullScreen && lookupHint2 != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 6),
                                 child: Text(lookupHint2!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
@@ -1353,12 +1366,14 @@ class _EntryScreenState extends State<EntryScreen> {
                                     controller: iso2Controller,
                                     focusNode: iso2Focus,
                                     textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
+                                    style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
+                                    decoration: InputDecoration(
+                                      isDense: true,
                                       labelText: 'Code ISO 2 *',
                                       hintText: 'Ex: 22G1',
                                       counterText: '',
-                                      prefixIcon: Icon(Icons.qr_code, size: 18),
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                      prefixIcon: Icon(Icons.qr_code, size: widget.isFullScreen ? 16 : 18),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 6 : 12),
                                     ),
                                     maxLength: 4,
                                     textCapitalization: TextCapitalization.characters,
@@ -1381,11 +1396,12 @@ class _EntryScreenState extends State<EntryScreen> {
                                     onTap: () => pickOperator(forSecond: true),
                                     borderRadius: BorderRadius.circular(11),
                                     child: InputDecorator(
-                                      decoration: const InputDecoration(
+                                      decoration: InputDecoration(
+                                        isDense: true,
                                         labelText: 'Armateur 2 *',
-                                        prefixIcon: Icon(Icons.business, size: 18),
-                                        suffixIcon: Icon(Icons.arrow_drop_down, size: 20),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                        prefixIcon: Icon(Icons.business, size: widget.isFullScreen ? 16 : 18),
+                                        suffixIcon: Icon(Icons.arrow_drop_down, size: widget.isFullScreen ? 18 : 20),
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 6 : 12),
                                       ),
                                       child: Text(
                                         operator2 == null ? 'Armateur Conteneur 2 *' : '${operator2!.name} (${operator2!.id})',
@@ -1581,14 +1597,17 @@ class _EntryScreenState extends State<EntryScreen> {
                           isoController.selection = TextSelection(baseOffset: 0, extentOffset: isoController.text.length);
                         },
                         textCapitalization: TextCapitalization.characters,
-                        decoration: const InputDecoration(
+                        style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
+                        decoration: InputDecoration(
+                          isDense: true,
                           labelText: 'Booking / ordre libre *',
-                          helperText: 'Le booking n’est pas un numéro ISO de conteneur',
-                          prefixIcon: Icon(Icons.receipt_long, size: 20),
+                          helperText: widget.isFullScreen ? null : 'Le booking n’est pas un numéro ISO de conteneur',
+                          prefixIcon: Icon(Icons.receipt_long, size: widget.isFullScreen ? 18 : 20),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 7 : 12),
                         ),
                         validator: (v) => v == null || v.trim().isEmpty ? 'Booking requis' : null,
                       ),
-                    if (lookupHint != null)
+                    if (!widget.isFullScreen && lookupHint != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 7),
                         child: Text(lookupHint!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
@@ -1604,12 +1623,14 @@ class _EntryScreenState extends State<EntryScreen> {
                             controller: isoController,
                             focusNode: isoFocus,
                             textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
+                            style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
+                            decoration: InputDecoration(
+                              isDense: true,
                               labelText: 'Code ISO *',
                               hintText: 'Ex: 22G1',
                               counterText: '',
-                              prefixIcon: Icon(Icons.qr_code, size: 18),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                              prefixIcon: Icon(Icons.qr_code, size: widget.isFullScreen ? 16 : 18),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 6 : 12),
                             ),
                             maxLength: 4,
                             textCapitalization: TextCapitalization.characters,
@@ -1636,10 +1657,11 @@ class _EntryScreenState extends State<EntryScreen> {
                             borderRadius: BorderRadius.circular(11),
                             child: InputDecorator(
                               decoration: InputDecoration(
+                                isDense: true,
                                 labelText: 'Armateur *',
-                                prefixIcon: const Icon(Icons.business, size: 18),
-                                suffixIcon: const Icon(Icons.arrow_drop_down, size: 20),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                prefixIcon: Icon(Icons.business, size: widget.isFullScreen ? 16 : 18),
+                                suffixIcon: Icon(Icons.arrow_drop_down, size: widget.isFullScreen ? 18 : 20),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 6 : 12),
                                 enabled: widget.canCorrect || lookupHint != 'ISO et armateur repris du référentiel.',
                               ),
                               child: Text(
@@ -1695,7 +1717,10 @@ class _EntryScreenState extends State<EntryScreen> {
           ),
           // 8. Fixed Bottom Action Bar (en mode mobile F11)
           if (isMobileF11)
-            _buildBottomBar(),
+            SafeArea(
+              top: false,
+              child: _buildBottomBar(),
+            ),
         ],
       ),
     );
@@ -2499,8 +2524,9 @@ class _ExitScreenState extends State<ExitScreen> {
           final double totalGaps = (8 * intraGap) + (2 * sepGap);
           final double computedWidth = ((availableWidth - totalGaps) / 11).floorToDouble();
           final double boxWidth = computedWidth.clamp(23.0, 34.0);
-          final double boxHeight = isCompact ? 40.0 : 44.0;
-          final double fontSize = isCompact ? 13.0 : 15.0;
+          final bool isFull = widget.isFullScreen;
+          final double boxHeight = isFull ? (isCompact ? 33.0 : 36.0) : (isCompact ? 40.0 : 44.0);
+          final double fontSize = isFull ? (isCompact ? 12.0 : 13.5) : (isCompact ? 13.0 : 15.0);
 
           return CallbackShortcuts(
             bindings: {
@@ -2548,7 +2574,7 @@ class _ExitScreenState extends State<ExitScreen> {
                         decoration: InputDecoration(
                           isDense: true,
                           counterText: '',
-                          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+                          contentPadding: EdgeInsets.symmetric(vertical: isFull ? 4 : 8, horizontal: 0),
                           filled: true,
                           fillColor: isLetter
                               ? const Color(0xffe9f3fa)
@@ -2647,7 +2673,7 @@ class _ExitScreenState extends State<ExitScreen> {
             ),
           ],
         )
-      else
+      else if (!widget.isFullScreen)
         const Text('4 lettres + 7 chiffres, avec chiffre de contrôle', style: TextStyle(fontSize: 11, color: Colors.grey)),
     ]);
   }
@@ -3012,9 +3038,9 @@ class _ExitScreenState extends State<ExitScreen> {
               // Search field
               Card(
                 elevation: 1,
-                margin: const EdgeInsets.only(bottom: 12),
+                margin: EdgeInsets.only(bottom: widget.isFullScreen ? 6 : 12),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(widget.isFullScreen ? 8 : 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -3022,11 +3048,14 @@ class _ExitScreenState extends State<ExitScreen> {
                         controller: searchController,
                         textCapitalization: TextCapitalization.characters,
                         inputFormatters: [UpperCaseFormatter()],
+                        style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
                         decoration: InputDecoration(
+                          isDense: widget.isFullScreen,
                           labelText: 'Plaque ou Conteneur *',
                           hintText: 'Ex: 15262-H-1, 5262H1 ou CSQU3054383',
-                          helperText: 'Recherche libre : tirets et espaces facultatifs (ex: 5262H1)',
-                          prefixIcon: const Icon(Icons.search, size: 22),
+                          helperText: widget.isFullScreen ? null : 'Recherche libre : tirets et espaces facultatifs (ex: 5262H1)',
+                          prefixIcon: Icon(Icons.search, size: widget.isFullScreen ? 18 : 22),
+                          contentPadding: widget.isFullScreen ? const EdgeInsets.symmetric(horizontal: 10, vertical: 7) : null,
                           suffixIcon: searchController.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, size: 20),
@@ -3584,12 +3613,14 @@ class _ExitScreenState extends State<ExitScreen> {
                                           controller: iso1Controller,
                                           focusNode: iso1Focus,
                                           textInputAction: TextInputAction.next,
+                                          style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
                                           decoration: InputDecoration(
+                                            isDense: true,
                                             labelText: isTwin ? 'Code ISO 1 *' : 'Code ISO *',
                                             hintText: 'Ex: ${activeVisit.iso}',
                                             counterText: '',
-                                            prefixIcon: const Icon(Icons.qr_code, size: 18),
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                            prefixIcon: Icon(Icons.qr_code, size: widget.isFullScreen ? 16 : 18),
+                                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 6 : 12),
                                           ),
                                           maxLength: 4,
                                           textCapitalization: TextCapitalization.characters,
@@ -3612,10 +3643,11 @@ class _ExitScreenState extends State<ExitScreen> {
                                           borderRadius: BorderRadius.circular(11),
                                           child: InputDecorator(
                                             decoration: InputDecoration(
+                                              isDense: true,
                                               labelText: isTwin ? 'Armateur 1 *' : 'Armateur *',
-                                              prefixIcon: const Icon(Icons.business, size: 18),
-                                              suffixIcon: const Icon(Icons.arrow_drop_down, size: 20),
-                                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                              prefixIcon: Icon(Icons.business, size: widget.isFullScreen ? 16 : 18),
+                                              suffixIcon: Icon(Icons.arrow_drop_down, size: widget.isFullScreen ? 18 : 20),
+                                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 6 : 12),
                                             ),
                                             child: Text(
                                               operator1 == null ? (isTwin ? 'Armateur Conteneur 1 *' : 'Choisir armateur *') : '${operator1!.name} (${operator1!.id})',
@@ -3666,12 +3698,14 @@ class _ExitScreenState extends State<ExitScreen> {
                                             controller: iso2Controller,
                                             focusNode: iso2Focus,
                                             textInputAction: TextInputAction.next,
-                                            decoration: const InputDecoration(
+                                            style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
+                                            decoration: InputDecoration(
+                                              isDense: true,
                                               labelText: 'Code ISO 2 *',
                                               hintText: 'Ex: 22G1',
                                               counterText: '',
-                                              prefixIcon: Icon(Icons.qr_code, size: 18),
-                                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                              prefixIcon: Icon(Icons.qr_code, size: widget.isFullScreen ? 16 : 18),
+                                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 6 : 12),
                                             ),
                                             maxLength: 4,
                                             textCapitalization: TextCapitalization.characters,
@@ -3693,11 +3727,12 @@ class _ExitScreenState extends State<ExitScreen> {
                                             onTap: () => pickOperator(forSecond: true),
                                             borderRadius: BorderRadius.circular(11),
                                             child: InputDecorator(
-                                              decoration: const InputDecoration(
+                                              decoration: InputDecoration(
+                                                isDense: true,
                                                 labelText: 'Armateur 2 *',
-                                                prefixIcon: Icon(Icons.business, size: 18),
-                                                suffixIcon: Icon(Icons.arrow_drop_down, size: 20),
-                                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                                                prefixIcon: Icon(Icons.business, size: widget.isFullScreen ? 16 : 18),
+                                                suffixIcon: Icon(Icons.arrow_drop_down, size: widget.isFullScreen ? 18 : 20),
+                                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 6 : 12),
                                               ),
                                               child: Text(
                                                 operator2 == null ? 'Armateur Conteneur 2 *' : '${operator2!.name} (${operator2!.id})',
@@ -3792,7 +3827,10 @@ class _ExitScreenState extends State<ExitScreen> {
             return Column(
               children: [
                 Expanded(child: listView),
-                _buildExitBottomBar(activeVisit),
+                SafeArea(
+                  top: false,
+                  child: _buildExitBottomBar(activeVisit),
+                ),
               ],
             );
           }

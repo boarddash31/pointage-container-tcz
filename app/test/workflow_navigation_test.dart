@@ -418,9 +418,10 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    // Redundant titles are hidden in mobile F11
+    // Redundant titles and input hints are hidden in mobile F11
     expect(find.text('État du camion à l’arrivée'), findsNothing);
     expect(find.textContaining('Glissez pour changer de mode'), findsNothing);
+    expect(find.text('4 lettres + 7 chiffres, avec chiffre de contrôle'), findsNothing);
 
     // Plaque and CIN are pinned at top in mobile F11
     expect(find.widgetWithText(TextFormField, 'Plaque camion *'), findsOneWidget);
@@ -462,6 +463,7 @@ void main() {
     expect(find.byKey(const ValueKey('mobile-f11-exit-submit-btn')), findsOneWidget);
     expect(find.byKey(const ValueKey('mobile-f11-exit-print-btn')), findsOneWidget);
     expect(find.text('F11'), findsOneWidget);
+    expect(find.text('4 lettres + 7 chiffres, avec chiffre de contrôle'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
