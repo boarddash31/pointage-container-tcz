@@ -86,10 +86,8 @@ export default {
 
     // 3. Fallback to static assets
     if (env && env.ASSETS) {
-      if (url.pathname === '/dashboard' || url.pathname === '/admin') {
-        const dashboardUrl = new URL('/dashboard.html', request.url);
-        return env.ASSETS.fetch(new Request(dashboardUrl, request));
-      }
+      // Let Pages clean URLs map /dashboard to dashboard.html. Rewriting it
+      // here loops because the asset layer redirects dashboard.html back.
       return env.ASSETS.fetch(request);
     }
 

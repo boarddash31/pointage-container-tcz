@@ -3,18 +3,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pointage_container/main.dart';
 
 void main() {
-  testWidgets('login starts blank and does not expose one-click credentials', (tester) async {
+  testWidgets('quick role buttons select an account but never fill its password', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
 
     final emailField = find.widgetWithText(TextField, 'Numéro de téléphone ou e-mail');
     final passwordField = find.widgetWithText(TextField, 'Mot de passe');
     expect(tester.widget<TextField>(emailField).controller!.text, isEmpty);
     expect(tester.widget<TextField>(passwordField).controller!.text, isEmpty);
-    expect(find.text('Admin 1-clic'), findsNothing);
-    expect(find.text('Entrée 1-clic'), findsNothing);
-    expect(find.text('Sortie 1-clic'), findsNothing);
-    expect(find.text('AdminTCZ2026!'), findsNothing);
-    expect(find.text('dahhaknouamane@gmail.com'), findsNothing);
+    for (final profile in [
+      ('admin', 'dahhaknouamane@gmail.com'),
+      ('entrée', 'dahhaknouamane+tcz-entree@gmail.com'),
+      ('sortie', 'dahhaknouamane+tcz-sortie@gmail.com'),
+    ]) {
+      await tester.tap(find.byKey(ValueKey('quick-profile-${profile.$1}')));
+      await tester.pump();
+      expect(tester.widget<TextField>(emailField).controller!.text, profile.$2);
+      expect(tester.widget<TextField>(passwordField).controller!.text, isEmpty);
+    }
     expect(find.text('Télécharger l’APK Android'), findsNothing);
   });
 

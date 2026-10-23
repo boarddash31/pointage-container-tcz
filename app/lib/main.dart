@@ -144,8 +144,28 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final email = TextEditingController(), password = TextEditingController();
   final passwordFocus = FocusNode();
+  String? selectedProfile;
   bool obscurePassword = false;
   bool busy = false; String? error, notice;
+  static const quickProfiles = [
+    ('Admin', 'dahhaknouamane@gmail.com', Icons.admin_panel_settings_rounded),
+    ('Entrée', 'dahhaknouamane+tcz-entree@gmail.com', Icons.login_rounded),
+    ('Sortie', 'dahhaknouamane+tcz-sortie@gmail.com', Icons.logout_rounded),
+  ];
+
+  void chooseProfile(String label, String address) {
+    setState(() {
+      selectedProfile = label;
+      email.value = TextEditingValue(
+        text: address,
+        selection: TextSelection.collapsed(offset: address.length),
+      );
+      password.clear();
+      error = null;
+      notice = null;
+    });
+    FocusScope.of(context).requestFocus(passwordFocus);
+  }
 
   @override void dispose() { email.dispose(); password.dispose(); passwordFocus.dispose(); super.dispose(); }
   Future<void> signIn() async {
@@ -221,15 +241,50 @@ class _LoginScreenState extends State<LoginScreen> {
       const Text('Terminal TCZ · Connexion agent',textAlign:TextAlign.center),
       const SizedBox(height:20),
 
+      Row(
+        children: [
+          for (var i = 0; i < quickProfiles.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.tonal(
+                key: ValueKey('quick-profile-${quickProfiles[i].$1.toLowerCase()}'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: selectedProfile == quickProfiles[i].$1
+                      ? const Color(0xffcdebf1)
+                      : const Color(0xffeef5f8),
+                  foregroundColor: const Color(0xff063e66),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: busy ? null : () => chooseProfile(
+                  quickProfiles[i].$1, quickProfiles[i].$2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(quickProfiles[i].$3, size: 17),
+                    const SizedBox(width: 5),
+                    Flexible(child: Text(quickProfiles[i].$1,
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+      const SizedBox(height:14),
+
       Column(children:[
         TextField(controller:email,keyboardType:TextInputType.text,
+          onChanged:(_){if(selectedProfile!=null)setState(()=>selectedProfile=null);},
           decoration:const InputDecoration(
             labelText:'Numéro de téléphone ou e-mail',
             hintText:'Ex: 0661998877 ou agent@tcz.ma',
             prefixIcon:Icon(Icons.person_pin_rounded,size:20),
           )),
         const SizedBox(height:12),
-        TextField(controller:password,
+        TextField(controller:password,focusNode:passwordFocus,
           obscureText:obscurePassword,onSubmitted:(_)=>signIn(),
           decoration:InputDecoration(
             labelText:'Mot de passe',
