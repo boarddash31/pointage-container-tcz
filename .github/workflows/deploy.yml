@@ -24,10 +24,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: ${{ vars.CLOUDFLARE_PROJECT_NAME || 'pointage-container-tcz' }}
-          directory: site
+          wranglerVersion: '4.151.3'
+          command: pages deploy site --project-name pointage-container-tcz --branch main --commit-dirty=true
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
