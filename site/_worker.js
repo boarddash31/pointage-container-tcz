@@ -31,13 +31,14 @@ export default {
       const body = (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH')
         ? await request.text()
         : null;
+      const authorization = request.headers.get('Authorization') || `Bearer ${SUPABASE_ANON_KEY}`;
 
       try {
         const originRes = await fetch(targetUrl, {
           method: request.method,
           headers: {
             'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Authorization': authorization,
             'Content-Type': 'application/json'
           },
           body

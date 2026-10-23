@@ -1,0 +1,3 @@
+-- Historical migration already applied to Supabase through the SQL editor.
+-- Its admin-only agent-directory behavior is captured in the canonical function
+-- definition in 20261023100000_secure_admin_dashboard_and_groupage.sql.

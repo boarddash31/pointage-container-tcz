@@ -11,9 +11,12 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase Auth shares its browser session with the Flutter web app. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    body:not(.dashboard-authenticated) > :not(#adminAuthGate) { visibility: hidden; }
     .mono { font-family: 'JetBrains Mono', monospace; }
     .bg-tcz-navy { background-color: #063e66; }
     .text-tcz-navy { color: #063e66; }
@@ -63,6 +66,27 @@
 </head>
 <body class="h-full flex flex-col text-slate-800">
 
+  <!-- Admin-only gate. Existing signed-in TCZ admins pass through with their saved device session. -->
+  <div id="adminAuthGate" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+    <section class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+      <div class="mb-5 flex items-center gap-3">
+        <div class="rounded-xl bg-sky-100 p-3 text-[#063e66]"><i data-lucide="shield-check" class="h-6 w-6"></i></div>
+        <div><h2 class="text-lg font-extrabold text-slate-900">Connexion Administration</h2><p class="text-xs text-slate-500">Session sécurisée sur cet appareil</p></div>
+      </div>
+      <form id="adminLoginForm" onsubmit="handleAdminLogin(event)" class="space-y-3">
+        <label class="block text-xs font-bold text-slate-700">E-mail ou identifiant
+          <input id="adminLoginEmail" autocomplete="username" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </label>
+        <label class="block text-xs font-bold text-slate-700">Mot de passe
+          <input id="adminLoginPassword" type="password" autocomplete="current-password" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
+        </label>
+        <p id="adminAuthError" class="hidden rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs font-semibold text-rose-700"></p>
+        <button id="adminLoginButton" type="submit" class="w-full rounded-lg bg-[#063e66] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#08527a] disabled:opacity-60">Se connecter</button>
+      </form>
+      <p id="adminSessionHint" class="mt-4 text-center text-[11px] leading-relaxed text-slate-500">Après la première connexion, la session reste enregistrée sur cet appareil. Déconnectez-vous sur un appareil partagé.</p>
+    </section>
+  </div>
+
   <!-- TOP APP BAR -->
   <header class="bg-[#063e66] text-white shadow-md sticky top-0 z-30">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -105,6 +129,10 @@
         </button>
 
         <!-- Open Gate App -->
+        <div id="adminSessionControl" class="hidden items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] text-white">
+          <span id="adminSessionEmail" class="max-w-40 truncate"></span>
+          <button type="button" onclick="signOutAdminDashboard()" class="rounded bg-white/10 px-2 py-1 font-bold hover:bg-white/20">Déconnexion</button>
+        </div>
         <a href="/" target="_blank" class="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition shadow-sm">
           <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
           <span>App Pointage Gate</span>
@@ -167,7 +195,7 @@
         <i data-lucide="shield-check" class="w-5 h-5 text-amber-600"></i>
         <div>
           <span class="font-bold text-amber-900 block">Autorisation Superviseur Active</span>
-          <span class="text-[11px] text-amber-700">Code PIN : <strong class="mono text-amber-900 bg-white px-1.5 py-0.5 rounded border border-amber-300">01010909</strong> (Annulations & Gestion agents)</span>
+          <span class="text-[11px] text-amber-700">Annulations et gestion des agents réservées aux administrateurs</span>
         </div>
       </div>
     </div>
@@ -229,7 +257,7 @@
           <div class="text-3xl font-extrabold text-rose-700 mono group-hover:scale-105 transition" id="kpiCancellationsToday">--</div>
           <span class="text-[11px] text-slate-500 font-medium">Sorties sans dépose</span>
         </div>
-        <div class="text-[10px] text-rose-600 font-semibold">Code 01010909 · Voir liste</div>
+        <div class="text-[10px] text-rose-600 font-semibold">Voir la liste des annulations</div>
       </div>
 
       <!-- 5. Attente Engin -->
@@ -390,152 +418,52 @@
     </div> <!-- /#section_flux -->
 
     <!-- TAB 2: GROUPAGE CLIENTS & ARMATEURS (DRAG & DROP STUDIO) -->
-    <div id="section_groupage" class="hidden space-y-6">
-
-      <!-- Header Banner -->
-      <div class="bg-gradient-to-r from-[#063e66] via-[#08527a] to-[#087e79] p-6 rounded-3xl text-white shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div class="space-y-1">
-          <div class="flex items-center space-x-2">
-            <span class="bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full tracking-wider">
-              Studio Interactif Drag & Drop
-            </span>
-            <span class="text-xs text-sky-200">Terminal Conteneur Zenata</span>
-          </div>
-          <h2 class="text-xl font-black tracking-tight text-white flex items-center gap-2">
-            <i data-lucide="layers" class="w-6 h-6 text-emerald-400"></i>
-            Groupage Clients & Armateurs Maritimes
-          </h2>
-          <p class="text-xs text-slate-200 max-w-2xl">
-            Glissez-déposez les armateurs maritimes du catalogue vers les dossiers clients pour gérer les affectations de groupage, transit et facturation.
-          </p>
+    <div id="section_groupage" class="hidden space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#063e66] px-3 py-2 text-white shadow-sm">
+        <div class="flex min-w-0 items-center gap-2">
+          <i data-lucide="layers" class="h-5 w-5 shrink-0 text-emerald-300"></i>
+          <h2 class="truncate text-sm font-extrabold">Clients & Armateurs</h2>
+          <span class="hidden sm:inline text-[10px] text-sky-200">Liez les lignes maritimes aux clients par glisser-déposer</span>
         </div>
-
-        <div class="flex items-center space-x-3 shrink-0">
-          <button type="button" onclick="openNewClientModal()" class="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-extrabold px-4 py-2.5 rounded-xl text-xs transition shadow-md">
-            <i data-lucide="folder-plus" class="w-4 h-4"></i>
-            <span>+ Nouveau Dossier Client</span>
-          </button>
-          <button type="button" onclick="loadGroupageData()" class="flex items-center space-x-1.5 bg-white/15 hover:bg-white/25 text-white font-bold px-3.5 py-2.5 rounded-xl text-xs transition border border-white/20">
-            <i data-lucide="refresh-cw" class="w-4 h-4" id="groupageRefreshIcon"></i>
-            <span class="hidden sm:inline">Actualiser</span>
-          </button>
+        <div class="flex items-center gap-2 text-[11px] font-bold">
+          <span class="rounded-md bg-white/10 px-2 py-1">Clients <b id="statClientsCount" class="mono">0</b></span>
+          <span class="rounded-md bg-white/10 px-2 py-1">Armateurs <b id="statArmateursCount" class="mono">0</b></span>
+          <span class="hidden md:inline rounded-md bg-white/10 px-2 py-1">Liens <b id="statAssignmentsCount" class="mono">0</b></span>
+          <button type="button" onclick="openNewClientModal()" class="rounded-md bg-emerald-400 px-2.5 py-1.5 text-slate-950 hover:bg-emerald-300">+ Client</button>
+          <button type="button" onclick="loadGroupageData()" class="rounded-md border border-white/20 bg-white/10 px-2 py-1.5 hover:bg-white/20" title="Actualiser"><i data-lucide="refresh-cw" id="groupageRefreshIcon" class="h-4 w-4"></i></button>
         </div>
       </div>
 
-      <!-- Quick Metrics Strip -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center space-x-3">
-          <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-            <i data-lucide="briefcase" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <div class="text-2xl font-black text-slate-900 mono" id="statClientsCount">0</div>
-            <div class="text-[11px] text-slate-500 font-semibold">Clients / Transitaires</div>
-          </div>
-        </div>
+      <div id="groupageAlert" class="hidden rounded-lg border p-2 text-xs font-bold"></div>
 
-        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center space-x-3">
-          <div class="p-3 bg-sky-50 text-sky-600 rounded-xl">
-            <i data-lucide="ship" class="w-5 h-5"></i>
+      <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
+        <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:col-span-4">
+          <div class="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-2.5 py-2">
+            <div class="flex items-center gap-2"><i data-lucide="anchor" class="h-4 w-4 text-sky-700"></i><h3 class="text-xs font-extrabold">Catalogue armateurs</h3><span id="armateursCatalogCount" class="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">0</span></div>
+            <input type="search" id="searchArmateurCatalog" oninput="filterArmateursCatalog()" placeholder="Filtrer…" class="w-32 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] outline-none focus:border-sky-600">
           </div>
-          <div>
-            <div class="text-2xl font-black text-slate-900 mono" id="statArmateursCount">0</div>
-            <div class="text-[11px] text-slate-500 font-semibold">Armateurs au Catalogue</div>
+          <div class="max-h-[68vh] overflow-auto">
+            <table class="w-full min-w-[350px] border-collapse text-left text-[11px]">
+              <thead class="sticky top-0 z-10 bg-slate-100 text-[10px] uppercase text-slate-500"><tr><th class="w-6 px-1.5 py-1.5"></th><th class="px-1.5 py-1.5">Armateur</th><th class="px-1.5 py-1.5">Code</th><th class="w-8 px-1 py-1.5">+</th></tr></thead>
+              <tbody id="armateursCatalogList"><tr><td colspan="4" class="px-2 py-5 text-center text-slate-400">Chargement…</td></tr></tbody>
+            </table>
           </div>
-        </div>
+          <div class="border-t border-slate-100 px-2 py-1 text-[10px] text-slate-400">Attrapez la poignée ⋮⋮ et déposez sur un client. Sur mobile, utilisez +.</div>
+        </section>
 
-        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center space-x-3">
-          <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-            <i data-lucide="link-2" class="w-5 h-5"></i>
+        <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm xl:col-span-8">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-2.5 py-2">
+            <div class="flex items-center gap-2"><i data-lucide="briefcase" class="h-4 w-4 text-indigo-700"></i><h3 class="text-xs font-extrabold">Clients / Transitaires</h3></div>
+            <input type="search" id="searchClientsFilter" oninput="filterClientsGroupage()" placeholder="Filtrer client, code ou armateur…" class="w-56 max-w-full rounded border border-slate-300 bg-white px-2 py-1 text-[11px] outline-none focus:border-indigo-600">
           </div>
-          <div>
-            <div class="text-2xl font-black text-slate-900 mono" id="statAssignmentsCount">0</div>
-            <div class="text-[11px] text-slate-500 font-semibold">Affectations Actives</div>
+          <div class="max-h-[68vh] overflow-auto">
+            <table class="w-full min-w-[620px] border-collapse text-left text-[11px]">
+              <thead class="sticky top-0 z-10 bg-slate-100 text-[10px] uppercase text-slate-500"><tr><th class="w-24 px-2 py-1.5">Code</th><th class="w-48 px-2 py-1.5">Client</th><th class="px-2 py-1.5">Armateurs associés · zone de dépôt</th><th class="w-44 px-2 py-1.5">Affecter / supprimer</th></tr></thead>
+              <tbody id="clientsGroupageGrid"><tr><td colspan="4" class="px-2 py-5 text-center text-slate-400">Chargement…</td></tr></tbody>
+            </table>
           </div>
-        </div>
-
-        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center space-x-3">
-          <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
-            <i data-lucide="mouse-pointer" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <div class="text-xs font-black text-slate-800">Glisser-Déposer</div>
-            <div class="text-[11px] text-slate-500">Drag & Drop Instantané</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Studio Alert Toast -->
-      <div id="groupageAlert" class="hidden p-4 rounded-2xl text-xs font-bold border transition-all"></div>
-
-      <!-- MAIN WORKSPACE: CATALOGUE (LEFT) + DROP ZONES (RIGHT) -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
-        <!-- LEFT COLUMN: ARMATURES CATALOGUE (4 cols) -->
-        <div class="lg:col-span-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4 lg:sticky lg:top-20">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div class="flex items-center space-x-2">
-              <div class="p-2 bg-sky-50 text-sky-700 rounded-lg">
-                <i data-lucide="anchor" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <h3 class="text-sm font-black text-slate-800">Catalogue des Armateurs</h3>
-                <p class="text-[11px] text-slate-400">Prenez une carte et glissez-la</p>
-              </div>
-            </div>
-            <span class="mono text-xs font-black bg-sky-100 text-sky-800 px-2 py-0.5 rounded-lg" id="armateursCatalogCount">0</span>
-          </div>
-
-          <!-- Search Catalog -->
-          <div class="relative">
-            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
-            <input type="text" id="searchArmateurCatalog" oninput="filterArmateursCatalog()" placeholder="Rechercher armateur (ex: CMA, MSC, MAE)..." class="w-full text-xs pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50/50">
-          </div>
-
-          <!-- Drag instruction box -->
-          <div class="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl text-[11px] text-indigo-900 flex items-center gap-2">
-            <i data-lucide="grip-vertical" class="w-4 h-4 text-indigo-500 shrink-0"></i>
-            <span>Cliquez et maintenez pour <strong>glisser l'armateur</strong> vers la carte du client à droite.</span>
-          </div>
-
-          <!-- Draggable Armateurs List -->
-          <div id="armateursCatalogList" class="space-y-2 max-h-[580px] overflow-y-auto pr-1">
-            <div class="text-center py-10 text-slate-400 text-xs">
-              <i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto mb-2 text-slate-300"></i>
-              Chargement du catalogue...
-            </div>
-          </div>
-        </div>
-
-        <!-- RIGHT COLUMN: CLIENTS & DROP ZONES (8 cols) -->
-        <div class="lg:col-span-8 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div class="flex items-center space-x-2">
-              <div class="p-2 bg-indigo-50 text-indigo-700 rounded-xl">
-                <i data-lucide="briefcase" class="w-5 h-5"></i>
-              </div>
-              <div>
-                <h3 class="text-sm font-black text-slate-800">Dossiers Groupage Clients / Transitaires</h3>
-                <p class="text-[11px] text-slate-400">Déposez les armateurs maritimes dans les zones ci-dessous</p>
-              </div>
-            </div>
-
-            <!-- Client search filter -->
-            <div class="relative w-full sm:w-64">
-              <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
-              <input type="text" id="searchClientsFilter" oninput="filterClientsGroupage()" placeholder="Filtrer client ou code..." class="w-full text-xs pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-            </div>
-          </div>
-
-          <!-- Clients Cards Grid -->
-          <div id="clientsGroupageGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="col-span-full text-center py-12 text-slate-400 text-xs">
-              <i data-lucide="loader" class="w-6 h-6 animate-spin mx-auto mb-2 text-slate-300"></i>
-              Chargement des dossiers clients...
-            </div>
-          </div>
-        </div>
-
+          <div class="border-t border-slate-100 px-2 py-1 text-[10px] text-slate-400">Vue compacte type tableur · utilisez la recherche pour retrouver rapidement une ligne.</div>
+        </section>
       </div>
     </div> <!-- /#section_groupage -->
 
@@ -903,11 +831,127 @@
   <script>
     const SUPABASE_URL = 'https://iparzfqxopcvwqelxlad.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwYXJ6ZnF4b3BjdndxZWx4bGFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTE3MjMsImV4cCI6MjEwNzk4NzcyM30.3hCnAHLQ8KRNRmaXCAMO8POWIRrjdeqMtqs8EavIbBs';
-    const SUPERVISOR_PIN = '01010909';
+    const dashboardAuth = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+    let activeDashboardSession = null;
+    let dashboardReady = false;
 
     let hourlyChartInstance = null;
     let armateurChartInstance = null;
     let rawVisitsData = [];
+
+    function setAdminGateMessage(message, isError = true) {
+      const box = document.getElementById('adminAuthError');
+      if (!box) return;
+      box.textContent = message || '';
+      box.classList.toggle('hidden', !message);
+      box.classList.toggle('border-rose-200', isError);
+      box.classList.toggle('bg-rose-50', isError);
+      box.classList.toggle('text-rose-700', isError);
+    }
+
+    async function enterDashboardWithSession(session) {
+      if (!session?.user || !dashboardAuth) return false;
+      const { data: roles, error: roleError } = await dashboardAuth
+        .from('user_roles').select('role').eq('user_id', session.user.id);
+      if (roleError) throw roleError;
+      if (!(roles || []).some(item => item.role === 'admin')) {
+        setAdminGateMessage('Ce compte n’a pas le rôle Administrateur. Connectez-vous avec le compte Admin TCZ.');
+        return false;
+      }
+      activeDashboardSession = session;
+      document.body.classList.add('dashboard-authenticated');
+      document.getElementById('adminAuthGate')?.classList.add('hidden');
+      const control = document.getElementById('adminSessionControl');
+      if (control) control.classList.remove('hidden');
+      const email = document.getElementById('adminSessionEmail');
+      if (email) email.textContent = session.user.email || session.user.phone || 'Admin TCZ';
+      if (!dashboardReady) {
+        dashboardReady = true;
+        setToday();
+        const hash = (window.location.hash || '').replace('#', '');
+        switchMainTab(['groupage', 'agents', 'flux'].includes(hash) ? hash : 'flux');
+        if (window.lucide) lucide.createIcons();
+      }
+      return true;
+    }
+
+    async function initializeAdminDashboard() {
+      if (!dashboardAuth) {
+        setAdminGateMessage('Le module de connexion ne se charge pas. Actualisez la page ou vérifiez la connexion Internet.');
+        return;
+      }
+      try {
+        const { data, error } = await dashboardAuth.auth.getSession();
+        if (error) throw error;
+        if (!data.session) return;
+        await enterDashboardWithSession(data.session);
+      } catch (err) {
+        setAdminGateMessage('Session Admin à vérifier. Connectez-vous de nouveau.');
+      }
+    }
+
+    async function handleAdminLogin(event) {
+      event.preventDefault();
+      if (!dashboardAuth) {
+        setAdminGateMessage('Le module de connexion est indisponible. Actualisez la page.');
+        return;
+      }
+      const button = document.getElementById('adminLoginButton');
+      const rawLogin = document.getElementById('adminLoginEmail').value.trim();
+      const password = document.getElementById('adminLoginPassword').value;
+      const login = rawLogin.includes('@') ? rawLogin : `${rawLogin.replace(/\D/g, '')}@tcz.local`;
+      button.disabled = true;
+      button.textContent = 'Connexion…';
+      setAdminGateMessage('');
+      try {
+        const { data, error } = await dashboardAuth.auth.signInWithPassword({ email: login, password });
+        if (error) throw error;
+        await enterDashboardWithSession(data.session);
+        document.getElementById('adminLoginPassword').value = '';
+      } catch (err) {
+        setAdminGateMessage(err?.message || 'Connexion refusée. Vérifiez vos identifiants.');
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Se connecter';
+      }
+    }
+
+    async function signOutAdminDashboard() {
+      await dashboardAuth?.auth.signOut();
+      activeDashboardSession = null;
+      dashboardReady = false;
+      document.body.classList.remove('dashboard-authenticated');
+      document.getElementById('adminSessionControl')?.classList.add('hidden');
+      document.getElementById('adminAuthGate')?.classList.remove('hidden');
+      setAdminGateMessage('Session terminée sur cet appareil.', false);
+    }
+
+    dashboardAuth?.auth.onAuthStateChange((event, session) => {
+      activeDashboardSession = session;
+      if (event === 'SIGNED_OUT') {
+        dashboardReady = false;
+        document.body.classList.remove('dashboard-authenticated');
+        document.getElementById('adminSessionControl')?.classList.add('hidden');
+        document.getElementById('adminAuthGate')?.classList.remove('hidden');
+      }
+    });
+
+    async function dashboardAuthHeaders() {
+      if (!dashboardAuth) throw new Error('Service de connexion indisponible.');
+      const { data, error } = await dashboardAuth.auth.getSession();
+      if (error || !data.session) {
+        document.getElementById('adminAuthGate')?.classList.remove('hidden');
+        throw new Error('Session expirée. Connectez-vous pour continuer.');
+      }
+      activeDashboardSession = data.session;
+      return {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${data.session.access_token}`,
+        'Content-Type': 'application/json'
+      };
+    }
 
     // Initialize date picker to today
     function setToday() {
@@ -938,12 +982,13 @@
     // Supabase / Local / Cloudflare Bridge RPC Caller
     async function callRpc(fnName, params = {}) {
       let lastError = null;
+      const authHeaders = await dashboardAuthHeaders();
 
       // 1. Try same-origin /api/rpc/ first (works on localhost, Cloudflare Worker & Netlify, bypasses corporate proxy 416 blocks)
       try {
         const localRes = await fetch(`/api/rpc/${fnName}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify(params)
         });
         if (localRes.ok) {
@@ -962,11 +1007,7 @@
       try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
           method: 'POST',
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json'
-          },
+          headers: authHeaders,
           body: JSON.stringify(params)
         });
         if (res.ok) {
@@ -984,12 +1025,10 @@
 
     // Direct Supabase Query
     async function queryTable(table, queryParams = '') {
+      const authHeaders = await dashboardAuthHeaders();
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${queryParams}`, {
         method: 'GET',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json'
-        }
+        headers: authHeaders
       });
       if (!res.ok) {
         const errText = await res.text();
@@ -1295,8 +1334,7 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
           p_last_name: lastName,
           p_role: role,
           p_password: password,
-          p_active: active,
-          p_admin_code: SUPERVISOR_PIN
+          p_active: active
         });
 
         alertBox.className = 'p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 block';
@@ -1343,8 +1381,7 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
           p_last_name: lastName,
           p_role: role,
           p_password: password,
-          p_avatar_url: avatarUrl,
-          p_admin_code: SUPERVISOR_PIN
+          p_avatar_url: avatarUrl
         });
 
         alertBox.className = 'p-3.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border-emerald-200 block';
@@ -1532,7 +1569,7 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
           exitCol = `<div class="mono font-semibold text-slate-700 flex items-center">${exited} ${durationStr}</div>`;
         } else if (v.status === 'ANNULE') {
           const cancelTime = v.canceled_at || v.exited_at ? new Date(v.canceled_at || v.exited_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-          const reason = v.cancel_reason || 'Sortie sans décharge (Code 01010909)';
+          const reason = v.cancel_reason || 'Sortie sans décharge';
           exitCol = `
             <div class="space-y-0.5">
               <div class="text-rose-700 font-bold text-[11px] flex items-center gap-1">
@@ -1626,7 +1663,7 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
         reportSubtitle = 'Visites clôturées avec bons de sortie délivrés';
       } else if (currentVisitFilter === 'ANNULE') {
         reportTitle = 'RAPPORT DES VISITES ANNULÉES (SORTIES SANS DÉCHARGE)';
-        reportSubtitle = 'Camions sortis sans dépose de conteneur (Code superviseur 01010909)';
+        reportSubtitle = 'Camions sortis sans dépose de conteneur';
       }
 
       // Filter summary counts
@@ -1682,7 +1719,7 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
             exitStr = `${exited}${dur}`;
           } else if (v.status === 'ANNULE') {
             const cancelTime = v.canceled_at || v.exited_at ? new Date(v.canceled_at || v.exited_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
-            const reason = v.cancel_reason || 'Sortie sans décharge (01010909)';
+            const reason = v.cancel_reason || 'Sortie sans décharge';
             exitStr = `ANNULÉ ${cancelTime ? 'à ' + cancelTime + ' : ' : ': '}${reason}`;
           }
 
@@ -2030,65 +2067,29 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
       if (elAssignments) elAssignments.textContent = totalAssignments;
     }
 
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
     function renderArmateursCatalog(filterText = '') {
       const container = document.getElementById('armateursCatalogList');
       if (!container) return;
-
       const q = (filterText || document.getElementById('searchArmateurCatalog')?.value || '').toLowerCase().trim();
-      const filtered = groupageArmateurs.filter(a => {
-        if (!q) return true;
-        return (a.name || '').toLowerCase().includes(q) ||
-               (a.id || '').toLowerCase().includes(q) ||
-               (a.bic || '').toLowerCase().includes(q);
-      });
-
-      if (filtered.length === 0) {
-        container.innerHTML = `
-          <div class="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200">
-            Aucun armateur ne correspond à "<strong>${q}</strong>"
-          </div>
-        `;
+      const filtered = groupageArmateurs.filter(a => !q || [a.name, a.id, a.bic].some(v => String(v || '').toLowerCase().includes(q)));
+      if (!filtered.length) {
+        container.innerHTML = `<tr><td colspan="4" class="px-2 py-5 text-center text-slate-400">Aucun armateur trouvé${q ? ` pour « ${escapeHtml(q)} »` : ''}.</td></tr>`;
         return;
       }
-
-      container.innerHTML = filtered.map(a => {
-        const bicTag = a.bic ? `<span class="mono text-[10px] bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded font-bold border border-sky-200">${a.bic}</span>` : '';
-        return `
-          <div
-            id="armateurCard_${a.id}"
-            draggable="true"
-            ondragstart="handleArmateurDragStart(event, '${a.id}')"
-            ondragend="handleArmateurDragEnd(event, '${a.id}')"
-            class="armateur-drag-card bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-indigo-400 hover:shadow-md transition-all flex items-center justify-between group cursor-grab active:cursor-grabbing"
-            title="Glissez vers un dossier client ou cliquez sur le bouton +"
-          >
-            <div class="flex items-center space-x-2.5 min-w-0">
-              <div class="text-slate-300 group-hover:text-indigo-500 transition">
-                <i data-lucide="grip-vertical" class="w-4 h-4"></i>
-              </div>
-              <div class="min-w-0">
-                <div class="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-900 transition flex items-center gap-1.5">
-                  <span>${a.name || a.id}</span>
-                  ${bicTag}
-                </div>
-                <div class="text-[10px] text-slate-400 mono">Code: ${a.id}</div>
-              </div>
-            </div>
-
-            <div class="flex items-center space-x-1 shrink-0">
-              <button
-                type="button"
-                onclick="openQuickAssignModal('${a.id}', '${(a.name || a.id).replace(/'/g, "\\'")}', '${a.bic || a.id}')"
-                class="opacity-70 group-hover:opacity-100 p-1 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
-                title="Affecter à un client"
-              >
-                <i data-lucide="plus-circle" class="w-4 h-4"></i>
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('');
-
+      container.innerHTML = filtered.map(a => `
+        <tr id="armateurCard_${escapeHtml(a.id)}" draggable="true"
+          ondragstart="handleArmateurDragStart(event, '${escapeHtml(a.id)}')"
+          ondragend="handleArmateurDragEnd(event, '${escapeHtml(a.id)}')"
+          class="armateur-drag-card border-b border-slate-100 hover:bg-sky-50/70" title="Glissez cette ligne sur un client">
+          <td class="cursor-grab px-1.5 py-1 text-slate-400"><i data-lucide="grip-vertical" class="h-3.5 w-3.5"></i></td>
+          <td class="max-w-40 truncate px-1.5 py-1 font-semibold text-slate-800" title="${escapeHtml(a.name || a.id)}">${escapeHtml(a.name || a.id)}</td>
+          <td class="px-1.5 py-1 font-mono text-[10px] text-slate-500">${escapeHtml(a.bic || a.id)}</td>
+          <td class="px-1 py-1"><button type="button" onclick="openQuickAssignForArmateur('${escapeHtml(a.id)}')" class="rounded px-1.5 py-1 font-bold text-indigo-700 hover:bg-indigo-50" title="Affecter">+</button></td>
+        </tr>`).join('');
       if (window.lucide) lucide.createIcons();
     }
 
@@ -2100,112 +2101,29 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
     function renderClientsGroupageGrid(filterText = '') {
       const grid = document.getElementById('clientsGroupageGrid');
       if (!grid) return;
-
       const q = (filterText || document.getElementById('searchClientsFilter')?.value || '').toLowerCase().trim();
-      const filtered = groupageClients.filter(c => {
-        if (!q) return true;
-        const codeMatch = (c.code || '').toLowerCase().includes(q);
-        const nameMatch = (c.name || '').toLowerCase().includes(q);
-        const armateursMatch = Array.isArray(c.armateurs) && c.armateurs.some(a =>
-          (a.name || '').toLowerCase().includes(q) || (a.id || '').toLowerCase().includes(q)
-        );
-        return codeMatch || nameMatch || armateursMatch;
-      });
-
-      if (filtered.length === 0) {
-        grid.innerHTML = `
-          <div class="col-span-full p-10 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-            Aucun dossier client trouvé pour "<strong>${q}</strong>".
-            <button onclick="openNewClientModal()" class="mt-2 block mx-auto text-indigo-600 font-bold hover:underline text-xs">+ Créer ce client</button>
-          </div>
-        `;
+      const filtered = groupageClients.filter(c => !q || [c.code, c.name, ...(c.armateurs || []).flatMap(a => [a.name, a.id, a.bic])].some(v => String(v || '').toLowerCase().includes(q)));
+      if (!filtered.length) {
+        grid.innerHTML = `<tr><td colspan="4" class="px-2 py-5 text-center text-slate-400">Aucun client trouvé${q ? ` pour « ${escapeHtml(q)} »` : ''}. <button onclick="openNewClientModal()" class="font-bold text-indigo-700">Créer un client</button></td></tr>`;
         return;
       }
-
       grid.innerHTML = filtered.map(c => {
         const armateurs = Array.isArray(c.armateurs) ? c.armateurs : [];
-        const count = armateurs.length;
-
-        const armateursChips = armateurs.map(a => `
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white text-slate-800 border border-slate-200 text-xs font-bold shadow-2xs group hover:border-rose-300 transition">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            <span class="truncate max-w-[140px]">${a.name || a.id}</span>
-            ${a.bic ? `<span class="mono text-[9px] text-slate-400 font-normal">[${a.bic}]</span>` : ''}
-            <button
-              type="button"
-              onclick="unassignArmateur('${c.id}', '${a.id}', '${(c.name || c.code).replace(/'/g, "\\'")}', '${(a.name || a.id).replace(/'/g, "\\'")}')"
-              class="text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-full w-4 h-4 flex items-center justify-center transition"
-              title="Retirer cet armateur"
-            >
-              &times;
-            </button>
-          </span>
-        `).join('');
-
-        const emptyMessage = `
-          <div class="text-center py-4 text-slate-400 text-xs w-full">
-            <i data-lucide="arrow-down-circle" class="w-5 h-5 mx-auto mb-1 text-slate-300"></i>
-            Aucun armateur associé.<br>
-            <span class="text-[11px] text-indigo-600 font-semibold">Glissez un armateur ici</span>
-          </div>
-        `;
-
-        return `
-          <div
-            id="clientCard_${c.id}"
-            class="bg-white p-4 rounded-2xl border-2 border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between space-y-3"
-          >
-            <!-- Card Header -->
-            <div class="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="mono text-xs font-black px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200/80">
-                    ${c.code}
-                  </span>
-                  <span class="text-[11px] font-bold text-slate-400">
-                    ${count} armateur${count > 1 ? 's' : ''}
-                  </span>
-                </div>
-                <h4 class="text-sm font-extrabold text-slate-900 truncate mt-1" title="${c.name}">
-                  ${c.name}
-                </h4>
-              </div>
-
-              <button
-                type="button"
-                onclick="handleDeleteClient('${c.id}', '${(c.name || c.code).replace(/'/g, "\\'")}')"
-                class="text-slate-300 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition"
-                title="Supprimer ce client"
-              >
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
-              </button>
-            </div>
-
-            <!-- Active Drop Zone -->
-            <div
-              id="dropZone_${c.id}"
-              class="drop-zone min-h-[90px] p-2.5 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/70 flex flex-wrap content-start gap-1.5 transition-all"
-              ondragover="handleClientDragOver(event, '${c.id}')"
-              ondragenter="handleClientDragEnter(event, '${c.id}')"
-              ondragleave="handleClientDragLeave(event, '${c.id}')"
-              ondrop="handleClientDrop(event, '${c.id}')"
-            >
-              ${count > 0 ? armateursChips : emptyMessage}
-            </div>
-
-            <!-- Card Footer -->
-            <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-              <span class="flex items-center gap-1">
-                <i data-lucide="shield-check" class="w-3 h-3 text-emerald-500"></i> Dossier Validé
-              </span>
-              <span class="font-medium text-indigo-600 cursor-pointer hover:underline" onclick="openQuickAssignForClient('${c.id}', '${(c.name || c.code).replace(/'/g, "\\'")}')">
-                + Associer armateur
-              </span>
-            </div>
-          </div>
-        `;
+        const chips = armateurs.map(a => `<span class="inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-900" title="${escapeHtml(a.name || a.id)} ${escapeHtml(a.bic || '')}"><span>${escapeHtml(a.name || a.id)}</span><button type="button" onclick="unassignArmateur('${c.id}','${escapeHtml(a.id)}')" class="ml-0.5 font-black text-rose-600 hover:text-rose-800" aria-label="Retirer">×</button></span>`).join('');
+        const options = groupageArmateurs.map(a => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name || a.id)} · ${escapeHtml(a.bic || a.id)}</option>`).join('');
+        return `<tr id="clientCard_${c.id}" class="border-b border-slate-100 hover:bg-slate-50">
+          <td class="px-2 py-1.5 font-mono text-[10px] font-bold text-indigo-800">${escapeHtml(c.code)}</td>
+          <td class="max-w-52 truncate px-2 py-1.5 font-semibold text-slate-800" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</td>
+          <td id="dropZone_${c.id}" class="drop-zone min-h-9 px-2 py-1.5" ondragover="handleClientDragOver(event,'${c.id}')" ondragenter="handleClientDragEnter(event,'${c.id}')" ondragleave="handleClientDragLeave(event,'${c.id}')" ondrop="handleClientDrop(event,'${c.id}')">
+            <div class="flex min-h-6 flex-wrap items-center gap-1">${chips || '<span class="text-[10px] italic text-slate-400">Déposer un armateur ici…</span>'}</div>
+          </td>
+          <td class="whitespace-nowrap px-2 py-1.5">
+            <div class="flex items-center gap-1"><select id="assignArmateur_${c.id}" class="max-w-28 rounded border border-slate-300 bg-white px-1 py-1 text-[10px]" aria-label="Choisir un armateur"><option value="">Armateur…</option>${options}</select>
+            <button type="button" onclick="assignSelectedArmateur('${c.id}')" class="rounded bg-indigo-600 px-1.5 py-1 text-[10px] font-bold text-white hover:bg-indigo-700" title="Associer">+</button>
+            <button type="button" onclick="handleDeleteClient('${c.id}')" class="rounded px-1.5 py-1 text-slate-400 hover:bg-rose-50 hover:text-rose-700" title="Supprimer le client"><i data-lucide="trash-2" class="h-3.5 w-3.5"></i></button></div>
+          </td>
+        </tr>`;
       }).join('');
-
       if (window.lucide) lucide.createIcons();
     }
 
@@ -2293,7 +2211,26 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
       }
     }
 
-    async function unassignArmateur(clientId, armateurId, clientName, armateurName) {
+    async function assignSelectedArmateur(clientId) {
+      const armateurId = document.getElementById(`assignArmateur_${clientId}`)?.value;
+      if (!armateurId) {
+        showGroupageToast('Choisissez un armateur dans la ligne du client.', 'info');
+        return;
+      }
+      await assignArmateurToClient(clientId, armateurId);
+    }
+
+    function openQuickAssignForArmateur(armateurId) {
+      const armateur = groupageArmateurs.find(a => a.id === armateurId);
+      if (!armateur) return;
+      openQuickAssignModal(armateur.id, armateur.name || armateur.id, armateur.bic || armateur.id);
+    }
+
+    async function unassignArmateur(clientId, armateurId) {
+      const client = groupageClients.find(c => c.id === clientId);
+      const armateur = (client?.armateurs || []).find(a => a.id === armateurId);
+      const clientName = client?.name || client?.code || 'Client';
+      const armateurName = armateur?.name || armateur?.id || armateurId;
       if (!confirm(`Confirmez-vous le retrait de l'armateur "${armateurName}" du dossier client "${clientName}" ?`)) {
         return;
       }
@@ -2361,7 +2298,9 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
       }
     }
 
-    async function handleDeleteClient(clientId, clientName) {
+    async function handleDeleteClient(clientId) {
+      const client = groupageClients.find(c => c.id === clientId);
+      const clientName = client?.name || client?.code || 'ce client';
       if (!confirm(`ATTENTION : Confirmez-vous la suppression définitive du dossier client "${clientName}" ? Toutes ses liaisons d'armateurs seront également supprimées.`)) {
         return;
       }
@@ -2481,21 +2420,13 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
 
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', () => {
-      setToday();
-
-      // Check hash route (#groupage, #agents, #flux)
-      const hash = (window.location.hash || '').replace('#', '');
-      if (hash === 'groupage' || hash === 'agents' || hash === 'flux') {
-        switchMainTab(hash);
-      } else {
-        switchMainTab('flux');
-      }
-
-      lucide.createIcons();
+      if (window.lucide) lucide.createIcons();
+      initializeAdminDashboard();
     });
 
     // Auto-refresh every 20 seconds
     setInterval(() => {
+      if (!dashboardReady) return;
       if (currentMainTab === 'flux') {
         loadAllData();
       } else if (currentMainTab === 'groupage') {

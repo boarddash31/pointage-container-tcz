@@ -139,3 +139,10 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 - Deployed to Cloudflare Pages. The stable `https://pointage-container-tcz.pages.dev/` URL returned HTTP 200; `/api/health` returned HTTP 200; `/downloads/pointage-tcz.apk` returned HTTP 404. Added the Cloudflare Pages deployment credentials as GitHub Actions secrets so future pushes can deploy the web files.
 - Attached `marsa.digital` to the Pages project; Cloudflare reports the domain status as `initializing`. Public DNS currently returns no records. The Cloudflare zone is active and requires registrar delegation to `arturo.ns.cloudflare.com` and `holly.ns.cloudflare.com` before the custom domain can resolve. Until then, use the stable `pages.dev` URL.
 - The legacy Netlify URL remains a separate stale deployment; Netlify previously reported exhausted operational credits. The current supported web release is the Cloudflare Pages deployment.
+
+## Admin dashboard access and compact Groupage (2026-10-23)
+
+- Secured the legacy admin dashboard with a persistent Supabase Auth session and an Admin-role check. Dashboard RPC calls now forward the signed-in access token through the Cloudflare worker; the matching SQL wrappers restrict dashboard, agent and groupage operations to authenticated Admins.
+- Replaced the oversized Groupage cards with compact searchable Armateur and Client tables. Desktop supports dragging an Armateur row onto a Client; touch/mobile also has a direct assignment control and quick-assign dialog. Assignment, removal, client creation and refresh continue to use Supabase RPCs.
+- Hid dashboard content until the Admin session is verified and removed the old supervisor PIN from the public dashboard HTML and fallback labels. Kept the source and packaged dashboard copies identical.
+- Verification: `npm run test:db` passed (lifecycle, stock, roles, RLS and 95 operators); `npm run test:bridge` passed (2 tests); both inline dashboard scripts parse; `git diff --check` is clean. Flutter was not changed; its SDK is unavailable on PATH in this shell. Live authenticated drag-and-drop still needs an Admin session to verify.

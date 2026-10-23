@@ -1,0 +1,3 @@
+-- Historical migration already applied to Supabase through the SQL editor.
+-- Its resulting admin-only account-management behavior is captured and enforced
+-- by the canonical wrappers in 20261023100000_secure_admin_dashboard_and_groupage.sql.
