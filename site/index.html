@@ -76,6 +76,22 @@
     window.tczIsFullscreen = function() {
       return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
     };
+
+    var wasFullscreenBeforePrint = false;
+    window.addEventListener('beforeprint', function() {
+      try {
+        wasFullscreenBeforePrint = window.tczIsFullscreen();
+      } catch (_) {}
+    });
+    window.addEventListener('afterprint', function() {
+      try {
+        if (wasFullscreenBeforePrint) {
+          setTimeout(function() {
+            window.tczToggleFullscreen(true);
+          }, 350);
+        }
+      } catch (_) {}
+    });
   </script>
   <style>
     /* Suppress Netlify badge and drawer */

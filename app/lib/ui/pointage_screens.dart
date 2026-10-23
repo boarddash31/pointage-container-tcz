@@ -415,7 +415,36 @@ class _EntryScreenState extends State<EntryScreen> {
       final savedContainer1 = kind == 'loaded' ? number : (booking.text.isNotEmpty ? booking.text : null);
       final savedContainer2 = isTwin ? (kind == 'loaded' ? number2 : (booking2.text.isNotEmpty ? booking2.text : null)) : null;
 
-      _lastBonBytes = outcome?.bytes;
+      Uint8List? bonBytes = outcome?.bytes;
+      if (bonBytes == null) {
+        try {
+          bonBytes = await BonPdfBuilder.buildA5(
+            document: {
+              'kind': 'ENTREE',
+              'visit_id': visitId,
+              'created_at': DateTime.now().toIso8601String(),
+            },
+            visitData: {
+              'id': visitId,
+              'plate': savedPlate,
+              'driver_cin': cin.text.trim(),
+              'entry_kind': kind,
+              'container_number': savedContainer1,
+              'iso_code': iso.trim(),
+              'armateur_id': operator?.id ?? '',
+              'entered_at': DateTime.now().toIso8601String(),
+              'is_twin': isTwin,
+              'container_number_2': savedContainer2,
+              'iso_code_2': isTwin ? iso2.trim() : null,
+              'armateur_id_2': isTwin ? (operator2?.id ?? operator?.id) : null,
+              'booking_reference_2': (isTwin && kind == 'empty') ? booking2.text.trim() : null,
+              'bookings': kind == 'empty' && booking.text.isNotEmpty ? {'reference': booking.text.trim()} : null,
+            },
+          );
+        } catch (_) {}
+      }
+
+      _lastBonBytes = bonBytes;
       _lastVisitId = visitId;
       _lastPlate = savedPlate;
 
@@ -425,12 +454,23 @@ class _EntryScreenState extends State<EntryScreen> {
         operator2=null;
         lookupHint=null;lookupHint2=null;kind='loaded';isTwin=false;iso='';iso2='';
       });
-      if(mounted && outcome?.bytes != null){
+
+      // 1. Directly trigger native browser/windows print popup
+      if (bonBytes != null) {
+        await _sendToPrinter(bonBytes, kind: 'ENTREE', visitId: visitId, plate: savedPlate);
+      }
+
+      // Re-assert fullscreen if enabled
+      if (widget.isFullScreen) {
+        FullscreenHelper.requestBrowserFullscreen();
+      }
+
+      if(mounted && bonBytes != null){
         await showDialog(
           context: context,
           barrierDismissible: false,
           builder: (_) => BonConfirmationDialog(
-            bytes: outcome!.bytes!,
+            bytes: bonBytes!,
             kind: 'ENTRÉE',
             visitId: visitId,
             plate: savedPlate,
@@ -439,10 +479,12 @@ class _EntryScreenState extends State<EntryScreen> {
             onNewTruck: () {
               if (mounted) {
                 plateFocus.requestFocus();
+                if (widget.isFullScreen) FullscreenHelper.requestBrowserFullscreen();
               }
             },
           ),
         );
+        if (widget.isFullScreen) FullscreenHelper.requestBrowserFullscreen();
       }
     }catch(e){
       if(mounted){
@@ -759,6 +801,10 @@ class _EntryScreenState extends State<EntryScreen> {
       }
     } catch (_) {
       await Printing.sharePdf(bytes: bytes, filename: '$fileName.pdf');
+    } finally {
+      if (widget.isFullScreen) {
+        FullscreenHelper.requestBrowserFullscreen();
+      }
     }
   }
 
@@ -781,7 +827,7 @@ class _EntryScreenState extends State<EntryScreen> {
             .from('truck_visits')
             .select('*,bookings(reference)')
             .eq('plate', formattedPlate)
-            .order('created_at', ascending: false)
+            .order('entered_at', ascending: false)
             .limit(1)
             .maybeSingle();
 
@@ -791,7 +837,7 @@ class _EntryScreenState extends State<EntryScreen> {
               .from('truck_visits')
               .select('*,bookings(reference)')
               .eq('plate', currentPlate)
-              .order('created_at', ascending: false)
+              .order('entered_at', ascending: false)
               .limit(1)
               .maybeSingle();
         }
@@ -801,7 +847,7 @@ class _EntryScreenState extends State<EntryScreen> {
           final candidates = await widget.repository.client
               .from('truck_visits')
               .select('*,bookings(reference)')
-              .order('created_at', ascending: false)
+              .order('entered_at', ascending: false)
               .limit(100);
           for (final c in candidates) {
             final p = (c['plate'] as String? ?? '').replaceAll(RegExp(r'[^A-Z0-9]'), '').toUpperCase();
@@ -829,7 +875,7 @@ class _EntryScreenState extends State<EntryScreen> {
           visitData = await widget.repository.client
               .from('truck_visits')
               .select('*,bookings(reference)')
-              .order('created_at', ascending: false)
+              .order('entered_at', ascending: false)
               .limit(1)
               .maybeSingle();
           if (visitData != null) {
@@ -860,7 +906,7 @@ class _EntryScreenState extends State<EntryScreen> {
           }
           if (visitData != null) {
             bytesToPrint = await BonPdfBuilder.buildA5(
-              document: {'kind': 'ENTREE', 'visit_id': targetVisitId, 'created_at': visitData['created_at']},
+              document: {'kind': 'ENTREE', 'visit_id': targetVisitId, 'created_at': visitData['entered_at'] ?? DateTime.now().toIso8601String()},
               visitData: visitData,
             );
           }
@@ -883,6 +929,11 @@ class _EntryScreenState extends State<EntryScreen> {
       // 1. Direct print / Layout print
       await _sendToPrinter(bytesToPrint, kind: 'ENTREE', visitId: targetVisitId, plate: targetPlate);
 
+      // Re-assert fullscreen if enabled
+      if (widget.isFullScreen) {
+        FullscreenHelper.requestBrowserFullscreen();
+      }
+
       // 2. Open confirmation dialog with reprint and download options
       if (mounted) {
         await showDialog(
@@ -897,10 +948,14 @@ class _EntryScreenState extends State<EntryScreen> {
             containerNumber: visitData?['container_number']?.toString() ?? visitData?['booking']?.toString(),
             containerNumber2: visitData?['container_number_2']?.toString() ?? visitData?['booking2']?.toString(),
             onNewTruck: () {
-              if (mounted) plateFocus.requestFocus();
+              if (mounted) {
+                plateFocus.requestFocus();
+                if (widget.isFullScreen) FullscreenHelper.requestBrowserFullscreen();
+              }
             },
           ),
         );
+        if (widget.isFullScreen) FullscreenHelper.requestBrowserFullscreen();
       }
     } catch (e) {
       if (mounted) message(context, 'Erreur d’impression : $e');
@@ -2235,7 +2290,34 @@ class _ExitScreenState extends State<ExitScreen> {
       if (!mounted) return;
       message(context, 'Sortie confirmée pour le camion ${visit.plate}.');
       final visitId = visit.id;
-      final pdfBytes = outcome?.bytes;
+      Uint8List? pdfBytes = outcome?.bytes;
+      if (pdfBytes == null) {
+        try {
+          pdfBytes = await BonPdfBuilder.buildA5(
+            document: {
+              'kind': 'SORTIE',
+              'visit_id': visitId,
+              'created_at': DateTime.now().toIso8601String(),
+            },
+            visitData: {
+              'id': visitId,
+              'plate': visit.plate,
+              'driver_cin': visit.cin,
+              'entry_kind': visit.entryKind,
+              'container_number': visit.container,
+              'iso_code': visit.iso,
+              'armateur_id': visit.armateur,
+              'entered_at': visit.enteredAt.toIso8601String(),
+              'is_twin': visit.isTwin,
+              'container_number_2': visit.container2,
+              'iso_code_2': visit.iso2,
+              'armateur_id_2': visit.armateur2,
+              'bookings': visit.booking != null ? {'reference': visit.booking} : null,
+            },
+          );
+        } catch (_) {}
+      }
+
       _lastExitBytes = pdfBytes;
       _lastExitVisitId = visitId;
       _lastExitPlate = visit.plate;
@@ -2246,22 +2328,35 @@ class _ExitScreenState extends State<ExitScreen> {
       });
       loadVisits();
 
+      // 1. Directly trigger native browser/windows print popup
+      if (pdfBytes != null) {
+        await _sendToPrinter(pdfBytes, kind: 'SORTIE', visitId: visitId, plate: visit.plate);
+      }
+
+      if (widget.isFullScreen) {
+        FullscreenHelper.requestBrowserFullscreen();
+      }
+
       if (mounted && pdfBytes != null) {
         await showDialog(
           context: context,
           barrierDismissible: false,
           builder: (_) => BonConfirmationDialog(
-            bytes: pdfBytes,
+            bytes: pdfBytes!,
             kind: 'SORTIE',
             visitId: visitId,
             plate: visit.plate,
             containerNumber: visit.container,
             containerNumber2: visit.container2,
             onNewTruck: () {
-              if (mounted) searchController.clear();
+              if (mounted) {
+                searchController.clear();
+                if (widget.isFullScreen) FullscreenHelper.requestBrowserFullscreen();
+              }
             },
           ),
         );
+        if (widget.isFullScreen) FullscreenHelper.requestBrowserFullscreen();
       }
     } catch (e) {
       if (mounted) message(context, 'Sortie refusée : $e');
@@ -2803,6 +2898,10 @@ class _ExitScreenState extends State<ExitScreen> {
       }
     } catch (_) {
       await Printing.sharePdf(bytes: bytes, filename: '$fileName.pdf');
+    } finally {
+      if (widget.isFullScreen) {
+        FullscreenHelper.requestBrowserFullscreen();
+      }
     }
   }
 
@@ -2830,7 +2929,7 @@ class _ExitScreenState extends State<ExitScreen> {
             .from('truck_visits')
             .select('*,bookings(reference)')
             .eq('plate', formattedPlate)
-            .order('created_at', ascending: false)
+            .order('entered_at', ascending: false)
             .limit(1)
             .maybeSingle();
 
@@ -2840,7 +2939,7 @@ class _ExitScreenState extends State<ExitScreen> {
               .from('truck_visits')
               .select('*,bookings(reference)')
               .eq('plate', currentPlate)
-              .order('created_at', ascending: false)
+              .order('entered_at', ascending: false)
               .limit(1)
               .maybeSingle();
         }
@@ -2850,7 +2949,7 @@ class _ExitScreenState extends State<ExitScreen> {
           final candidates = await widget.repository.client
               .from('truck_visits')
               .select('*,bookings(reference)')
-              .order('created_at', ascending: false)
+              .order('entered_at', ascending: false)
               .limit(100);
           for (final c in candidates) {
             final p = (c['plate'] as String? ?? '').replaceAll(RegExp(r'[^A-Z0-9]'), '').toUpperCase();
@@ -2877,7 +2976,7 @@ class _ExitScreenState extends State<ExitScreen> {
         visitData = await widget.repository.client
             .from('truck_visits')
             .select('*,bookings(reference)')
-            .order('created_at', ascending: false)
+            .order('entered_at', ascending: false)
             .limit(1)
             .maybeSingle();
         if (visitData != null) {
@@ -2915,7 +3014,7 @@ class _ExitScreenState extends State<ExitScreen> {
           }
           if (visitData != null) {
             bytesToPrint = await BonPdfBuilder.buildA5(
-              document: {'kind': targetKind, 'visit_id': targetVisitId, 'created_at': visitData['created_at']},
+              document: {'kind': targetKind, 'visit_id': targetVisitId, 'created_at': visitData['entered_at'] ?? DateTime.now().toIso8601String()},
               visitData: visitData,
             );
           }
@@ -2938,6 +3037,11 @@ class _ExitScreenState extends State<ExitScreen> {
       // 1. Direct print / Layout print
       await _sendToPrinter(bytesToPrint, kind: targetKind, visitId: targetVisitId, plate: targetPlate);
 
+      // Re-assert fullscreen if enabled
+      if (widget.isFullScreen) {
+        FullscreenHelper.requestBrowserFullscreen();
+      }
+
       // 2. Open confirmation dialog with reprint and download options
       if (mounted) {
         await showDialog(
@@ -2952,10 +3056,14 @@ class _ExitScreenState extends State<ExitScreen> {
             containerNumber: activeVisit?.container ?? visitData?['container_number']?.toString(),
             containerNumber2: activeVisit?.container2 ?? visitData?['container_number_2']?.toString(),
             onNewTruck: () {
-              if (mounted) searchController.clear();
+              if (mounted) {
+                searchController.clear();
+                if (widget.isFullScreen) FullscreenHelper.requestBrowserFullscreen();
+              }
             },
           ),
         );
+        if (widget.isFullScreen) FullscreenHelper.requestBrowserFullscreen();
       }
     } catch (e) {
       if (mounted) message(context, 'Erreur d’impression : $e');
