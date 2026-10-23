@@ -29,4 +29,13 @@ if (Test-Path "$AppPath\web\_redirects") {
 $SiteDir = 'E:\pointage_repo\site'
 if (-not (Test-Path $SiteDir)) { New-Item -ItemType Directory -Path $SiteDir -Force | Out-Null }
 Copy-Item -Path "$AppPath\build\web\*" -Destination $SiteDir -Recurse -Force
+
+# The public site is web-only. Remove files left by older APK-enabled builds.
+$downloads = Join-Path $SiteDir 'downloads'
+foreach ($name in @('pointage-tcz.apk', 'SHA256SUMS.txt')) {
+  $artifact = Join-Path $downloads $name
+  if (Test-Path -LiteralPath $artifact -PathType Leaf) {
+    Remove-Item -LiteralPath $artifact -Force
+  }
+}
 Write-Host "Successfully built and synced to $SiteDir (http://localhost:8085)"

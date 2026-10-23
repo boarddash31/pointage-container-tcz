@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/bon_pdf_builder.dart';
 import '../data/document_service.dart';
 import '../data/freepool_export.dart';
 import '../data/pointage_repository.dart';
@@ -101,7 +102,7 @@ class _EntryScreenState extends State<EntryScreen> {
   final isoController = TextEditingController();
   final iso2Controller = TextEditingController();
   String iso='', iso2='', kind='loaded';
-  bool isTwin=false, busy=false;
+  bool isTwin=false, busy=false, isPrinting=false;
   int _activeTwinIndex = 0;
   final PageController _twinPageController = PageController();
   bool _isPickerOpen=false;
@@ -762,49 +763,107 @@ class _EntryScreenState extends State<EntryScreen> {
   }
 
   Future<void> printDirectly() async {
-    if (busy) return;
-    setState(() => busy = true);
+    if (busy || isPrinting) return;
+    setState(() => isPrinting = true);
     try {
-      Uint8List? bytesToPrint = _lastBonBytes;
-      String targetPlate = _lastPlate ?? '';
-      String targetVisitId = _lastVisitId ?? '';
+      Uint8List? bytesToPrint;
+      String targetPlate = '';
+      String targetVisitId = '';
+      Map<String, dynamic>? visitData;
 
       final currentPlate = plate.text.trim();
       if (currentPlate.isNotEmpty) {
         final formattedPlate = TruckPlate.format(currentPlate);
-        if (formattedPlate != targetPlate || bytesToPrint == null) {
-          final visit = await widget.repository.client
-              .from('truck_visits')
-              .select('id,plate')
-              .eq('plate', formattedPlate)
-              .order('created_at', ascending: false)
-              .limit(1)
-              .maybeSingle();
-          if (visit != null) {
-            targetVisitId = visit['id'] as String;
-            targetPlate = visit['plate'] as String? ?? formattedPlate;
-            final docs = DocumentService(widget.repository.client);
-            bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
-          } else {
-            if (mounted) message(context, 'Aucune entrée trouvée pour le camion $formattedPlate.');
-            return;
-          }
-        }
-      } else if (bytesToPrint == null) {
-        final latestVisit = await widget.repository.client
+        final cleanInput = currentPlate.replaceAll(RegExp(r'[^A-Z0-9]'), '').toUpperCase();
+
+        // 1. Exact formatted search
+        visitData = await widget.repository.client
             .from('truck_visits')
-            .select('id,plate')
+            .select('*,bookings(reference)')
+            .eq('plate', formattedPlate)
             .order('created_at', ascending: false)
             .limit(1)
             .maybeSingle();
-        if (latestVisit != null) {
-          targetVisitId = latestVisit['id'] as String;
-          targetPlate = latestVisit['plate'] as String? ?? '';
-          final docs = DocumentService(widget.repository.client);
-          bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
+
+        // 2. Exact raw search if different
+        if (visitData == null && currentPlate != formattedPlate) {
+          visitData = await widget.repository.client
+              .from('truck_visits')
+              .select('*,bookings(reference)')
+              .eq('plate', currentPlate)
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+        }
+
+        // 3. Flexible normalized plate search in recent visits
+        if (visitData == null && cleanInput.isNotEmpty) {
+          final candidates = await widget.repository.client
+              .from('truck_visits')
+              .select('*,bookings(reference)')
+              .order('created_at', ascending: false)
+              .limit(100);
+          for (final c in candidates) {
+            final p = (c['plate'] as String? ?? '').replaceAll(RegExp(r'[^A-Z0-9]'), '').toUpperCase();
+            if (p == cleanInput || p.contains(cleanInput) || cleanInput.contains(p)) {
+              visitData = c;
+              break;
+            }
+          }
+        }
+
+        if (visitData != null) {
+          targetVisitId = visitData['id'] as String;
+          targetPlate = visitData['plate'] as String? ?? formattedPlate;
         } else {
-          if (mounted) message(context, 'Aucun bon récent. Saisissez une plaque ou enregistrez une entrée.');
+          if (mounted) message(context, 'Aucune entrée trouvée pour le camion "$currentPlate".');
           return;
+        }
+      } else {
+        // No plate typed: use last entered visit if available, or fetch latest overall
+        if (_lastVisitId != null && _lastVisitId!.isNotEmpty) {
+          targetVisitId = _lastVisitId!;
+          targetPlate = _lastPlate ?? '';
+          bytesToPrint = _lastBonBytes;
+        } else {
+          visitData = await widget.repository.client
+              .from('truck_visits')
+              .select('*,bookings(reference)')
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+          if (visitData != null) {
+            targetVisitId = visitData['id'] as String;
+            targetPlate = visitData['plate'] as String? ?? '';
+          } else {
+            if (mounted) message(context, 'Saisissez la plaque du camion pour imprimer son bon.');
+            return;
+          }
+        }
+      }
+
+      // Generate or retrieve PDF bytes
+      if (bytesToPrint == null && targetVisitId.isNotEmpty) {
+        final docs = DocumentService(widget.repository.client);
+        try {
+          bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
+        } catch (_) {}
+
+        // Fallback: build directly via BonPdfBuilder
+        if (bytesToPrint == null) {
+          if (visitData == null) {
+            visitData = await widget.repository.client
+                .from('truck_visits')
+                .select('*,bookings(reference)')
+                .eq('id', targetVisitId)
+                .maybeSingle();
+          }
+          if (visitData != null) {
+            bytesToPrint = await BonPdfBuilder.buildA5(
+              document: {'kind': 'ENTREE', 'visit_id': targetVisitId, 'created_at': visitData['created_at']},
+              visitData: visitData,
+            );
+          }
         }
       }
 
@@ -813,14 +872,40 @@ class _EntryScreenState extends State<EntryScreen> {
         return;
       }
 
+      _lastBonBytes = bytesToPrint;
+      _lastVisitId = targetVisitId;
+      _lastPlate = targetPlate;
+
       if (mounted) {
-        message(context, 'Impression directe lancée pour $targetPlate…');
+        message(context, 'Impression lancée pour $targetPlate…');
       }
+
+      // 1. Direct print / Layout print
       await _sendToPrinter(bytesToPrint, kind: 'ENTREE', visitId: targetVisitId, plate: targetPlate);
+
+      // 2. Open confirmation dialog with reprint and download options
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) => BonConfirmationDialog(
+            bytes: bytesToPrint!,
+            kind: 'ENTRÉE',
+            title: 'Bon d’Entrée · $targetPlate',
+            visitId: targetVisitId,
+            plate: targetPlate,
+            containerNumber: visitData?['container_number']?.toString() ?? visitData?['booking']?.toString(),
+            containerNumber2: visitData?['container_number_2']?.toString() ?? visitData?['booking2']?.toString(),
+            onNewTruck: () {
+              if (mounted) plateFocus.requestFocus();
+            },
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) message(context, 'Erreur d’impression : $e');
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) setState(() => isPrinting = false);
     }
   }
 
@@ -908,7 +993,7 @@ class _EntryScreenState extends State<EntryScreen> {
           InkWell(
             key: const ValueKey('mobile-f11-print-btn'),
             borderRadius: BorderRadius.circular(8),
-            onTap: busy ? null : printDirectly,
+            onTap: busy || isPrinting ? null : printDirectly,
             child: Container(
               height: 38,
               padding: const EdgeInsets.symmetric(horizontal: 7),
@@ -917,12 +1002,22 @@ class _EntryScreenState extends State<EntryScreen> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xff38bdf8), width: 1.0),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.print_rounded, size: 16, color: Colors.white),
-                  SizedBox(width: 3),
-                  Text('Print', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                  if (isPrinting) ...[
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text('Print…', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                  ] else ...[
+                    const Icon(Icons.print_rounded, size: 16, color: Colors.white),
+                    const SizedBox(width: 3),
+                    const Text('Print', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                  ],
                 ],
               ),
             ),
@@ -1704,9 +1799,11 @@ class _EntryScreenState extends State<EntryScreen> {
                             backgroundColor: const Color(0xff0e7490).withValues(alpha: 0.15),
                             foregroundColor: const Color(0xff0e7490),
                           ),
-                          onPressed: busy ? null : printDirectly,
-                          icon: const Icon(Icons.print_rounded),
-                          label: const Text('Imprimer bon', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: busy || isPrinting ? null : printDirectly,
+                          icon: isPrinting
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xff0e7490)))
+                              : const Icon(Icons.print_rounded),
+                          label: Text(isPrinting ? 'Impression…' : 'Imprimer bon', style: const TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
@@ -1948,7 +2045,7 @@ class _ExitScreenState extends State<ExitScreen> {
   final reasonController = TextEditingController();
   late Future<List<TruckVisit>> visitsFuture;
   TruckVisit? selectedVisit;
-  bool busy = false;
+  bool busy = false, isPrinting = false;
   bool _isPickerOpen = false;
   List<OperatorRecord> operators = [];
   Uint8List? _lastExitBytes;
@@ -2710,85 +2807,160 @@ class _ExitScreenState extends State<ExitScreen> {
   }
 
   Future<void> printExitDirectly([TruckVisit? activeVisit]) async {
-    if (busy) return;
-    setState(() => busy = true);
+    if (busy || isPrinting) return;
+    setState(() => isPrinting = true);
     try {
       Uint8List? bytesToPrint;
       String targetPlate = '';
       String targetVisitId = '';
       String targetKind = 'SORTIE';
+      Map<String, dynamic>? visitData;
 
       if (activeVisit != null) {
         targetVisitId = activeVisit.id;
         targetPlate = activeVisit.plate;
-        final docs = DocumentService(widget.repository.client);
-        bytesToPrint = await docs.prepareLatest(targetVisitId, 'SORTIE');
-        if (bytesToPrint == null) {
-          bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
-          targetKind = 'ENTREE';
+        targetKind = activeVisit.exitedAt != null ? 'SORTIE' : 'ENTREE';
+      } else if (searchController.text.trim().isNotEmpty) {
+        final currentPlate = searchController.text.trim();
+        final formattedPlate = TruckPlate.format(currentPlate);
+        final cleanPlate = currentPlate.replaceAll(RegExp(r'[^A-Z0-9]'), '').toUpperCase();
+
+        // 1. Exact formatted
+        visitData = await widget.repository.client
+            .from('truck_visits')
+            .select('*,bookings(reference)')
+            .eq('plate', formattedPlate)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+
+        // 2. Raw plate
+        if (visitData == null && currentPlate != formattedPlate) {
+          visitData = await widget.repository.client
+              .from('truck_visits')
+              .select('*,bookings(reference)')
+              .eq('plate', currentPlate)
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+        }
+
+        // 3. Flexible normalized plate search in recent visits
+        if (visitData == null && cleanPlate.isNotEmpty) {
+          final candidates = await widget.repository.client
+              .from('truck_visits')
+              .select('*,bookings(reference)')
+              .order('created_at', ascending: false)
+              .limit(100);
+          for (final c in candidates) {
+            final p = (c['plate'] as String? ?? '').replaceAll(RegExp(r'[^A-Z0-9]'), '').toUpperCase();
+            if (p == cleanPlate || p.contains(cleanPlate) || cleanPlate.contains(p)) {
+              visitData = c;
+              break;
+            }
+          }
+        }
+
+        if (visitData != null) {
+          targetVisitId = visitData['id'] as String;
+          targetPlate = visitData['plate'] as String? ?? formattedPlate;
+          targetKind = visitData['exit_kind'] != null ? 'SORTIE' : 'ENTREE';
+        } else {
+          if (mounted) message(context, 'Aucun camion trouvé pour la plaque "$currentPlate".');
+          return;
         }
       } else if (_lastExitBytes != null) {
         bytesToPrint = _lastExitBytes;
         targetVisitId = _lastExitVisitId ?? '';
         targetPlate = _lastExitPlate ?? '';
-      } else if (searchController.text.trim().isNotEmpty) {
-        final formattedPlate = TruckPlate.format(searchController.text.trim());
-        final visit = await widget.repository.client
+      } else {
+        visitData = await widget.repository.client
             .from('truck_visits')
-            .select('id,plate')
-            .eq('plate', formattedPlate)
+            .select('*,bookings(reference)')
             .order('created_at', ascending: false)
             .limit(1)
             .maybeSingle();
-        if (visit != null) {
-          targetVisitId = visit['id'] as String;
-          targetPlate = visit['plate'] as String? ?? formattedPlate;
-          final docs = DocumentService(widget.repository.client);
-          bytesToPrint = await docs.prepareLatest(targetVisitId, 'SORTIE');
-          if (bytesToPrint == null) {
-            bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
-            targetKind = 'ENTREE';
-          }
+        if (visitData != null) {
+          targetVisitId = visitData['id'] as String;
+          targetPlate = visitData['plate'] as String? ?? '';
+          targetKind = visitData['exit_kind'] != null ? 'SORTIE' : 'ENTREE';
         } else {
-          if (mounted) message(context, 'Aucun camion trouvé pour la plaque $formattedPlate.');
+          if (mounted) message(context, 'Saisissez la plaque du camion pour imprimer son bon.');
           return;
         }
-      } else {
-        // Find most recent completed visit or active visit
-        final latest = await widget.repository.client
-            .from('truck_visits')
-            .select('id,plate')
-            .order('created_at', ascending: false)
-            .limit(1)
-            .maybeSingle();
-        if (latest != null) {
-          targetVisitId = latest['id'] as String;
-          targetPlate = latest['plate'] as String? ?? '';
-          final docs = DocumentService(widget.repository.client);
-          bytesToPrint = await docs.prepareLatest(targetVisitId, 'SORTIE');
-          if (bytesToPrint == null) {
+      }
+
+      // Prepare bytes
+      if (bytesToPrint == null && targetVisitId.isNotEmpty) {
+        final docs = DocumentService(widget.repository.client);
+        try {
+          bytesToPrint = await docs.prepareLatest(targetVisitId, targetKind);
+        } catch (_) {}
+
+        if (bytesToPrint == null && targetKind == 'SORTIE') {
+          try {
             bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
-            targetKind = 'ENTREE';
+            if (bytesToPrint != null) targetKind = 'ENTREE';
+          } catch (_) {}
+        }
+
+        // Fallback: build with BonPdfBuilder
+        if (bytesToPrint == null) {
+          if (visitData == null) {
+            visitData = await widget.repository.client
+                .from('truck_visits')
+                .select('*,bookings(reference)')
+                .eq('id', targetVisitId)
+                .maybeSingle();
           }
-        } else {
-          if (mounted) message(context, 'Aucun bon récent à imprimer.');
-          return;
+          if (visitData != null) {
+            bytesToPrint = await BonPdfBuilder.buildA5(
+              document: {'kind': targetKind, 'visit_id': targetVisitId, 'created_at': visitData['created_at']},
+              visitData: visitData,
+            );
+          }
         }
       }
 
       if (bytesToPrint == null) {
-        if (mounted) message(context, 'Impossible de charger le bon pour $targetPlate.');
+        if (mounted) message(context, 'Impossible de générer le bon pour $targetPlate.');
         return;
       }
 
+      _lastExitBytes = bytesToPrint;
+      _lastExitVisitId = targetVisitId;
+      _lastExitPlate = targetPlate;
+
       if (mounted) {
-        message(context, 'Impression directe lancée pour $targetPlate…');
+        message(context, 'Impression lancée pour $targetPlate…');
       }
+
+      // 1. Direct print / Layout print
       await _sendToPrinter(bytesToPrint, kind: targetKind, visitId: targetVisitId, plate: targetPlate);
+
+      // 2. Open confirmation dialog with reprint and download options
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (_) => BonConfirmationDialog(
+            bytes: bytesToPrint!,
+            kind: targetKind == 'SORTIE' ? 'SORTIE' : 'ENTRÉE',
+            title: 'Bon ${targetKind == 'SORTIE' ? 'de Sortie' : 'd’Entrée'} · $targetPlate',
+            visitId: targetVisitId,
+            plate: targetPlate,
+            containerNumber: activeVisit?.container ?? visitData?['container_number']?.toString(),
+            containerNumber2: activeVisit?.container2 ?? visitData?['container_number_2']?.toString(),
+            onNewTruck: () {
+              if (mounted) searchController.clear();
+            },
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) message(context, 'Erreur d’impression : $e');
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) setState(() => isPrinting = false);
     }
   }
 
@@ -2891,7 +3063,7 @@ class _ExitScreenState extends State<ExitScreen> {
           InkWell(
             key: const ValueKey('mobile-f11-exit-print-btn'),
             borderRadius: BorderRadius.circular(8),
-            onTap: busy ? null : () => printExitDirectly(activeVisit),
+            onTap: busy || isPrinting ? null : () => printExitDirectly(activeVisit),
             child: Container(
               height: 38,
               padding: const EdgeInsets.symmetric(horizontal: 7),
@@ -2900,12 +3072,22 @@ class _ExitScreenState extends State<ExitScreen> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xff38bdf8), width: 1.0),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.print_rounded, size: 16, color: Colors.white),
-                  SizedBox(width: 3),
-                  Text('Print', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                  if (isPrinting) ...[
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text('Print…', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                  ] else ...[
+                    const Icon(Icons.print_rounded, size: 16, color: Colors.white),
+                    const SizedBox(width: 3),
+                    const Text('Print', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                  ],
                 ],
               ),
             ),
@@ -3847,6 +4029,7 @@ class BonConfirmationDialog extends StatelessWidget {
     required this.bytes,
     required this.kind,
     required this.visitId,
+    this.title,
     this.plate,
     this.containerNumber,
     this.containerNumber2,
@@ -3857,6 +4040,7 @@ class BonConfirmationDialog extends StatelessWidget {
   final Uint8List bytes;
   final String kind;
   final String visitId;
+  final String? title;
   final String? plate;
   final String? containerNumber;
   final String? containerNumber2;
@@ -3935,7 +4119,7 @@ class BonConfirmationDialog extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${kind == 'ENTRÉE' ? 'Entrée' : (kind == 'SORTIE' ? 'Sortie' : kind)} enregistrée !',
+                          title ?? '${kind == 'ENTRÉE' ? 'Entrée' : (kind == 'SORTIE' ? 'Sortie' : kind)} enregistrée !',
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
