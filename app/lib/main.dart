@@ -142,17 +142,16 @@ class LoginScreen extends StatefulWidget {
   @override State<LoginScreen> createState() => _LoginScreenState();
 }
 class _LoginScreenState extends State<LoginScreen> {
-  final email = TextEditingController(), password = TextEditingController();
+  final email = TextEditingController(text: 'dahhaknouamane@gmail.com'), password = TextEditingController(text: 'AdminTCZ2026!');
   final passwordFocus = FocusNode();
-  String? selectedProfile;
+  String? selectedProfile = 'Admin';
   bool obscurePassword = false;
   bool busy = false; String? error, notice;
   static const quickProfiles = [
-    ('Admin', 'dahhaknouamane@gmail.com', Icons.admin_panel_settings_rounded),
+    ('Admin', 'dahhaknouamane@gmail.com', Icons.admin_panel_settings_outlined),
     ('Entrée', 'dahhaknouamane+tcz-entree@gmail.com', Icons.login_rounded),
     ('Sortie', 'dahhaknouamane+tcz-sortie@gmail.com', Icons.logout_rounded),
   ];
-
   void chooseProfile(String label, String address) {
     setState(() {
       selectedProfile = label;
@@ -160,11 +159,50 @@ class _LoginScreenState extends State<LoginScreen> {
         text: address,
         selection: TextSelection.collapsed(offset: address.length),
       );
-      password.clear();
+      password.value = const TextEditingValue(
+        text: 'AdminTCZ2026!',
+        selection: TextSelection.collapsed(offset: 13),
+      );
       error = null;
       notice = null;
     });
-    FocusScope.of(context).requestFocus(passwordFocus);
+    FocusScope.of(context).unfocus();
+  }
+
+  Future<void> quickSignIn(String label, String address, String pwd) async {
+    if (kIsWeb && MediaQuery.sizeOf(context).width < 800) {
+      FullscreenHelper.requestBrowserFullscreen();
+    }
+    setState(() {
+      selectedProfile = label;
+      email.value = TextEditingValue(
+        text: address,
+        selection: TextSelection.collapsed(offset: address.length),
+      );
+      password.value = TextEditingValue(
+        text: pwd,
+        selection: TextSelection.collapsed(offset: pwd.length),
+      );
+      busy = true;
+      error = null;
+      notice = null;
+    });
+    FocusScope.of(context).unfocus();
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: address, password: pwd);
+    } catch (e) {
+      if (mounted) {
+        final raw = e.toString();
+        if (raw.contains('Invalid login credentials')) {
+          setState(() => error = 'Identifiants incorrects.');
+        } else {
+          setState(() => error = raw);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   @override void dispose() { email.dispose(); password.dispose(); passwordFocus.dispose(); super.dispose(); }
@@ -241,40 +279,108 @@ class _LoginScreenState extends State<LoginScreen> {
       const Text('Terminal TCZ · Connexion agent',textAlign:TextAlign.center),
       const SizedBox(height:20),
 
-      Row(
-        children: [
-          for (var i = 0; i < quickProfiles.length; i++) ...[
-            if (i > 0) const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton.tonal(
-                key: ValueKey('quick-profile-${quickProfiles[i].$1.toLowerCase()}'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: selectedProfile == quickProfiles[i].$1
-                      ? const Color(0xffcdebf1)
-                      : const Color(0xffeef5f8),
-                  foregroundColor: const Color(0xff063e66),
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 11),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      // Accès direct 1-clic (Mode Test)
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xfff0f7fb),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xffc5d9e8)),
+        ),
+        child: Column(
+          children: [
+            const Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Icon(Icons.bolt, size: 18, color: Color(0xff075a8d)),
+                SizedBox(width: 4),
+                Text('Accès rapide direct (Mode Test)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d))),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xff063e66),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: busy ? null : () => quickSignIn('Admin', 'dahhaknouamane@gmail.com', 'AdminTCZ2026!'),
+                  icon: const Icon(Icons.admin_panel_settings, size: 16),
+                  label: const Text('Admin 1-clic', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
-                onPressed: busy ? null : () => chooseProfile(
-                  quickProfiles[i].$1, quickProfiles[i].$2),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(quickProfiles[i].$3, size: 17),
-                    const SizedBox(width: 5),
-                    Flexible(child: Text(quickProfiles[i].$1,
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12))),
-                  ],
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xff168846),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: busy ? null : () => quickSignIn('Entrée', 'dahhaknouamane+tcz-entree@gmail.com', 'AdminTCZ2026!'),
+                  icon: const Icon(Icons.login_rounded, size: 16),
+                  label: const Text('Entrée 1-clic', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xffb45309),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: busy ? null : () => quickSignIn('Sortie', 'dahhaknouamane+tcz-sortie@gmail.com', 'AdminTCZ2026!'),
+                  icon: const Icon(Icons.logout_rounded, size: 16),
+                  label: const Text('Sortie 1-clic', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xffc5d9e8)),
+              ),
+              child: const Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  Icon(Icons.key, size: 14, color: Color(0xff075a8d)),
+                  Text('Mot de passe test :', style: TextStyle(fontSize: 11, color: Color(0xff475569))),
+                  SelectableText('AdminTCZ2026!',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xff0f172a))),
+                ],
               ),
             ),
+            const SizedBox(height: 6),
+            const Text('Connexion instantanée en 1 clic sans saisie de mot de passe',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: Color(0xff64748b))),
           ],
-        ],
+        ),
       ),
-      const SizedBox(height:14),
+      const SizedBox(height: 18),
 
+      const Text('Ou sélection manuelle',textAlign:TextAlign.center,
+        style:TextStyle(fontWeight:FontWeight.w700,color:Color(0xff17324d), fontSize:13)),
+      const SizedBox(height:8),
+      Wrap(alignment:WrapAlignment.center,spacing:8,runSpacing:8,children:[
+        for(final profile in quickProfiles)
+          ChoiceChip(
+            label:Text(profile.$1),avatar:Icon(profile.$3,size:18),
+            selected:selectedProfile==profile.$1,
+            onSelected:busy?null:(_)=>chooseProfile(profile.$1,profile.$2)),
+      ]),
+      const SizedBox(height:14),
       Column(children:[
         TextField(controller:email,keyboardType:TextInputType.text,
           onChanged:(_){if(selectedProfile!=null)setState(()=>selectedProfile=null);},
@@ -284,7 +390,7 @@ class _LoginScreenState extends State<LoginScreen> {
             prefixIcon:Icon(Icons.person_pin_rounded,size:20),
           )),
         const SizedBox(height:12),
-        TextField(controller:password,focusNode:passwordFocus,
+        TextField(controller:password,
           obscureText:obscurePassword,onSubmitted:(_)=>signIn(),
           decoration:InputDecoration(
             labelText:'Mot de passe',
@@ -322,6 +428,11 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       const Text('Saisissez votre numéro de téléphone (ou email) et votre mot de passe attribué.',
         textAlign:TextAlign.center,style:TextStyle(fontSize:12,color:Color(0xff49677e))),
+      if(kIsWeb) Padding(padding:const EdgeInsets.only(top:10),
+        child:TextButton.icon(onPressed:()=>launchUrl(
+          Uri.base.resolve('downloads/pointage-tcz.apk'),
+          mode:LaunchMode.externalApplication),
+          icon:const Icon(Icons.android),label:const Text('Télécharger l’APK Android'))),
     ])))))));
 }
 
@@ -372,9 +483,7 @@ class _PointageShellState extends State<PointageShell> {
       final repo = widget.repository;
 
       final isMobile = MediaQuery.sizeOf(context).width < 800;
-      // Start the operational Pointage screen in its focused layout on every
-      // form factor. Data and Bons keep the regular navigation when selected.
-      final isFullScreen = _isFullScreenUserPref ?? (section == 0);
+      final isFullScreen = _isFullScreenUserPref ?? (isMobile && section == 0);
 
       final screens = <Widget>[
         switch (activeProcess) {
