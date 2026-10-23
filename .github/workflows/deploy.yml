@@ -7,6 +7,7 @@ on:
     paths:
       - 'site/**'
       - 'app/**'
+      - 'wrangler.json'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
@@ -23,7 +24,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy to Cloudflare Pages
-        if: "${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}"
         uses: cloudflare/pages-action@v1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -31,22 +31,3 @@ jobs:
           projectName: ${{ vars.CLOUDFLARE_PROJECT_NAME || 'pointage-container-tcz' }}
           directory: site
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy-netlify:
-    name: Deploy to Netlify
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Deploy to Netlify
-        if: "${{ secrets.NETLIFY_AUTH_TOKEN != '' && secrets.NETLIFY_SITE_ID != '' }}"
-        uses: nwtgck/actions-netlify@v3
-        with:
-          publish-dir: site
-          production-branch: main
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          deploy-message: "Deploy from GitHub Actions: ${{ github.sha }}"
-          enable-pull-request-comment: false
-          enable-commit-comment: false
-          overwrites-pull-request-comment: false
