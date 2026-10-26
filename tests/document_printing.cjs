@@ -1,0 +1,30 @@
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+module.exports=async(db,admin,migration)=>{
+  await db.exec('reset role');
+  // Mirror the production profile columns introduced by the account-management migrations.
+  await db.exec('alter table public.profiles add column if not exists first_name text, add column if not exists last_name text');
+  await db.exec(fs.readFileSync(migration,'utf8'));
+  await db.exec(`set request.jwt.claim.sub='${admin}'; set request.jwt.claims='{"role":"authenticated"}'`);
+  await db.query("update public.profiles set first_name='Agent',last_name='Terminal',display_name='Display Name' where id=$1",[admin]);
+  const order=(await db.query("select public.create_transport_order('EDO','LIVRAISON','PRINT-CONTEXT','MAE','[{\"iso_code\":\"22G1\",\"quantity\":1}]') id")).rows[0].id;
+  const item=(await db.query('select id from public.transport_order_items where order_id=$1',[order])).rows[0].id;
+  const visit=(await db.query("select public.enter_transport_visit('87784-B-6','T284529','empty',null,'22G1','MAE',$1) id",[item])).rows[0].id;
+  const doc=(await db.query("select id,event_id from public.generated_documents where visit_id=$1 and kind='ENTREE'",[visit])).rows[0];
+  await db.query("update public.generated_documents set created_at='2026-01-23T13:35:06Z' where id=$1",[doc.id]);
+  await db.query("update public.profiles set first_name='Renamed',last_name='Operator' where id=$1",[admin]);
+  await db.exec("set request.jwt.claim.sub='22222222-2222-4222-8222-222222222222'; set role authenticated");
+  const ctx=(await db.query('select public.document_print_context($1) ctx',[doc.id])).rows[0].ctx;
+  assert.equal(ctx.agent_name,'Agent Terminal','new documents freeze the real event author');
+  assert.equal(Number(ctx.visit_number),Number(doc.event_id));
+  assert.equal(ctx.created_at_local,'2026-01-23 14:35:06','Casablanca time is independent of client/server OS timezone');
+  const visibleProfiles=(await db.query('select id from public.profiles')).rows;
+  assert.equal(visibleProfiles.length,1,'metadata does not expose other profile records');
+  await assert.rejects(db.query('select public.document_print_context($1)',['00000000-0000-0000-0000-000000000000']),e=>e.code==='P0002');
+  await db.exec('reset role; set role anon');
+  await assert.rejects(db.query('select public.document_print_context($1)',[doc.id]),e=>e.code==='42501');
+  await db.exec('reset role');await db.exec("set request.jwt.claim.sub='00000000-0000-0000-0000-000000000000'; set role authenticated");
+  await assert.rejects(db.query('select public.document_print_context($1)',[doc.id]),e=>e.code==='42501');
+  await db.exec('reset role');
+  console.log('PASS: archived author, visit number, Casablanca document time, profile privacy and read/anon authorization');
+};

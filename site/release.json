@@ -1,0 +1,19 @@
+{
+    "release":  "v3.1.0",
+    "status":  "git-release",
+    "bundle_sha256":  "219b6001631f9b7a117cd66a91f955f58818d7269064db195776eb9362680d9c",
+    "features":  [
+                     "automatic-disabled-order-type",
+                     "spacious-order-form",
+                     "edo-ero-only-creation",
+                     "operator-typeahead",
+                     "unique-order-reference",
+                     "editable-edo-ero",
+                     "quantity-increment",
+                     "carrier-items",
+                     "marsa-charge-decharge",
+                     "delivery-24h"
+                 ],
+    "application_version":  "3.1.0+2",
+    "git_tag":  "v3.1.0"
+}

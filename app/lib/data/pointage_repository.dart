@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../domain/transport_order.dart';
 
 class OperatorRecord {
   const OperatorRecord(this.id, this.name, this.bic);
@@ -34,7 +35,7 @@ class TruckVisit {
     iso: j['iso_code'] as String,
     armateur: j['armateur_id'] as String,
     container: j['container_number'] as String?,
-    booking: (j['bookings'] as Map<String, dynamic>?)?['reference'] as String?,
+    booking: (j['carrier_booking_reference'] ?? (j['bookings'] as Map<String, dynamic>?)?['reference']) as String?,
     enteredAt: DateTime.parse(j['entered_at'] as String),
     enginAt: j['engin_at'] as String?,
     exitedAt: j['exited_at'] as String?,
@@ -50,6 +51,25 @@ class TruckVisit {
 class PointageRepository {
   PointageRepository(this.client);
   final SupabaseClient client;
+
+  Future<List<TransportOrderItem>> transportOrderItems() async {
+    final rows=await client.rpc('transport_order_items_status');
+    return [for(final row in rows as List) TransportOrderItem.fromJson(Map<String,dynamic>.from(row as Map))];
+  }
+
+  Future<String> createTransportOrder({required String kind, required String direction,
+    required String reference, required String armateur, required List<Map<String,dynamic>> items}) async =>
+      await client.rpc('create_transport_order',params:{'p_kind':kind,'p_direction':direction,
+        'p_reference':reference,'p_armateur':armateur,'p_items':items}) as String;
+
+  Future<int> updateTransportOrder({required String orderId, required int expectedVersion,
+    required List<Map<String,dynamic>> items}) async =>
+      (await client.rpc('update_transport_order',params:{'p_order':orderId,
+        'p_expected_version':expectedVersion,'p_items':items}) as num).toInt();
+
+  Future<int> increaseTransportOrderQuantity({required String itemId, required int quantity}) async =>
+      (await client.rpc('increase_transport_order_quantity',params:{'p_item':itemId,
+        'p_quantity':quantity}) as num).toInt();
 
   Future<List<DataTransaction>> transactions() async {
     final rows = await client.rpc('data_transactions');
@@ -79,16 +99,17 @@ class PointageRepository {
   Future<String> enter({required String plate, required String cin,
       required String kind, required String iso, required String armateur,
       String? containerNumber, String? booking, bool isTwin = false,
-      String? containerNumber2, String? iso2, String? armateur2, String? booking2}) async {
-    final result = await client.rpc('enter_truck', params: {
+      String? containerNumber2, String? iso2, String? armateur2, String? booking2,
+      String? orderItemId, String? orderItemId2}) async {
+    final result = await client.rpc('enter_transport_visit', params: {
       'p_plate': plate, 'p_cin': cin, 'p_entry_kind': kind,
-      'p_container': containerNumber, 'p_booking': booking,
+      'p_container': containerNumber, 'p_order_item':orderItemId,
       'p_iso': iso, 'p_armateur': armateur,
       'p_is_twin': isTwin,
       'p_container_2': containerNumber2,
       'p_iso_2': iso2,
       'p_armateur_2': armateur2,
-      'p_booking_2': booking2,
+      'p_order_item_2':orderItemId2,
     });
     return result as String;
   }
@@ -97,7 +118,7 @@ class PointageRepository {
     var query = client.from('truck_visits').select(
       'id,plate,driver_cin,entry_kind,container_number,iso_code,armateur_id,'
       'entered_at,engin_at,exited_at,canceled_at,is_twin,container_number_2,'
-      'iso_code_2,armateur_id_2,booking_reference_2,bookings(reference)',
+      'iso_code_2,armateur_id_2,booking_reference_2,carrier_booking_reference,bookings(reference)',
     );
     if (insideOnly) query = query.isFilter('exited_at', null).isFilter('canceled_at', null);
     final rows = await query.order('entered_at', ascending: true).limit(500);
@@ -267,11 +288,17 @@ class DataTransaction {
         number = json['transaction_number']?.toString() ?? json['id'] as String,
         creator = json['creator_name'] as String,
         changer = json['changer_name'] as String,
-        changedAt = DateTime.parse(json['changed_at'] as String);
+        changedAt = DateTime.parse(json['changed_at'] as String),
+        clientId = json['client_id'] as String?,
+        clientName = json['client_name'] as String?,
+        clientOrder = json['client_order_reference'] as String?,
+        bookingArmateur = json['carrier_booking_armateur_id'] as String?,
+        bookingArmateur2 = json['carrier_booking_armateur_id_2'] as String?;
 
   final TruckVisit visit;
   final String number, creator, changer;
   final DateTime changedAt;
+  final String? clientId, clientName, clientOrder, bookingArmateur, bookingArmateur2;
   String get type => visit.entryKind == 'loaded' ? 'Réception' : 'Livraison';
   String get status => visit.canceledAt != null ? 'Annulée'
       : visit.exitedAt != null ? 'Sorti' : 'Présent';
@@ -280,6 +307,7 @@ class DataTransaction {
   String get bookings => [visit.booking, visit.booking2]
       .whereType<String>().where((s) => s.isNotEmpty).join(' / ');
   bool matches(String query) => [number, type, status, creator, changer,
-      visit.plate, containers, bookings, visit.armateur, visit.armateur2 ?? '']
+      visit.plate, containers, bookings, visit.armateur, visit.armateur2 ?? '',
+      clientName ?? '', clientOrder ?? '']
       .join(' ').toLowerCase().contains(query.trim().toLowerCase());
 }

@@ -28,6 +28,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: Scaffold(
         body: DataScreen(repository: repository))));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Transactions'));
+    await tester.pumpAndSettle();
     expect(find.text('213216'), findsOneWidget);
     expect(find.text('Réception'), findsOneWidget);
     expect(find.text('Entry Operator'), findsOneWidget);

@@ -1,0 +1,30 @@
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+
+module.exports = async (db, admin, foundation, guard) => {
+  await db.exec('reset role');
+  await db.exec(fs.readFileSync(foundation,'utf8'));
+  await db.exec(fs.readFileSync(guard,'utf8'));
+  const clerk = '55555555-5555-4555-8555-555555555555';
+  await db.query("insert into auth.users(id,raw_user_meta_data) values($1,'{}')",[clerk]);
+  await db.query("insert into public.user_roles(user_id,role) values($1,'entree')",[clerk]);
+  const client=(await db.query("insert into public.clients(code,name) values('EDI-CLIENT','EDI Client') returning id")).rows[0].id;
+  await db.exec(`set request.jwt.claim.sub='${clerk}'; set request.jwt.claims='{"role":"authenticated","user_metadata":{"role":"service_role"}}'`);
+  const create=(assigned)=>db.query("select public.enter_order_truck('12345-A-1','AB12345','empty',null,'BOOK-EDI','22G1','MAE',$1,false,null,null,null,null,$2) id",[assigned?client:null,assigned?'ORDER-EDI':null]);
+  await assert.rejects(create(true),e=>e.code==='42501','clerk cannot classify a visit through the new RPC');
+  await assert.rejects(db.query("select public.enter_truck('12345-A-2','AB12345','empty',null,'BOOK-EDI','22G1','MAE',$1)",[client]),e=>e.code==='42501','legacy RPC is protected too');
+  const visit=(await create(false)).rows[0].id;
+  await assert.rejects(db.query('update public.truck_visits set client_id=$1,client_order_reference=$2 where id=$3',[client,'ORDER-EDI',visit]),e=>e.code==='42501');
+  await db.exec(`set request.jwt.claim.sub='${admin}'`);
+  await db.query('update public.truck_visits set client_id=$1,client_order_reference=$2 where id=$3',[client,'ORDER-ADMIN',visit]);
+  await db.exec(`set request.jwt.claim.sub='${clerk}'`);
+  await assert.rejects(db.query('update public.truck_visits set client_id=null,client_order_reference=null where id=$1',[visit]),e=>e.code==='42501','clerk cannot clear an imported assignment');
+  await db.query('update public.truck_visits set version=version+1 where id=$1',[visit]);
+  await db.exec("set request.jwt.claim.sub=''; set request.jwt.claims='{\"role\":\"service_role\"}'");
+  await db.query("update public.truck_visits set client_order_reference='ORDER-EDI' where id=$1",[visit]);
+  const row=(await db.query('select client_id,client_order_reference from public.truck_visits where id=$1',[visit])).rows[0];
+  assert.equal(row.client_id,client);
+  assert.equal(row.client_order_reference,'ORDER-EDI');
+  await db.exec(`set request.jwt.claim.sub='${admin}'; set request.jwt.claims='{"role":"authenticated"}'`);
+  console.log('PASS: clerk entry works; client/order assignments blocked through new/legacy RPCs and updates; admin/system allowed; user metadata cannot grant access');
+};

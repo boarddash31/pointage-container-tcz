@@ -10,6 +10,9 @@ import '../data/freepool_export.dart';
 import '../data/pointage_repository.dart';
 import '../domain/container_number.dart';
 import '../domain/container_iso.dart';
+import '../domain/booking_group.dart';
+import '../domain/transport_order.dart';
+import 'transport_orders_screen.dart';
 import '../domain/truck_plate.dart';
 import 'truck_diagram.dart';
 import '../utils/fullscreen_helper.dart';
@@ -110,8 +113,21 @@ class _EntryScreenState extends State<EntryScreen> {
   Uint8List? _lastBonBytes;
   String? _lastVisitId;
   String? _lastPlate;
+  TransportOrderItem? orderItem,orderItem2;
+  Future<void> pickOrder({bool second=false})async{
+    final selected=await Navigator.push<TransportOrderItem>(context,MaterialPageRoute(builder:(_)=>TransportOrdersScreen(
+      repository:widget.repository,direction:kind=='loaded'?'RESTITUTION':'LIVRAISON')));
+    if(selected==null||!mounted)return;
+    if(isTwin&&!selected.iso.startsWith('2')){message(context,'Le mode 2 conteneurs exige des articles de 20 pieds.');return;}
+    setState((){
+      final op=operators.where((o)=>o.id==selected.armateur).firstOrNull;
+      if(second){orderItem2=selected;booking2.text=selected.reference;iso2=selected.iso;iso2Controller.text=iso2;operator2=op;}
+      else{orderItem=selected;booking.text=selected.reference;iso=selected.iso;isoController.text=iso;operator=op;}
+    });
+  }
   void selectGateMode(String selectedKind, bool selectedTwin) {
     setState(() {
+      if(kind!=selectedKind){orderItem=null;orderItem2=null;booking.clear();booking2.clear();}
       kind = selectedKind;
       isTwin = selectedTwin;
       if (selectedTwin) {
@@ -342,6 +358,7 @@ class _EntryScreenState extends State<EntryScreen> {
     }
   }
   Future<void> submit() async {
+    if(orderItem==null||(isTwin&&orderItem2==null)){message(context,'Sélectionnez un article EDO / ERO pour chaque conteneur.');return;}
     if(!form.currentState!.validate())return;
     if(operator==null){message(context,'Choisissez un armateur.');return;}
     if(iso.trim().isEmpty || !RegExp(r'^[0-9A-Z]{4}$').hasMatch(iso.trim())){
@@ -397,6 +414,7 @@ class _EntryScreenState extends State<EntryScreen> {
         containerNumber2:(isTwin&&kind=='loaded')?number2:null,
         iso2:isTwin?iso2.trim():null,
         armateur2:isTwin?(operator2?.id??operator!.id):null,
+        orderItemId:orderItem?.id,orderItemId2:isTwin?orderItem2?.id:null,
         booking2:(isTwin&&kind=='empty')?booking2.text.trim():null,
       );
       if(!mounted)return;
@@ -450,7 +468,7 @@ class _EntryScreenState extends State<EntryScreen> {
 
       form.currentState!.reset();for(final c in [plate,cin,booking,booking2,isoController,iso2Controller,...boxes,...boxes2]){c.clear();}
       setState((){
-        operator=null;
+        orderItem=null;orderItem2=null;operator=null;
         operator2=null;
         lookupHint=null;lookupHint2=null;kind='loaded';isTwin=false;iso='';iso2='';
       });
@@ -1179,10 +1197,10 @@ class _EntryScreenState extends State<EntryScreen> {
                     child: Row(
                       children: [
                         for (final option in [
-                          ('loaded', false, 'Déposer avec 1 conteneur'),
-                          ('loaded', true, 'Déposer avec 2 conteneurs'),
-                          ('empty', false, 'Prendre avec 1 conteneur'),
-                          ('empty', true, 'Prendre avec 2 conteneurs'),
+                          ('loaded', false, 'Restituer 1 conteneur'),
+                          ('loaded', true, 'Restituer 2 conteneurs'),
+                          ('empty', false, 'Livraison de 1 conteneur'),
+                          ('empty', true, 'Livraison de 2 conteneurs'),
                         ])
                           Padding(
                             padding: const EdgeInsets.only(right: 8, bottom: 4),
@@ -1328,6 +1346,13 @@ class _EntryScreenState extends State<EntryScreen> {
                   const SizedBox(height: 12),
                 ],
 
+                  Wrap(spacing:8,runSpacing:8,children:[
+                    OutlinedButton.icon(onPressed:()=>pickOrder(),icon:const Icon(Icons.receipt_long),
+                      label:Text(orderItem==null?'EDO / ERO · Conteneur 1':'${orderItem!.kind} ${orderItem!.reference} · ${orderItem!.iso} · ${orderItem!.remaining} disponibles')),
+                    if(isTwin)OutlinedButton.icon(onPressed:()=>pickOrder(second:true),icon:const Icon(Icons.receipt_long),
+                      label:Text(orderItem2==null?'EDO / ERO · Conteneur 2':'${orderItem2!.kind} ${orderItem2!.reference} · ${orderItem2!.iso} · ${orderItem2!.remaining} disponibles')),
+                  ]),
+                  const SizedBox(height:12),
                   // 4. Conteneur 1 (ou Mono)
                   if (isTwin) ...[
                     LayoutBuilder(builder: (context, space) {
@@ -1354,6 +1379,7 @@ class _EntryScreenState extends State<EntryScreen> {
                             else
                               TextFormField(
                                 controller: booking,
+                                readOnly:true,onTap:()=>pickOrder(),
                                 focusNode: bookingFocus,
                                 textInputAction: TextInputAction.next,
                                 onChanged: (_) => setState(() {}),
@@ -1483,6 +1509,7 @@ class _EntryScreenState extends State<EntryScreen> {
                             else
                               TextFormField(
                                 controller: booking2,
+                                readOnly:true,onTap:()=>pickOrder(second:true),
                                 focusNode: bookingFocus2,
                                 textInputAction: TextInputAction.next,
                                 onChanged: (_) => setState(() {}),
@@ -1739,6 +1766,7 @@ class _EntryScreenState extends State<EntryScreen> {
                     else
                       TextFormField(
                         controller: booking,
+                        readOnly:true,onTap:()=>pickOrder(),
                         focusNode: bookingFocus,
                         textInputAction: TextInputAction.next,
                         onChanged: (_) => setState(() {}),
@@ -1750,8 +1778,8 @@ class _EntryScreenState extends State<EntryScreen> {
                         style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
                         decoration: InputDecoration(
                           isDense: true,
-                          labelText: 'Booking / ordre libre *',
-                          helperText: widget.isFullScreen ? null : 'Le booking n’est pas un numéro ISO de conteneur',
+                          labelText: 'Référence Booking / EDO *',
+                          helperText: widget.isFullScreen ? null : 'Sélectionnez un article avec une quantité disponible',
                           prefixIcon: Icon(Icons.receipt_long, size: widget.isFullScreen ? 18 : 20),
                           contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 7 : 12),
                         ),
@@ -1949,7 +1977,7 @@ class _EnginScreenState extends State<EnginScreen> {
   late Future<List<TruckVisit>> queue;
   @override void initState(){super.initState();queue=widget.repository.visits();}
   void refresh()=>setState((){queue=widget.repository.visits();});
-  @override Widget build(BuildContext context)=>VisitQueue(title:'Engin · dépose / prise',
+  @override Widget build(BuildContext context)=>VisitQueue(title:'Engin · restitution / livraison',
     repository:widget.repository,queue:queue,onRefresh:refresh,
     canCancel:widget.canCancel,exitMode:false);
 }
@@ -2431,7 +2459,7 @@ class _ExitScreenState extends State<ExitScreen> {
         /* Retry in Bons. */
       }
       if (!mounted) return;
-      message(context, 'Sortie et prise conteneur confirmées pour le camion ${visit.plate}.');
+      message(context, 'Livraison confirmée pour le camion ${visit.plate}.');
       final visitId = visit.id;
       final pdfBytes = outcome?.bytes;
       final savedPlate = visit.plate;
@@ -4662,7 +4690,7 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
         final kind=widget.visit.entryKind=='loaded'?'DEPOSE':'PRISE';
         await documents.finalizeLatest(widget.visit.id,kind);
       }catch(_){/* Retry in Bons. */}},
-      widget.visit.entryKind=='loaded'?'Dépose validée.':'Prise validée.');
+      widget.visit.entryKind=='loaded'?'Restitution validée.':'Livraison validée.');
   }
   Future<void> forcePickup() async {
     if(!ContainerNumber.isValid(container.text)){
@@ -4718,14 +4746,14 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
         isTwin:v.isTwin,containerNumber:v.container,containerNumber2:v.container2,
         iso:v.iso,iso2:v.iso2,operator:v.armateur,operator2:v.armateur2,
         showUnknown:true),
-      Text(pending?(v.entryKind=='loaded'?'DÉPOSE · conteneur au sol':'PRISE · conteneur sur châssis'):
+      Text(pending?(v.entryKind=='loaded'?'RESTITUTION · conteneur au sol':'LIVRAISON · conteneur sur châssis'):
         'Engin validé',textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold)),
       const SizedBox(height:14),
       if(pending && v.entryKind=='empty') TextField(controller:container,
         inputFormatters:[UpperCaseFormatter()],maxLength:11,
         decoration:const InputDecoration(labelText:'Numéro du conteneur pris *')),
       if(pending)FilledButton.icon(onPressed:busy?null:engin,icon:const Icon(Icons.check),
-        label:Text(v.entryKind=='loaded'?'Valider la dépose':'Valider la prise')),
+        label:Text(v.entryKind=='loaded'?'Valider la restitution':'Valider la livraison')),
       if(widget.exitMode) ...[
         if(pending)const Padding(padding:EdgeInsets.symmetric(vertical:8),
           child:Text('Complétez Engin ici, puis rouvrez le camion pour valider la sortie.')),
@@ -4735,14 +4763,6 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
       if(widget.canCancel&&pending)...[
         const SizedBox(height:10),TextField(controller:reason,
           decoration:const InputDecoration(labelText:'Motif d’exception / annulation (admin)')),
-        if(v.entryKind=='empty')...[
-          const Padding(padding:EdgeInsets.symmetric(vertical:8),
-            child:Text('Forcer seulement si le conteneur est présent physiquement mais absent du stock. '
-              'Cette action ne crée pas de stock fictif; elle apparaît dans la liste de rapprochement.')),
-          OutlinedButton.icon(onPressed:busy?null:forcePickup,
-            icon:const Icon(Icons.report_problem_outlined),
-            label:const Text('Forcer la prise sans stock')),
-        ],
         TextButton.icon(
           onPressed: busy ? null : () async {
             final approval = await showSupervisorApprovalDialog(
@@ -4788,7 +4808,7 @@ class DataScreen extends StatefulWidget {
   @override State<DataScreen> createState()=>_DataScreenState();
 }
 class _DataScreenState extends State<DataScreen> {
-  String query='';late Future<List<DataTransaction>> visits;
+  String query='';bool grouped=true;late Future<List<DataTransaction>> visits;
   @override void initState(){super.initState();visits=widget.repository.transactions();}
   void refresh() => setState(() => visits = widget.repository.transactions());
   void details(DataTransaction row) => showDialog<void>(context:context,
@@ -4811,8 +4831,34 @@ class _DataScreenState extends State<DataScreen> {
         ]))),
       actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Fermer'))],
     ));
+  Widget orderCard(ClientOrderGroup group) => Card(child:ExpansionTile(
+    key:PageStorageKey((group.clientId,group.reference)),
+    title:Text(group.reference.isEmpty?'Sans ordre client':'Ordre ${group.reference}'),
+    subtitle:Text('${group.clientName??group.clientId??'Client non renseigné'}\n'
+      '${group.transactions.length} visite(s) · ${group.containerCount} conteneur(s) identifié(s) · ${group.bookings.length} booking(s)\n'
+      '${group.inside} au parc · ${group.exited} sorti(s) · ${group.canceled} annulé(s)'),
+    children:[for(final booking in group.bookings)ExpansionTile(
+      key:PageStorageKey(('booking',group.clientId,group.reference,booking.armateur,booking.reference)),
+      title:Text('${booking.armateur} · ${booking.reference.isEmpty?'Sans booking enregistré':'Booking ${booking.reference}'}'),
+      subtitle:Text('${booking.transactions.length} visite(s) · ${booking.containerCount} conteneur(s) identifié(s)'),
+      children:[SingleChildScrollView(key:const PageStorageKey('booking-container-scroll'),
+        scrollDirection:Axis.horizontal,child:DataTable(columns:[
+          for(final label in ['Transaction','Type','Camion','Conteneur','ISO','Statut','Créateur','Dernier modificateur'])DataColumn(label:Text(label)),
+        ],rows:[for(final part in booking.parts)DataRow(cells:[
+          DataCell(Text(part.transaction.number),onTap:()=>details(part.transaction)),
+          DataCell(Text(part.transaction.type)),DataCell(Text(part.transaction.visit.plate)),
+          DataCell(SelectableText(part.container??'À affecter')),DataCell(Text(part.iso)),
+          DataCell(Text(part.transaction.status)),DataCell(Text(part.transaction.creator)),DataCell(Text(part.transaction.changer)),
+        ])]))],
+    )],
+  ));
   @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.all(16),children:[
     Text('Data · visites & stock',style:Theme.of(context).textTheme.headlineSmall),
+    const SizedBox(height:12),
+    SegmentedButton<bool>(segments:const[
+      ButtonSegment(value:true,label:Text('Par ordre client'),icon:Icon(Icons.folder_copy_outlined)),
+      ButtonSegment(value:false,label:Text('Transactions'),icon:Icon(Icons.table_rows_outlined)),
+    ],selected:{grouped},onSelectionChanged:(value)=>setState(()=>grouped=value.single)),
     Align(alignment:Alignment.centerRight,child:IconButton(
       tooltip:'Actualiser',onPressed:refresh,icon:const Icon(Icons.refresh))),
     const SizedBox(height:12),TextField(decoration:const InputDecoration(labelText:'Rechercher numéro, type, camion, conteneur, booking ou agent',
@@ -4820,6 +4866,16 @@ class _DataScreenState extends State<DataScreen> {
     FutureBuilder<List<DataTransaction>>(future:visits,builder:(context,s){
       if(s.hasError)return ListTile(title:Text('${s.error}'));
       if(!s.hasData)return const Center(child:CircularProgressIndicator());
+      if(grouped){
+        final groups=ClientOrderGroup.fromTransactions(s.data!).where((g)=>g.matches(query)).toList();
+        return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          const Padding(padding:EdgeInsets.symmetric(vertical:12),child:Text(
+            'Groupes calculés sur les 500 dernières visites maximum. Les totaux peuvent être partiels.')),
+          Text('${groups.length} groupe(s) affiché(s)'),
+          if(groups.isEmpty)const ListTile(title:Text('Aucun ordre trouvé')),
+          for(final group in groups)orderCard(group),
+        ]);
+      }
       final rows=s.data!.where((row)=>row.matches(query)).toList();
       return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Padding(padding:const EdgeInsets.symmetric(vertical:12),child:Text(

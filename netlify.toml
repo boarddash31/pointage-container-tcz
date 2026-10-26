@@ -6,7 +6,7 @@
   to = "https://iparzfqxopcvwqelxlad.supabase.co/rest/v1/rpc/:splat"
   status = 200
   force = true
-  headers = { apikey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwYXJ6ZnF4b3BjdndxZWx4bGFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTE3MjMsImV4cCI6MjEwNzk4NzcyM30.3hCnAHLQ8KRNRmaXCAMO8POWIRrjdeqMtqs8EavIbBs", Authorization = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwYXJ6ZnF4b3BjdndxZWx4bGFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTE3MjMsImV4cCI6MjEwNzk4NzcyM30.3hCnAHLQ8KRNRmaXCAMO8POWIRrjdeqMtqs8EavIbBs" }
+  headers = { apikey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwYXJ6ZnF4b3BjdndxZWx4bGFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTE3MjMsImV4cCI6MjEwNzk4NzcyM30.3hCnAHLQ8KRNRmaXCAMO8POWIRrjdeqMtqs8EavIbBs" }
 
 [[redirects]]
   from = "/admin"

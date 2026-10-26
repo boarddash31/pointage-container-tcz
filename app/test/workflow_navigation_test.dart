@@ -37,6 +37,15 @@ class NoRoleFixture extends QueueFixture {
 }
 
 void main() {
+  testWidgets('gate clerk has no client or client-order assignment controls',(tester)async{
+    await tester.pumpWidget(MaterialApp(home:Scaffold(body:EntryScreen(repository:QueueFixture(),canCorrect:false))));
+    await tester.pumpAndSettle();
+    expect(find.text('Ordre client / groupage'),findsNothing);
+    expect(find.text('Client de l’ordre'),findsNothing);
+    expect(find.text('Référence ordre client'),findsNothing);
+    expect(find.byType(DropdownButtonFormField<String>),findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   testWidgets('inactive account can leave the access screen', (tester) async {
     await tester.pumpWidget(MaterialApp(home: PointageShell(repository: NoRoleFixture())));
     await tester.pumpAndSettle();
@@ -138,7 +147,7 @@ void main() {
     ))));
     await tester.pumpAndSettle();
     expect(find.text('Position réelle de dépose *'), findsNothing);
-    expect(find.text('Valider la dépose'), findsOneWidget);
+    expect(find.text('Valider la restitution'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
@@ -150,10 +159,10 @@ void main() {
     ))));
     await tester.pumpAndSettle();
 
-    expect(find.text('Déposer avec 1 conteneur'), findsOneWidget);
-    expect(find.text('Déposer avec 2 conteneurs'), findsOneWidget);
-    expect(find.text('Prendre avec 1 conteneur'), findsOneWidget);
-    expect(find.text('Prendre avec 2 conteneurs'), findsOneWidget);
+    expect(find.text('Restituer 1 conteneur'), findsOneWidget);
+    expect(find.text('Restituer 2 conteneurs'), findsOneWidget);
+    expect(find.text('Livraison de 1 conteneur'), findsOneWidget);
+    expect(find.text('Livraison de 2 conteneurs'), findsOneWidget);
 
     // Switch to Twin mode
     await tester.ensureVisible(find.byKey(const ValueKey('gate-loaded-true')));

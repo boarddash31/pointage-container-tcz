@@ -38,10 +38,32 @@ addEventListener("message", eventListener);
 if (!window._flutter) {
   window._flutter = {};
 }
-_flutter.buildConfig = {"engineRevision":"a804b261645ef8c13eb3d5c44a5c2fb0340c5539","wasmHashes":{"canvaskit.wasm":"fbed517a43e82452404446683f00f2e876d835aed84410695759e67b6bb01cd3","chromium/canvaskit.wasm":"ae8ff1d858140f7b1300ced3fa89fb8c9dce0a400a0f4f1e11f6dcfb3315fdcf","skwasm.wasm":"e540fd5e8303b7b68ec2718cb49e9c421f8ade3075b15e02a7059a62654df9a1","skwasm_heavy.wasm":"565f5cc1cca6ab120f11934b105f01fec4b58b480c82e0889dca93af8e6f8635","webparagraph/canvaskit.wasm":"0ce1b05082efdc8529550e8a01f6ff0593972d55525035010e26f5600aa9f254","wimp.wasm":"e924eaafd801d41e017d178f3fd5cf8a417f641fe35c9ed34a4e1d7582283e0c"},"builds":[{"compileTarget":"dart2js","renderer":"canvaskit","mainJsPath":"main.dart.js"},{}]};
+_flutter.buildConfig = {"engineRevision":"deb287481e3ce9468f3434937ced4240a70539ca","wasmHashes":{"canvaskit.wasm":"fbed517a43e82452404446683f00f2e876d835aed84410695759e67b6bb01cd3","chromium/canvaskit.wasm":"ae8ff1d858140f7b1300ced3fa89fb8c9dce0a400a0f4f1e11f6dcfb3315fdcf","skwasm.wasm":"e540fd5e8303b7b68ec2718cb49e9c421f8ade3075b15e02a7059a62654df9a1","skwasm_heavy.wasm":"565f5cc1cca6ab120f11934b105f01fec4b58b480c82e0889dca93af8e6f8635","webparagraph/canvaskit.wasm":"0ce1b05082efdc8529550e8a01f6ff0593972d55525035010e26f5600aa9f254","wimp.wasm":"e924eaafd801d41e017d178f3fd5cf8a417f641fe35c9ed34a4e1d7582283e0c"},"builds":[{"compileTarget":"dart2js","renderer":"canvaskit","mainJsPath":"main.dart.js"},{}]};
 
-_flutter.loader.load({
-  serviceWorkerSettings: {
-    serviceWorkerVersion: "4229696352" /* Flutter's service worker is deprecated and will be removed in a future Flutter release. */
+
+// Finish removing an older Flutter worker before requesting the new program/assets.
+// Supabase's persisted session is in localStorage and is retained.
+window.tczBootReady = (async function () {
+  const release = 'marsa-bons-v1';
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.filter(registration =>
+        document.baseURI.startsWith(registration.scope) &&
+        [registration.active, registration.waiting, registration.installing].some(worker =>
+          worker && new URL(worker.scriptURL).pathname.endsWith('/flutter_service_worker.js'))
+      ).map(registration => registration.unregister()));
+    }
+    if ('caches' in window) {
+      const flutterCaches = new Set(['flutter-app-cache', 'flutter-temp-cache', 'flutter-app-manifest']);
+      const names = await caches.keys();
+      await Promise.all(names.filter(name => flutterCaches.has(name)).map(name => caches.delete(name)));
+    }
+  } catch (error) {
+    console.warn('Flutter cache cleanup unavailable; loading the current release.', error);
   }
-});
+  for (const build of _flutter.buildConfig.builds) {
+    if (build.mainJsPath) build.mainJsPath += '?tcz_release=' + release;
+  }
+  return _flutter.loader.load();
+})();

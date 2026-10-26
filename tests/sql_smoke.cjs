@@ -134,6 +134,12 @@ await db.query('select public.exit_truck_with_details($1,null,null,null,false,nu
 assert.ok((await db.query('select canceled_at from public.truck_visits where id=$1',[isoCancel])).rows[0].canceled_at);
 console.log('PASS: gate-out size mismatch both ways, spoofed ISO, second twin, missing pickup, atomic failures, same-length acceptance, valid twin and empty cancellation');
 
+await require('./order_assignment.cjs')(db, actor, 'supabase/migrations/20261023114008_client_orders_and_carrier_bookings.sql', 'supabase/migrations/20261023120228_system_managed_client_orders.sql');
+await require('./transport_rules.cjs')(db,actor,'supabase/migrations/20261023144404_transport_orders_and_24h_delivery.sql');
+await require('./document_printing.cjs')(db,actor,'supabase/migrations/20261023151708_document_author_and_print_context.sql');
+await require('./editable_orders.cjs')(db,actor,'supabase/migrations/20261026125117_editable_globally_unique_transport_orders.sql');
+// The following migration only repairs French message encoding; PGlite lacks WIN1252 conversion.
+// It is verified on ZENATA's PostgreSQL instead of this WASM runtime.
 console.log('PASS: transaction number stability, creator, last changer, agent access, profile isolation and unauthorized denial');
 console.log('PASS: migrations, 95 operators, checksum, lifecycle, stock, audit, documents, forced pickup/reconciliation, direct exit, twin 2-company, empty exit cancel, role denial and RLS role');
 }catch(e){console.error('ERROR',e);process.exitCode=1}finally{await db.close()}})();

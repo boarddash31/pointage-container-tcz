@@ -1,5 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.76.1';
 import { PDFDocument, StandardFonts, rgb } from 'npm:pdf-lib@1.17.1';
+import { terminalSlipPdf } from './terminal-slip.ts';
+import { documentPdfPath,hasCurrentPdf,isTerminalForm,terminalTemplateVersion } from './pdf-cache.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -12,13 +14,13 @@ const json = (status: number, body: unknown) =>
     headers: { ...cors, 'content-type': 'application/json' },
   });
 
-function printable(input: unknown, fallback = '-'): string {
+function printable(input: unknown, fallback = '-', maxLength = 110): string {
   if (input === null || input === undefined || String(input).trim() === '') return fallback;
   return String(input)
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^\x20-\x7E]/g, '')
-    .slice(0, 110);
+    .slice(0, maxLength);
 }
 
 function formatDate(rawIso: unknown): string {
@@ -35,6 +37,7 @@ function formatDate(rawIso: unknown): string {
 }
 
 async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
+  if (['ENTREE','DEPOSE','PRISE','SORTIE'].includes(String(document.kind).toUpperCase())) return terminalSlipPdf(document);
   const snapshot = (document.snapshot ?? {}) as Record<string, unknown>;
   const event = (snapshot.event ?? {}) as Record<string, unknown>;
 
@@ -323,11 +326,13 @@ Deno.serve(async (request) => {
     .eq('id', documentId)
     .single();
   if (readError || !doc) return json(404, { error: 'Document unavailable' });
-  if (doc.status === 'uploaded' && doc.storage_path) return json(200, { path: doc.storage_path });
+  const templateVersion=isTerminalForm(doc.kind)?terminalTemplateVersion:'legacy';
+  if (hasCurrentPdf(doc)) return json(200, { path: doc.storage_path,template_version:templateVersion });
+  const {data: context} = await userClient.rpc('document_print_context', {p_document: doc.id});
   const admin = createClient(url, service);
-  const path = `${doc.visit_id}/${doc.id}.pdf`;
+  const path = documentPdfPath(doc);
   try {
-    const bytes = await pdfFor(doc);
+    const bytes = await pdfFor({...doc, print_context: context});
     const { error: uploadError } = await admin.storage.from('pointage-documents').upload(path, bytes, {
       contentType: 'application/pdf',
       upsert: false,
@@ -338,7 +343,7 @@ Deno.serve(async (request) => {
       .update({ status: 'uploaded', storage_path: path })
       .eq('id', doc.id);
     if (updateError) throw updateError;
-    return json(200, { path });
+    return json(200, { path,template_version:templateVersion });
   } catch (error) {
     await admin.from('generated_documents').update({ status: 'failed' }).eq('id', doc.id);
     return json(500, { error: String(error) });

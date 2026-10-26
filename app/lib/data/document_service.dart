@@ -5,10 +5,14 @@ import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'bon_pdf_builder.dart';
+import '../domain/terminal_slip.dart';
+
+typedef PdfRenderer=Future<Uint8List> Function({required Map<String,dynamic> document,Map<String,dynamic>? visitData});
 
 class DocumentService {
-  DocumentService(this.client);
+  DocumentService(this.client,{this.renderPdf=BonPdfBuilder.buildA5});
   final SupabaseClient client;
+  final PdfRenderer renderPdf;
   static const bridgeUrl=String.fromEnvironment('PDF_BRIDGE_URL');
   static const bridgeAutoPrint=bool.fromEnvironment('PDF_BRIDGE_AUTO_PRINT');
 
@@ -68,8 +72,13 @@ class DocumentService {
       .limit(1).maybeSingle();
 
   Future<Uint8List> prepare(Map<String,dynamic> document) async {
-    // 1. Generate the modern, crystal-clear A5 Bon with truck visuals and gate-out rules
+    // Use the archived movement and its author when reprinting the terminal form.
     try {
+      Map<String,dynamic> printDocument=document;
+      try{
+        final context=await client.rpc('document_print_context',params:{'p_document':document['id']});
+        if(context is Map)printDocument={...document,'print_context':Map<String,dynamic>.from(context)};
+      }catch(_){/* Older backends still render the archived fields. */}
       Map<String, dynamic>? visitData;
       final visitId = document['visit_id'] as String?;
       if (visitId != null && visitId.isNotEmpty) {
@@ -81,21 +90,26 @@ class DocumentService {
               .maybeSingle();
         } catch (_) {}
       }
-      return await BonPdfBuilder.buildA5(
-        document: document,
+      return await renderPdf(
+        document: printDocument,
         visitData: visitData,
       );
     } catch (_) {
       // Fallback to storage download if builder fails
       var path = document['storage_path'] as String?;
-      if (path == null || path.isEmpty) {
+      final terminalForm=TerminalSlip.supports((document['kind']??'').toString());
+      if (terminalForm||path == null || path.isEmpty) {
         final response = await client.functions.invoke('generate-bon', body: {
           'document_id': document['id'],
         });
         if (response.status != 200) {
           throw StateError('Génération PDF refusée (${response.status}) : ${response.data}');
         }
-        path = (response.data as Map<String, dynamic>)['path'] as String?;
+        final result=response.data as Map<String,dynamic>;
+        if(terminalForm&&(result['template_version']!='marsa-v1'||!(result['path']?.toString().endsWith('-marsa-v1.pdf')??false))){
+          throw StateError('Le générateur PDF ne fournit pas encore le modèle Marsa Maroc. Réessayez après sa mise à jour.');
+        }
+        path = result['path'] as String?;
         if (path == null) throw StateError('Chemin du PDF absent.');
       }
       return client.storage.from('pointage-documents').download(path);
