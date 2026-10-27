@@ -26,17 +26,14 @@ public sealed class PointageDb(string connectionString)
     }
 }
 
-public sealed class ActorResolver(PointageDb database)
+public sealed class ActorResolver(PointageDb database, CorporateAuthentication authentication)
 {
     public async Task<Guid> Resolve(ClaimsPrincipal principal, CancellationToken cancellation)
     {
-        var issuer = principal.FindFirst("iss")?.Value;
-        var subject = principal.FindFirst("sub")?.Value;
-        if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(subject) || issuer.Length > 256 || subject.Length > 256)
-            throw new UnauthorizedAccessException();
+        var identity = CorporateIdentity.Resolve(principal, authentication);
         // Map validated external identity to a server-managed profile. Ignore role/user-id claims.
         var result = await database.Scalar("api.resolve_actor", cancellation,
-            PointageDb.Text("@Issuer", issuer, 256), PointageDb.Text("@Subject", subject, 256));
+            PointageDb.Text("@Issuer", identity.Issuer, 256), PointageDb.Text("@Subject", identity.Subject, 256));
         return result is Guid actor ? actor : throw new UnauthorizedAccessException();
     }
 }

@@ -1,5 +1,12 @@
 # Pointage Container — progress
 
+## Comptes d’entreprise et validation locale IT (2026-10-27)
+
+- Réponses utilisateur : utiliser les comptes d’entreprise AD/Entra ID et conserver le lot localement pour validation IT. Aucune publication du lot sur le dépôt public, aucune nouvelle demande de publication et aucun workflow distant à lancer.
+- Configuration API préparée pour Entra ID (tenant unique, audience API, clients approuvés, scope délégué, identité tenant/oid) ou AD Windows/Negotiate sous IIS (directory/SID). Les rôles restent gérés dans SQL et rattachés aux UUID de profils conservés. La connexion Flutter actuelle reste Supabase jusqu’au lot d’adaptation client.
+- Demande IT dans `migration/sqlserver/it/REQUEST-FOR-IT.md`, vérifications de claims préparées dans Pointage.Checks. Le workflow précédemment proposé est déplacé hors de `.github/workflows` vers un exemple inactif sous `it/` pour respecter le choix local.
+- Tests Node du transfert exécutables localement ; compilation .NET, exécution SQL Server et intégration AD/Entra toujours à faire sur un poste IT équipé. Pas de contournement du blocage SDK et pas de tests annoncés comme exécutés sans résultat.
+
 ## Migration SQL Server — premier lot (2026-10-27)
 
 - Demande de commencer la migration pendant la préparation de la machine. Cible confirmée : SQL Server 2025 sur Windows Server. Branche isolée `migration/sql-server`, base de code issue de v3.1.0 ; application Flutter et Supabase de production non basculés.

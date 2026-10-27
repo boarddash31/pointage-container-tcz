@@ -10,12 +10,12 @@ This branch starts the replacement backend. Flutter v3.1.0 still connects to the
 - Reproducible SQL Server DDL and a transfer manifest. UUIDs, event/audit IDs, Unicode strings, JSON text and timestamp precision are retained. `profiles.initial_password` and the Supabase `auth` schema are excluded.
 - A read-only, repeatable-read PostgreSQL exporter and a transactional .NET bulk importer. Export snapshots are private files under ignored `.migration-data/`.
 - ASP.NET Core API for the current user, armateurs and EDO/ERO read/create/edit/increment operations. SQL enforces global reference uniqueness, item/carrier/ISO uniqueness, version conflicts and allocated-quantity/history protection. A stock-update guard enforces 24 hours from the receiving truck entry.
-- JWT validation against an explicit HTTPS issuer and audience. A verified issuer/subject must map to an active profile in `internal.identity_accounts`; application roles come from SQL, never user-editable token metadata. No default admin, shared password or anonymous business endpoint is provided.
+- Corporate authentication handlers prepared for Entra ID or AD Windows/Negotiate. Entra checks a single tenant, the API audience, allowed client applications and a delegated scope; AD uses the Windows SID authenticated by IIS/Negotiate. The stable corporate identity must map to an active profile in `internal.identity_accounts`; application roles come from SQL. No default admin, shared password or anonymous business endpoint is provided.
 - SQL Server 2025 syntax checks, rollback-only database tests, transfer-conversion unit checks and a CI job using a temporary SQL Server container with synthetic fixtures.
 
 ## Remaining before production
 
-1. Choose the internal authentication provider with IT (AD/ADFS, Entra ID or application-managed accounts) and implement the corresponding browser login/activation flow. The first slice accepts validated OIDC/JWT identities; it does not yet issue tokens or implement Windows Integrated Authentication.
+1. Corporate accounts have been selected. IT must confirm the available mechanism (AD Windows integrated or Entra ID), configure its domain/tenant/application IDs and validate the prepared API handlers. Implement the corresponding browser login flow and directory-provisioning process; the current Flutter login still uses Supabase.
 2. Port gate entry, twin reservations, yard movements, gate exit, cancellation, reconciliation, Data/reporting and admin-user operations. All reservation writers must lock parent orders before items, in deterministic order, matching the order editor.
 3. Port protected PDF generation/download/archive, transfer the actual Storage files, verify checksums and update the Windows print bridge. Exporting database metadata does not transfer PDFs.
 4. Replace Flutter's Supabase repository/auth/storage calls with the new API, including the supervisor dashboard.
@@ -30,7 +30,7 @@ This branch starts the replacement backend. Flutter v3.1.0 still connects to the
 - Protected service-account configuration. Production API SQL credentials belong to the `pointage_api` database role, with procedure execution and no direct table permissions; do not use a DBA/sa account for the application.
 - Protected backup storage for SQL backups, PDF files, application configuration and identity mappings. Recovery objectives and retention must be agreed with the operations team.
 
-The local workstation has .NET runtimes but no SDK. Download of Microsoft's SDK archive was denied by the company File Transfer policy; no alternative download or local policy bypass is attempted. Use an IT-provisioned SDK for compilation/SQL integration validation. A GitHub CI definition is prepared, but publication of this detailed schema/tools to the public repository was rejected by automatic review pending the owner's explicit approval. No CI run has been started.
+The owner explicitly chose local retention and IT validation, not publication to the public repository. The local workstation has .NET runtimes but no SDK. Download of Microsoft's SDK archive was denied by the company File Transfer policy; no alternative download or local policy bypass is attempted. Use an IT-provisioned SDK for compilation/SQL integration validation. The optional CI example is stored under `it/`, outside `.github/workflows`, and is not active. No CI run has been started. See [the IT request](it/REQUEST-FOR-IT.md) for corporate authentication requirements.
 
 ## Validate locally without a database
 
@@ -49,7 +49,7 @@ dotnet build Pointage.Migration -c Release
 dotnet run --project Pointage.Checks -c Release
 ```
 
-`Pointage.Checks` parses SQL Server 2025 syntax and exercises API order validation. The tests require no source account or production database.
+`Pointage.Checks` parses SQL Server 2025 syntax and exercises API order validation and corporate identity checks with synthetic claims. These checks are prepared but have not been compiled or executed on this workstation. They require no source account or production database; they do not replace real AD/Entra integration tests.
 
 ## First test database
 
@@ -94,13 +94,12 @@ Provide these through the Windows service/IIS protected configuration:
 
 ```text
 ConnectionStrings__Pointage=<encrypted SQL connection with trusted certificate>
-Authentication__Authority=<HTTPS OIDC issuer approved by IT>
-Authentication__Audience=<API audience approved by IT>
+Authentication__Mode=<EntraId or Windows>
 Cors__Origins__0=<HTTPS application origin>
 AllowedHosts=<internal API hostname>
 ```
 
-Startup fails if the issuer, audience, CORS origins or SQL connection are missing/insecure. The public liveness endpoint is `/health/live`; business endpoints require an authenticated, mapped identity. Validate the real issuer/subject with IT, then have a DBA map it to the intended preserved profile ID in `internal.identity_accounts`. The profile's roles are in `dbo.user_roles`; do not create mappings by trusting browser-supplied user IDs or role claims. Corporate identity integration remains a required implementation/acceptance step.
+Supply the additional mode-specific settings documented in [the IT request](it/REQUEST-FOR-IT.md). Startup fails if corporate identity settings, CORS origins or SQL connection are missing/insecure. The liveness endpoint is `/health/live`; IIS Windows authentication may additionally require an authenticated monitor. Business endpoints require an authenticated, mapped identity. The DBA maps the verified Entra tenant/oid or AD directory/SID to the intended preserved profile ID in `internal.identity_accounts`. Roles remain in `dbo.user_roles`; browser-supplied user IDs, names or role claims do not establish a mapping. Compilation and real corporate identity integration tests remain required before activation.
 
 First routes:
 
