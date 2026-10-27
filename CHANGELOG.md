@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.1.1 — 2026-10-27
+
+- Bon de Sortie A4 TCZ / Marsa Maroc : présentation douanière, identification, données camion/chauffeur/agent, cadres ECOR et sortie du terminal.
+- Conservation des faits archivés, prise en charge de deux conteneurs et du camion vide après restitution ; aucune supposition sur les champs douaniers ou le poids.
+- Cache PDF SORTIE versionné gate-out-v1 ; l'ancien modèle est refusé en repli. Le générateur serveur nécessite un déploiement séparé.
+- 49 tests Flutter réussis et compilation web vérifiée. Publication GitHub uniquement.
+
 ## v3.1.0 — 2026-10-26
 
 - Ordres EDO/ERO modifiables : référence unique, articles par armateur et ISO, ajout de quantité, protection des réservations et historique des modifications.

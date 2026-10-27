@@ -2,7 +2,7 @@
 
 Flutter mobile/web application backed by Supabase Auth, PostgreSQL, private PDF Storage and Edge Functions. The Node bridge is optional for archiving PDFs to a Windows network share and submitting print jobs to a Windows printer.
 
-The web app is deployed at [pointage-container-tcz.pages.dev](https://pointage-container-tcz.pages.dev/). The custom domain `https://marsa.digital` is attached and awaits DNS delegation. The public site is web-only; no APK is linked or included in the release. Source is in the private GitHub repository `boarddash31/pointage-container-tcz`. The first admin must complete the Supabase password-recovery flow; never share its link or password in this repository.
+The web app is deployed at [pointage-container-tcz.pages.dev](https://pointage-container-tcz.pages.dev/). The custom domain `https://marsa.digital` is attached and awaits DNS delegation. The public site is web-only; no APK is linked or included in the release. Source is in the GitHub repository `boarddash31/pointage-container-tcz`. The first admin must complete the Supabase password-recovery flow; never share its link or password in this repository.
 
 ## Repository layout
 

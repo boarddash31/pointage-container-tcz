@@ -7,6 +7,7 @@
 - Nouveau script `005_application_accounts.sql` (version 3), tests transactionnels `006_account_smoke_test.sql`, API Account* et outil DBA interactif `Pointage.Admin` pour le premier Admin. Les profils historiques peuvent être liés sans changer leur UUID/nom. Pas de copie de mots de passe Supabase, pas de route HTTP de bootstrap ni de secret intégré. Ancien scaffolding identity_accounts/resolve_actor retiré avant tout déploiement SQL.
 - Tests exécutés : génération DDL/manifest, conversions des 22 tables, nouveau snapshot synthétique de 13 lignes sous `.migration-data/sqlserver-phase2-20261027`, intégrité/hachages/comptages/conversions des 22 fichiers ; XML/configuration des projets valides. Le générateur de fixtures refuse les écrasements et peut viser un nouveau dossier ignoré avec --out. L'ancien fixture ci-safe est conservé ; son manifeste appartient à la version préparatoire précédente.
 - Tests .NET réels de hachage/validation et tests SQL d'autorisation, sessions, verrouillage, reset, dernier Admin, versions et unicité préparés mais NON exécutés : SDK .NET toujours absent, aucune destination SQL fournie. Ne pas annoncer cette tranche prête à la production. Dossier IT et exemple CI privée inactif mis à jour. Question de disponibilité de la machine envoyée, sans réponse à ce stade.
+- La branche locale de migration est synchronisée avec les sources et le bundle applicatifs publiés en v3.1.1 ; le lot SQL Server demeure local. Les archives IT préparatoires précédentes sont remplacées par le lot actuel de comptes applicatifs.
 - Restent la validation .NET/SQL/HTTP/concurrence sur la machine IT, le portage Gate/twin/Data/PDF et l'adaptation Flutter avant transfert réel et bascule. L'application publique continue sur Supabase ; aucune donnée métier exportée ni connexion de production modifiée.
 
 ## Bon de Sortie TCZ / Marsa Maroc — essais locaux (2026-10-27)
@@ -41,6 +42,12 @@
 - Le téléchargement local du SDK .NET officiel a été bloqué par la politique File Transfer de l’entreprise. Aucun contournement local tenté. Préparation d’une validation GitHub CI sur la branche, sans accès/secret de production : compilation .NET, parseur SQL 2025, conteneur SQL temporaire, tests transactionnels, import de données fictives avec TLS vérifié et refus d’accès API anonyme. Résultat CI à vérifier ; ne pas annoncer la compilation ou l’exécution SQL réussie avant résultat.
 - Prochains lots : opérations Gate/twin et concurrence, reporting, authentification choisie par IT, transfert des PDF et génération serveur, adaptation du client Flutter et tests d’acceptation Windows/IIS/impression. Aucun export réel, gel d’écritures ou changement de connexion du client effectué.
 - La commande de commit + push de la branche a été refusée automatiquement avant exécution : le dépôt est public et ce lot expose le schéma détaillé/contraintes/outils internes sans accord explicite sur cette publication précise. Aucune branche distante créée, aucun workflow lancé. Question d’autorisation envoyée avec choix de conserver le lot localement pour IT ou publier sur le dépôt public. La préparation et la conservation locale restent autorisées ; ne pas contourner ce refus.
+## v3.1.1 — 2026-10-27
+
+- Bon de Sortie A4 TCZ / Marsa Maroc : présentation douanière, identification, données camion/chauffeur/agent, cadres ECOR et sortie du terminal.
+- Conservation des faits archivés, prise en charge de deux conteneurs et du camion vide après restitution ; aucune supposition sur les champs douaniers ou le poids.
+- Cache PDF SORTIE versionné gate-out-v1 ; l'ancien modèle est refusé en repli. Le générateur serveur nécessite un déploiement séparé.
+- 49 tests Flutter réussis et compilation web vérifiée. Publication GitHub uniquement.
 
 ## Version GitHub v3.1.0 (2026-10-26)
 
