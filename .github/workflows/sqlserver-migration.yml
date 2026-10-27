@@ -1,0 +1,103 @@
+name: SQL Server migration validation
+
+on:
+  push:
+    branches: ['migration/sql-server']
+    paths: ['backend/**', 'migration/sqlserver/**', 'tests/sqlserver_migration_test.cjs', '.github/workflows/sqlserver-migration.yml']
+  pull_request:
+    paths: ['backend/**', 'migration/sqlserver/**', 'tests/sqlserver_migration_test.cjs', '.github/workflows/sqlserver-migration.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate manifest and conversion logic
+        run: |
+          node migration/sqlserver/tools/generate-schema.cjs
+          git diff --exit-code -- migration/sqlserver/001_schema.sql migration/sqlserver/manifest.json
+          node tests/sqlserver_migration_test.cjs
+          node migration/sqlserver/tools/create-test-snapshot.cjs
+      - name: Build API, SQL parser and import utility
+        working-directory: backend
+        run: |
+          dotnet build Pointage.Checks -c Release
+          dotnet build Pointage.Migration -c Release
+          dotnet run --project Pointage.Checks -c Release --no-build
+          dotnet run --project Pointage.Migration -c Release --no-build -- --snapshot ../.migration-data/ci-safe --check
+      - name: Create temporary test database and TLS certificates
+        shell: bash
+        run: |
+          db_password="Ci_$(openssl rand -hex 24)Aa1!"
+          echo "::add-mask::$db_password"
+          echo "MSSQL_SA_PASSWORD=$db_password" >> "$GITHUB_ENV"
+          mkdir -p .ci
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=Pointage CI Root' -keyout .ci/ca.key -out .ci/ca.crt -addext 'basicConstraints=critical,CA:TRUE' 2>/dev/null
+          openssl req -newkey rsa:2048 -nodes -subj '/CN=localhost' -keyout .ci/server.key -out .ci/server.csr 2>/dev/null
+          printf 'subjectAltName=DNS:localhost,IP:127.0.0.1\nextendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyEncipherment\nbasicConstraints=CA:FALSE\n' > .ci/extensions
+          openssl x509 -req -in .ci/server.csr -CA .ci/ca.crt -CAkey .ci/ca.key -CAcreateserial -out .ci/server.crt -days 1 -extfile .ci/extensions 2>/dev/null
+          openssl pkcs12 -export -out .ci/server.pfx -inkey .ci/server.key -in .ci/server.crt -passout pass: 2>/dev/null
+          sudo cp .ci/ca.crt /usr/local/share/ca-certificates/pointage-ci.crt
+          sudo update-ca-certificates >/dev/null
+          printf '[network]\ntlscert=/var/opt/mssql/cert/server.crt\ntlskey=/var/opt/mssql/cert/server.key\nforceencryption=1\n' > .ci/mssql.conf
+          sudo chown 10001:0 .ci/server.key .ci/server.crt .ci/mssql.conf
+          sudo chmod 640 .ci/server.key
+          docker run -d --name pointage-sql -p 127.0.0.1:1433:1433 -e ACCEPT_EULA=Y -e MSSQL_PID=Developer -e MSSQL_SA_PASSWORD="$db_password" -v "$PWD/.ci:/var/opt/mssql/cert:ro" -v "$PWD/.ci/mssql.conf:/var/opt/mssql/mssql.conf:ro" mcr.microsoft.com/mssql/server:2025-latest
+          ready=0
+          for i in $(seq 1 60); do
+            if docker exec pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q "SELECT 1"' >/dev/null 2>&1; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" = 1
+      - name: Execute SQL Server schema and rollback-only smoke checks
+        shell: bash
+        run: |
+          docker exec pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q "CREATE DATABASE TCZ_Pointage_Test COLLATE Latin1_General_100_BIN2"'
+          for file in migration/sqlserver/001_schema.sql migration/sqlserver/002_order_api.sql migration/sqlserver/003_smoke_test.sql; do
+            docker exec -i pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -d TCZ_Pointage_Test' < "$file"
+          done
+      - name: Import synthetic snapshot with certificate verification enabled
+        working-directory: backend
+        shell: bash
+        run: |
+          export POINTAGE_TARGET_CONNECTION="Server=localhost,1433;Database=TCZ_Pointage_Test;User Id=sa;Password=$MSSQL_SA_PASSWORD;Encrypt=Mandatory;TrustServerCertificate=False"
+          dotnet run --project Pointage.Migration -c Release --no-build -- --snapshot ../.migration-data/ci-safe --apply
+          docker exec -i pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -d TCZ_Pointage_Test' < ../migration/sqlserver/004_verify_import.sql
+      - name: Verify API rejects anonymous operations
+        working-directory: backend
+        shell: bash
+        run: |
+          export ConnectionStrings__Pointage="Server=localhost,1433;Database=TCZ_Pointage_Test;User Id=sa;Password=$MSSQL_SA_PASSWORD;Encrypt=Mandatory;TrustServerCertificate=False"
+          export Authentication__Authority=https://identity.invalid
+          export Authentication__Audience=pointage-test
+          export Cors__Origins__0=https://localhost
+          export ASPNETCORE_URLS=https://localhost:5443
+          export ASPNETCORE_Kestrel__Certificates__Default__Path="$GITHUB_WORKSPACE/.ci/server.pfx"
+          dotnet run --project Pointage.Api -c Release --no-build > "$RUNNER_TEMP/pointage-api.log" 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do curl --silent --fail https://localhost:5443/health/live && break; sleep 1; done
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' https://localhost:5443/api/orders/items)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"kind":"ERO","reference":"forged","actor_id":"11111111-1111-4111-8111-111111111111","items":[]}' https://localhost:5443/api/orders)" = 401
+      - name: Diagnostic logs on failure
+        if: failure()
+        run: |
+          docker logs pointage-sql 2>&1 | tail -70 || true
+          cat "$RUNNER_TEMP/pointage-api.log" 2>/dev/null || true
+      - name: Remove temporary SQL container
+        if: always()
+        run: docker rm -f pointage-sql || true

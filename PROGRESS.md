@@ -1,5 +1,16 @@
 # Pointage Container — progress
 
+## Migration SQL Server — premier lot (2026-10-27)
+
+- Demande de commencer la migration pendant la préparation de la machine. Cible confirmée : SQL Server 2025 sur Windows Server. Branche isolée `migration/sql-server`, base de code issue de v3.1.0 ; application Flutter et Supabase de production non basculés.
+- Inventaire en lecture seule des 22 tables public/private, colonnes, clés, contrôles, index et extensions du projet ZENATA. Aucun enregistrement métier ni mot de passe exporté. Métadonnées et manifestes dans `migration/sqlserver/`.
+- Préparation du schéma SQL Server, des contraintes et des premières procédures API EDO/ERO, gardes d’historique/quantités et délai de livraison depuis l’entrée du camion. Export PostgreSQL explicite en transaction READ ONLY, contrôle des conversions, import .NET transactionnel dans une destination vide en ordre des FK avec identifiants conservés.
+- API ASP.NET Core .NET 10 : issuer/audience HTTPS obligatoires, identité vérifiée mappée côté serveur, rôles SQL, procédures paramétrées, aucune création d’admin anonyme ni transfert de mots de passe. Décision d’authentification entreprise/applicative demandée à l’utilisateur et encore en attente.
+- Tests Node du transfert réussis (UUID, bigint, décimales, JSON exact, microsecondes, Unicode, nullabilité et refus de troncature), snapshot de test uniquement fictif généré sous `.migration-data/` ignoré.
+- Le téléchargement local du SDK .NET officiel a été bloqué par la politique File Transfer de l’entreprise. Aucun contournement local tenté. Préparation d’une validation GitHub CI sur la branche, sans accès/secret de production : compilation .NET, parseur SQL 2025, conteneur SQL temporaire, tests transactionnels, import de données fictives avec TLS vérifié et refus d’accès API anonyme. Résultat CI à vérifier ; ne pas annoncer la compilation ou l’exécution SQL réussie avant résultat.
+- Prochains lots : opérations Gate/twin et concurrence, reporting, authentification choisie par IT, transfert des PDF et génération serveur, adaptation du client Flutter et tests d’acceptation Windows/IIS/impression. Aucun export réel, gel d’écritures ou changement de connexion du client effectué.
+- La commande de commit + push de la branche a été refusée automatiquement avant exécution : le dépôt est public et ce lot expose le schéma détaillé/contraintes/outils internes sans accord explicite sur cette publication précise. Aucune branche distante créée, aucun workflow lancé. Question d’autorisation envoyée avec choix de conserver le lot localement pour IT ou publier sur le dépôt public. La préparation et la conservation locale restent autorisées ; ne pas contourner ce refus.
+
 ## Version GitHub v3.1.0 (2026-10-26)
 
 - Demande utilisateur : pousser les dernières modifications avec un commit et une version. Branche `main`, nouveau tag annoté `v3.1.0` ; le tag historique `v3` est conservé. Version applicative `3.1.0+2` et documentation du fonctionnement actuel mises à jour.

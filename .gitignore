@@ -23,4 +23,11 @@ supabase/.branches/
 # Local Netlify folder
 .netlify
 *.zip
+.migration-data/
+.ci/
+backend/**/bin/
+backend/**/obj/
+backend/**/appsettings.Local.json
+backend/**/appsettings.Production.json
+backend/**/.env
 site_deploy.zip

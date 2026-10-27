@@ -1,0 +1,36 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {validateRow,manifestHash}=require('../migration/sqlserver/tools/row-validation.cjs');
+const manifest=require('../migration/sqlserver/manifest.json');
+const catalog=require('../migration/sqlserver/source-schema.json');
+assert.equal(manifestHash('{"tables":[]}\r\n'),manifestHash('{"tables":[]}\n'),'Windows/Linux manifest hashes agree');
+const find=name=>manifest.tables.find(t=>t.source_table===name);
+const single=(type,sqlType=type,nullable=false)=>({source_table:'fixture',columns:[{name:'value',type,sql_type:sqlType,nullable}]});
+const valid=(type,value,sqlType)=>validateRow(single(type,sqlType),{value}).value;
+const invalid=(type,value,sqlType)=>assert.throws(()=>valid(type,value,sqlType));
+assert.equal(manifest.tables.length,22);
+assert.equal(new Set(manifest.tables.map(t=>t.import_order)).size,22);
+for(const fk of catalog.constraints.filter(c=>c.type==='f'&&!c.definition.includes('auth.users'))){
+  const target=fk.definition.match(/REFERENCES (?:(?:public|private)\.)?([a-z_]+)\(/)[1];
+  assert.ok(find(target).import_order<find(fk.table).import_order,'parent is loaded before '+fk.table);
+}
+assert.ok(!find('profiles').columns.some(c=>c.name==='initial_password'));
+assert.ok(!manifest.tables.some(t=>t.source_schema==='auth'));
+assert.equal(valid('int8','9223372036854775807'),'9223372036854775807');
+invalid('int8','9223372036854775808');invalid('int8',9007199254740992);
+assert.equal(valid('numeric','12345678901234567890.123456789012345678'),'12345678901234567890.123456789012345678');
+invalid('numeric',1.1);invalid('numeric','1.1234567890123456789');invalid('numeric','123456789012345678901');
+assert.equal(valid('timestamptz','2026-10-27 12:34:56.123456+00'),'2026-10-27T12:34:56.123456+00:00');
+invalid('timestamptz',new Date());invalid('timestamptz','infinity');invalid('timestamptz','2026-10-27T12:34:56.1234567Z');
+assert.equal(valid('jsonb','{"transaction_number":9007199254740993}'),'{"transaction_number":9007199254740993}');
+assert.equal(valid('jsonb','null'),'null');invalid('jsonb',{value:1});invalid('jsonb','{invalid}');
+assert.equal(valid('date','2024-02-29'),'2024-02-29');invalid('date','2025-02-29');
+assert.equal(valid('uuid','12345678-1234-1234-1234-123456789abc'),'12345678-1234-1234-1234-123456789abc');invalid('uuid','not-a-guid');
+invalid('bool','false');assert.equal(valid('bool',false),false);
+invalid('int4',2147483648);invalid('int4',1.5);
+invalid('text','MAE ','nvarchar(64)');invalid('text','M'.repeat(65),'nvarchar(64)');
+assert.equal(valid('text','Équipe TCZ','nvarchar(max) COLLATE Latin1_General_100_BIN2'),'Équipe TCZ');
+assert.throws(()=>validateRow(single('text','nvarchar(max)'),{value:'ok',initial_password:'do-not-export'}),e=>!e.message.includes('do-not-export'));
+assert.equal(validateRow(single('text','nvarchar(max)',true),{value:null}).value,null);
+assert.throws(()=>validateRow(single('text','nvarchar(max)'),{}));
+console.log('PASS: all 22 tables, FK import order, no password export, exact bigint/decimal/JSON/microseconds, Unicode, nullability and truncation rejection');

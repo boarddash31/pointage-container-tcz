@@ -1,0 +1,2357 @@
+{
+  "captured_on": "2026-10-27",
+  "source_project": "iparzfqxopcvwqelxlad",
+  "postgres_version": "17.11",
+  "tables": [
+    {
+      "table": "transport_order_aliases",
+      "schema": "private",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "alias_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "order_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "jsonb",
+          "name": "original_header",
+          "type": "jsonb",
+          "default": null,
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "transport_order_controls",
+      "schema": "private",
+      "columns": [
+        {
+          "udt": "bool",
+          "name": "singleton",
+          "type": "boolean",
+          "default": "true",
+          "nullable": "NO"
+        },
+        {
+          "udt": "bool",
+          "name": "required",
+          "type": "boolean",
+          "default": "false",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "armateurs",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "text",
+          "name": "id",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "bic",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "official_logo_path",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "bool",
+          "name": "official_logo_verified",
+          "type": "boolean",
+          "default": "false",
+          "nullable": "NO"
+        },
+        {
+          "udt": "bool",
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "audit_logs",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "int8",
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "entity",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "entity_id",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "action",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "actor_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "jsonb",
+          "name": "before_data",
+          "type": "jsonb",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "jsonb",
+          "name": "after_data",
+          "type": "jsonb",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "reason",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        }
+      ]
+    },
+    {
+      "table": "bookings",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "reference",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "client_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "armateur_id",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "iso_code",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "client_armateurs",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "client_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "armateur_id",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "date",
+          "name": "valid_from",
+          "type": "date",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "date",
+          "name": "valid_to",
+          "type": "date",
+          "default": null,
+          "nullable": "YES"
+        }
+      ]
+    },
+    {
+      "table": "clients",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "code",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "name",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "bool",
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "container_number",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "client_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "armateur_id",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "iso_code",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "start_visit_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "end_visit_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "arrived_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "departed_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "position",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        }
+      ]
+    },
+    {
+      "table": "containers",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "text",
+          "name": "number",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "iso_code",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "armateur_id",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "source",
+          "type": "text",
+          "default": "'operator'::text",
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "document_actions",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "int8",
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "document_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "actor_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "action",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "evp_rules",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "date",
+          "name": "effective_from",
+          "type": "date",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "int4",
+          "name": "size_feet",
+          "type": "integer",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "numeric",
+          "name": "factor",
+          "type": "numeric",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "source_note",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "created_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "forced_container_actions",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "visit_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "container_number",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "action",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "reason",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "actor_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "uuid",
+          "name": "resolved_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "external_reference",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        }
+      ]
+    },
+    {
+      "table": "generated_documents",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "visit_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "int8",
+          "name": "event_id",
+          "type": "bigint",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "kind",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "storage_path",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "status",
+          "type": "text",
+          "default": "'pending'::text",
+          "nullable": "NO"
+        },
+        {
+          "udt": "jsonb",
+          "name": "snapshot",
+          "type": "jsonb",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "created_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "iso_report_types",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "text",
+          "name": "iso_code",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "date",
+          "name": "effective_from",
+          "type": "date",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "category",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "int4",
+          "name": "size_feet",
+          "type": "integer",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "source_note",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "printer_settings",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "device_id",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "printer_name",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "profiles",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "display_name",
+          "type": "text",
+          "default": "''::text",
+          "nullable": "NO"
+        },
+        {
+          "udt": "bool",
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "phone",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "first_name",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "last_name",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "avatar_url",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "initial_password",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        }
+      ]
+    },
+    {
+      "table": "transport_order_items",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "order_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "iso_code",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "int4",
+          "name": "quantity",
+          "type": "integer",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "armateur_id",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "transport_orders",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "kind",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "direction",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "reference",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "armateur_id",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "client_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "client_order_reference",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "bool",
+          "name": "active",
+          "type": "boolean",
+          "default": "true",
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "created_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "int4",
+          "name": "version",
+          "type": "integer",
+          "default": "1",
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "updated_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        }
+      ]
+    },
+    {
+      "table": "truck_visits",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "plate",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "driver_cin",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "entry_kind",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "container_number",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "uuid",
+          "name": "booking_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "iso_code",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "armateur_id",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "client_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "entered_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "entered_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "engin_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "uuid",
+          "name": "engin_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "exited_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "uuid",
+          "name": "exited_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "canceled_at",
+          "type": "timestamp with time zone",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "uuid",
+          "name": "canceled_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "cancel_reason",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "int4",
+          "name": "version",
+          "type": "integer",
+          "default": "1",
+          "nullable": "NO"
+        },
+        {
+          "udt": "bool",
+          "name": "is_twin",
+          "type": "boolean",
+          "default": "false",
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "container_number_2",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "iso_code_2",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "armateur_id_2",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "booking_reference_2",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "client_order_reference",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "carrier_booking_reference",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "carrier_booking_armateur_id",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "text",
+          "name": "carrier_booking_armateur_id_2",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "uuid",
+          "name": "order_item_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "uuid",
+          "name": "order_item_id_2",
+          "type": "uuid",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "bool",
+          "name": "order_controlled",
+          "type": "boolean",
+          "default": "false",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "user_roles",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "user_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "role",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "visit_events",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "int8",
+          "name": "id",
+          "type": "bigint",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "visit_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "action",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "actor_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "jsonb",
+          "name": "details",
+          "type": "jsonb",
+          "default": "'{}'::jsonb",
+          "nullable": "NO"
+        }
+      ]
+    },
+    {
+      "table": "yard_operations",
+      "schema": "public",
+      "columns": [
+        {
+          "udt": "uuid",
+          "name": "id",
+          "type": "uuid",
+          "default": "gen_random_uuid()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "visit_id",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "kind",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "container_number",
+          "type": "text",
+          "default": null,
+          "nullable": "NO"
+        },
+        {
+          "udt": "text",
+          "name": "position",
+          "type": "text",
+          "default": null,
+          "nullable": "YES"
+        },
+        {
+          "udt": "timestamptz",
+          "name": "performed_at",
+          "type": "timestamp with time zone",
+          "default": "now()",
+          "nullable": "NO"
+        },
+        {
+          "udt": "uuid",
+          "name": "performed_by",
+          "type": "uuid",
+          "default": null,
+          "nullable": "NO"
+        }
+      ]
+    }
+  ],
+  "constraints": [
+    {
+      "name": "transport_order_aliases_order_id_fkey",
+      "type": "f",
+      "table": "transport_order_aliases",
+      "schema": "private",
+      "definition": "FOREIGN KEY (order_id) REFERENCES transport_orders(id)"
+    },
+    {
+      "name": "transport_order_aliases_pkey",
+      "type": "p",
+      "table": "transport_order_aliases",
+      "schema": "private",
+      "definition": "PRIMARY KEY (alias_id)"
+    },
+    {
+      "name": "transport_order_controls_pkey",
+      "type": "p",
+      "table": "transport_order_controls",
+      "schema": "private",
+      "definition": "PRIMARY KEY (singleton)"
+    },
+    {
+      "name": "transport_order_controls_singleton_check",
+      "type": "c",
+      "table": "transport_order_controls",
+      "schema": "private",
+      "definition": "CHECK (singleton)"
+    },
+    {
+      "name": "armateurs_pkey",
+      "type": "p",
+      "table": "armateurs",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "audit_logs_actor_id_fkey",
+      "type": "f",
+      "table": "audit_logs",
+      "schema": "public",
+      "definition": "FOREIGN KEY (actor_id) REFERENCES profiles(id)"
+    },
+    {
+      "name": "audit_logs_pkey",
+      "type": "p",
+      "table": "audit_logs",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "bookings_armateur_id_fkey",
+      "type": "f",
+      "table": "bookings",
+      "schema": "public",
+      "definition": "FOREIGN KEY (armateur_id) REFERENCES armateurs(id)"
+    },
+    {
+      "name": "bookings_client_id_fkey",
+      "type": "f",
+      "table": "bookings",
+      "schema": "public",
+      "definition": "FOREIGN KEY (client_id) REFERENCES clients(id)"
+    },
+    {
+      "name": "bookings_pkey",
+      "type": "p",
+      "table": "bookings",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "bookings_reference_check",
+      "type": "c",
+      "table": "bookings",
+      "schema": "public",
+      "definition": "CHECK (((length(btrim(reference)) >= 1) AND (length(btrim(reference)) <= 150)))"
+    },
+    {
+      "name": "client_armateurs_armateur_id_fkey",
+      "type": "f",
+      "table": "client_armateurs",
+      "schema": "public",
+      "definition": "FOREIGN KEY (armateur_id) REFERENCES armateurs(id)"
+    },
+    {
+      "name": "client_armateurs_check",
+      "type": "c",
+      "table": "client_armateurs",
+      "schema": "public",
+      "definition": "CHECK (((valid_to IS NULL) OR (valid_to >= valid_from)))"
+    },
+    {
+      "name": "client_armateurs_client_id_fkey",
+      "type": "f",
+      "table": "client_armateurs",
+      "schema": "public",
+      "definition": "FOREIGN KEY (client_id) REFERENCES clients(id)"
+    },
+    {
+      "name": "client_armateurs_pkey",
+      "type": "p",
+      "table": "client_armateurs",
+      "schema": "public",
+      "definition": "PRIMARY KEY (client_id, armateur_id, valid_from)"
+    },
+    {
+      "name": "clients_code_key",
+      "type": "u",
+      "table": "clients",
+      "schema": "public",
+      "definition": "UNIQUE (code)"
+    },
+    {
+      "name": "clients_pkey",
+      "type": "p",
+      "table": "clients",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "container_stock_intervals_armateur_id_fkey",
+      "type": "f",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "FOREIGN KEY (armateur_id) REFERENCES armateurs(id)"
+    },
+    {
+      "name": "container_stock_intervals_check",
+      "type": "c",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "CHECK (((departed_at IS NULL) OR (departed_at >= arrived_at)))"
+    },
+    {
+      "name": "container_stock_intervals_client_id_fkey",
+      "type": "f",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "FOREIGN KEY (client_id) REFERENCES clients(id)"
+    },
+    {
+      "name": "container_stock_intervals_container_number_fkey",
+      "type": "f",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "FOREIGN KEY (container_number) REFERENCES containers(number)"
+    },
+    {
+      "name": "container_stock_intervals_end_visit_id_fkey",
+      "type": "f",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "FOREIGN KEY (end_visit_id) REFERENCES truck_visits(id)"
+    },
+    {
+      "name": "container_stock_intervals_pkey",
+      "type": "p",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "container_stock_intervals_start_visit_id_fkey",
+      "type": "f",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "FOREIGN KEY (start_visit_id) REFERENCES truck_visits(id)"
+    },
+    {
+      "name": "containers_armateur_id_fkey",
+      "type": "f",
+      "table": "containers",
+      "schema": "public",
+      "definition": "FOREIGN KEY (armateur_id) REFERENCES armateurs(id)"
+    },
+    {
+      "name": "containers_iso_code_check",
+      "type": "c",
+      "table": "containers",
+      "schema": "public",
+      "definition": "CHECK ((iso_code ~ '^[0-9A-Z]{4}$'::text))"
+    },
+    {
+      "name": "containers_number_check",
+      "type": "c",
+      "table": "containers",
+      "schema": "public",
+      "definition": "CHECK ((number ~ '^[A-Z]{4}[0-9]{7}$'::text))"
+    },
+    {
+      "name": "containers_pkey",
+      "type": "p",
+      "table": "containers",
+      "schema": "public",
+      "definition": "PRIMARY KEY (number)"
+    },
+    {
+      "name": "containers_source_check",
+      "type": "c",
+      "table": "containers",
+      "schema": "public",
+      "definition": "CHECK ((source = ANY (ARRAY['operator'::text, 'manual'::text, 'import'::text])))"
+    },
+    {
+      "name": "document_actions_action_check",
+      "type": "c",
+      "table": "document_actions",
+      "schema": "public",
+      "definition": "CHECK ((action = ANY (ARRAY['PREVIEW_REQUESTED'::text, 'SHARE_REQUESTED'::text, 'PRINT_DIALOG_REQUESTED'::text, 'DIRECT_PRINT_REQUESTED'::text, 'BRIDGE_ARCHIVE_REQUESTED'::text, 'BRIDGE_PRINT_REQUESTED'::text])))"
+    },
+    {
+      "name": "document_actions_actor_id_fkey",
+      "type": "f",
+      "table": "document_actions",
+      "schema": "public",
+      "definition": "FOREIGN KEY (actor_id) REFERENCES profiles(id)"
+    },
+    {
+      "name": "document_actions_document_id_fkey",
+      "type": "f",
+      "table": "document_actions",
+      "schema": "public",
+      "definition": "FOREIGN KEY (document_id) REFERENCES generated_documents(id)"
+    },
+    {
+      "name": "document_actions_pkey",
+      "type": "p",
+      "table": "document_actions",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "evp_rules_created_by_fkey",
+      "type": "f",
+      "table": "evp_rules",
+      "schema": "public",
+      "definition": "FOREIGN KEY (created_by) REFERENCES profiles(id)"
+    },
+    {
+      "name": "evp_rules_factor_check",
+      "type": "c",
+      "table": "evp_rules",
+      "schema": "public",
+      "definition": "CHECK ((factor > (0)::numeric))"
+    },
+    {
+      "name": "evp_rules_pkey",
+      "type": "p",
+      "table": "evp_rules",
+      "schema": "public",
+      "definition": "PRIMARY KEY (effective_from, size_feet)"
+    },
+    {
+      "name": "evp_rules_size_feet_check",
+      "type": "c",
+      "table": "evp_rules",
+      "schema": "public",
+      "definition": "CHECK ((size_feet = ANY (ARRAY[20, 40, 45])))"
+    },
+    {
+      "name": "forced_container_actions_action_check",
+      "type": "c",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "CHECK ((action = 'PRISE_SANS_STOCK'::text))"
+    },
+    {
+      "name": "forced_container_actions_actor_id_fkey",
+      "type": "f",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "FOREIGN KEY (actor_id) REFERENCES profiles(id)"
+    },
+    {
+      "name": "forced_container_actions_check",
+      "type": "c",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "CHECK ((((resolved_at IS NULL) AND (resolved_by IS NULL) AND (external_reference IS NULL)) OR ((resolved_at IS NOT NULL) AND (resolved_by IS NOT NULL) AND (length(btrim(external_reference)) >= 3))))"
+    },
+    {
+      "name": "forced_container_actions_container_number_fkey",
+      "type": "f",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "FOREIGN KEY (container_number) REFERENCES containers(number)"
+    },
+    {
+      "name": "forced_container_actions_pkey",
+      "type": "p",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "forced_container_actions_reason_check",
+      "type": "c",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "CHECK ((length(btrim(reason)) >= 10))"
+    },
+    {
+      "name": "forced_container_actions_resolved_by_fkey",
+      "type": "f",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "FOREIGN KEY (resolved_by) REFERENCES profiles(id)"
+    },
+    {
+      "name": "forced_container_actions_visit_id_fkey",
+      "type": "f",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "FOREIGN KEY (visit_id) REFERENCES truck_visits(id)"
+    },
+    {
+      "name": "forced_container_actions_visit_id_key",
+      "type": "u",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "UNIQUE (visit_id)"
+    },
+    {
+      "name": "generated_documents_created_by_fkey",
+      "type": "f",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "FOREIGN KEY (created_by) REFERENCES profiles(id)"
+    },
+    {
+      "name": "generated_documents_event_id_fkey",
+      "type": "f",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "FOREIGN KEY (event_id) REFERENCES visit_events(id)"
+    },
+    {
+      "name": "generated_documents_event_id_key",
+      "type": "u",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "UNIQUE (event_id)"
+    },
+    {
+      "name": "generated_documents_kind_check",
+      "type": "c",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "CHECK ((kind = ANY (ARRAY['ENTREE'::text, 'DEPOSE'::text, 'PRISE'::text, 'SORTIE'::text, 'ANNULATION'::text])))"
+    },
+    {
+      "name": "generated_documents_pkey",
+      "type": "p",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "generated_documents_status_check",
+      "type": "c",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "CHECK ((status = ANY (ARRAY['pending'::text, 'uploaded'::text, 'failed'::text])))"
+    },
+    {
+      "name": "generated_documents_storage_path_key",
+      "type": "u",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "UNIQUE (storage_path)"
+    },
+    {
+      "name": "generated_documents_visit_id_fkey",
+      "type": "f",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "FOREIGN KEY (visit_id) REFERENCES truck_visits(id)"
+    },
+    {
+      "name": "iso_report_types_category_check",
+      "type": "c",
+      "table": "iso_report_types",
+      "schema": "public",
+      "definition": "CHECK ((category = ANY (ARRAY['20 DV'::text, '40 DV ST'::text, '40 DV HC'::text, '45 DV'::text, 'FRIGO 20'::text, 'FRIGO 40'::text, 'OT&FL&HP&CT'::text])))"
+    },
+    {
+      "name": "iso_report_types_pkey",
+      "type": "p",
+      "table": "iso_report_types",
+      "schema": "public",
+      "definition": "PRIMARY KEY (iso_code, effective_from)"
+    },
+    {
+      "name": "iso_report_types_size_feet_check",
+      "type": "c",
+      "table": "iso_report_types",
+      "schema": "public",
+      "definition": "CHECK ((size_feet = ANY (ARRAY[20, 40, 45])))"
+    },
+    {
+      "name": "printer_settings_pkey",
+      "type": "p",
+      "table": "printer_settings",
+      "schema": "public",
+      "definition": "PRIMARY KEY (user_id, device_id)"
+    },
+    {
+      "name": "printer_settings_user_id_fkey",
+      "type": "f",
+      "table": "printer_settings",
+      "schema": "public",
+      "definition": "FOREIGN KEY (user_id) REFERENCES profiles(id)"
+    },
+    {
+      "name": "profiles_id_fkey",
+      "type": "f",
+      "table": "profiles",
+      "schema": "public",
+      "definition": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "profiles_pkey",
+      "type": "p",
+      "table": "profiles",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "transport_order_item_carrier_iso_key",
+      "type": "u",
+      "table": "transport_order_items",
+      "schema": "public",
+      "definition": "UNIQUE (order_id, armateur_id, iso_code)"
+    },
+    {
+      "name": "transport_order_items_armateur_id_fkey",
+      "type": "f",
+      "table": "transport_order_items",
+      "schema": "public",
+      "definition": "FOREIGN KEY (armateur_id) REFERENCES armateurs(id)"
+    },
+    {
+      "name": "transport_order_items_iso_code_check",
+      "type": "c",
+      "table": "transport_order_items",
+      "schema": "public",
+      "definition": "CHECK ((iso_code ~ '^[0-9A-Z]{4}$'::text))"
+    },
+    {
+      "name": "transport_order_items_order_id_fkey",
+      "type": "f",
+      "table": "transport_order_items",
+      "schema": "public",
+      "definition": "FOREIGN KEY (order_id) REFERENCES transport_orders(id)"
+    },
+    {
+      "name": "transport_order_items_pkey",
+      "type": "p",
+      "table": "transport_order_items",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "transport_order_items_quantity_check",
+      "type": "c",
+      "table": "transport_order_items",
+      "schema": "public",
+      "definition": "CHECK (((quantity >= 1) AND (quantity <= 1000000)))"
+    },
+    {
+      "name": "transport_orders_armateur_id_fkey",
+      "type": "f",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "FOREIGN KEY (armateur_id) REFERENCES armateurs(id)"
+    },
+    {
+      "name": "transport_orders_check",
+      "type": "c",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "CHECK ((((kind <> 'EDO'::text) OR (direction = 'LIVRAISON'::text)) AND ((kind <> 'ERO'::text) OR (direction = 'RESTITUTION'::text))))"
+    },
+    {
+      "name": "transport_orders_check1",
+      "type": "c",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "CHECK (((client_order_reference IS NULL) OR (client_id IS NOT NULL)))"
+    },
+    {
+      "name": "transport_orders_client_id_fkey",
+      "type": "f",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "FOREIGN KEY (client_id) REFERENCES clients(id)"
+    },
+    {
+      "name": "transport_orders_created_by_fkey",
+      "type": "f",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "FOREIGN KEY (created_by) REFERENCES profiles(id)"
+    },
+    {
+      "name": "transport_orders_direction_check",
+      "type": "c",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "CHECK ((direction = ANY (ARRAY['RESTITUTION'::text, 'LIVRAISON'::text])))"
+    },
+    {
+      "name": "transport_orders_kind_check",
+      "type": "c",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "CHECK ((kind = ANY (ARRAY['BOOKING'::text, 'EDO'::text, 'ERO'::text])))"
+    },
+    {
+      "name": "transport_orders_pkey",
+      "type": "p",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "transport_orders_reference_check",
+      "type": "c",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "CHECK (((length(btrim(reference)) >= 1) AND (length(btrim(reference)) <= 150)))"
+    },
+    {
+      "name": "transport_orders_updated_by_fkey",
+      "type": "f",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "FOREIGN KEY (updated_by) REFERENCES profiles(id)"
+    },
+    {
+      "name": "gate_visit_entry_payload",
+      "type": "c",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CHECK ((((entry_kind = 'loaded'::text) AND (container_number IS NOT NULL)) OR ((entry_kind = 'empty'::text) AND (booking_id IS NOT NULL))))"
+    },
+    {
+      "name": "truck_visits_armateur_id_2_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (armateur_id_2) REFERENCES armateurs(id)"
+    },
+    {
+      "name": "truck_visits_armateur_id_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (armateur_id) REFERENCES armateurs(id)"
+    },
+    {
+      "name": "truck_visits_booking_id_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (booking_id) REFERENCES bookings(id)"
+    },
+    {
+      "name": "truck_visits_canceled_by_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (canceled_by) REFERENCES profiles(id)"
+    },
+    {
+      "name": "truck_visits_carrier_booking_armateur_id_2_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (carrier_booking_armateur_id_2) REFERENCES armateurs(id)"
+    },
+    {
+      "name": "truck_visits_carrier_booking_armateur_id_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (carrier_booking_armateur_id) REFERENCES armateurs(id)"
+    },
+    {
+      "name": "truck_visits_carrier_booking_reference_check",
+      "type": "c",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CHECK (((length(btrim(carrier_booking_reference)) >= 1) AND (length(btrim(carrier_booking_reference)) <= 150)))"
+    },
+    {
+      "name": "truck_visits_check1",
+      "type": "c",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CHECK (((exited_at IS NULL) OR ((engin_at IS NOT NULL) AND (canceled_at IS NULL))))"
+    },
+    {
+      "name": "truck_visits_check2",
+      "type": "c",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CHECK (((canceled_at IS NULL) OR ((exited_at IS NULL) AND (length(btrim(cancel_reason)) > 0))))"
+    },
+    {
+      "name": "truck_visits_client_id_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (client_id) REFERENCES clients(id)"
+    },
+    {
+      "name": "truck_visits_client_order_reference_check",
+      "type": "c",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CHECK (((length(btrim(client_order_reference)) >= 1) AND (length(btrim(client_order_reference)) <= 150)))"
+    },
+    {
+      "name": "truck_visits_container_number_2_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (container_number_2) REFERENCES containers(number)"
+    },
+    {
+      "name": "truck_visits_container_number_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (container_number) REFERENCES containers(number)"
+    },
+    {
+      "name": "truck_visits_engin_by_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (engin_by) REFERENCES profiles(id)"
+    },
+    {
+      "name": "truck_visits_entered_by_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (entered_by) REFERENCES profiles(id)"
+    },
+    {
+      "name": "truck_visits_entry_kind_check",
+      "type": "c",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CHECK ((entry_kind = ANY (ARRAY['loaded'::text, 'empty'::text])))"
+    },
+    {
+      "name": "truck_visits_exited_by_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (exited_by) REFERENCES profiles(id)"
+    },
+    {
+      "name": "truck_visits_order_item_id_2_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (order_item_id_2) REFERENCES transport_order_items(id)"
+    },
+    {
+      "name": "truck_visits_order_item_id_fkey",
+      "type": "f",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "FOREIGN KEY (order_item_id) REFERENCES transport_order_items(id)"
+    },
+    {
+      "name": "truck_visits_pkey",
+      "type": "p",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "user_roles_pkey",
+      "type": "p",
+      "table": "user_roles",
+      "schema": "public",
+      "definition": "PRIMARY KEY (user_id, role)"
+    },
+    {
+      "name": "user_roles_role_check",
+      "type": "c",
+      "table": "user_roles",
+      "schema": "public",
+      "definition": "CHECK ((role = ANY (ARRAY['admin'::text, 'entree'::text, 'engin'::text, 'sortie'::text, 'viewer'::text])))"
+    },
+    {
+      "name": "user_roles_user_id_fkey",
+      "type": "f",
+      "table": "user_roles",
+      "schema": "public",
+      "definition": "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE"
+    },
+    {
+      "name": "visit_events_action_check",
+      "type": "c",
+      "table": "visit_events",
+      "schema": "public",
+      "definition": "CHECK ((action = ANY (ARRAY['ENTREE'::text, 'DEPOSE'::text, 'PRISE'::text, 'SORTIE'::text, 'ANNULATION'::text])))"
+    },
+    {
+      "name": "visit_events_actor_id_fkey",
+      "type": "f",
+      "table": "visit_events",
+      "schema": "public",
+      "definition": "FOREIGN KEY (actor_id) REFERENCES profiles(id)"
+    },
+    {
+      "name": "visit_events_pkey",
+      "type": "p",
+      "table": "visit_events",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "visit_events_visit_id_fkey",
+      "type": "f",
+      "table": "visit_events",
+      "schema": "public",
+      "definition": "FOREIGN KEY (visit_id) REFERENCES truck_visits(id)"
+    },
+    {
+      "name": "yard_operations_container_number_fkey",
+      "type": "f",
+      "table": "yard_operations",
+      "schema": "public",
+      "definition": "FOREIGN KEY (container_number) REFERENCES containers(number)"
+    },
+    {
+      "name": "yard_operations_kind_check",
+      "type": "c",
+      "table": "yard_operations",
+      "schema": "public",
+      "definition": "CHECK ((kind = ANY (ARRAY['depose'::text, 'prise'::text])))"
+    },
+    {
+      "name": "yard_operations_performed_by_fkey",
+      "type": "f",
+      "table": "yard_operations",
+      "schema": "public",
+      "definition": "FOREIGN KEY (performed_by) REFERENCES profiles(id)"
+    },
+    {
+      "name": "yard_operations_pkey",
+      "type": "p",
+      "table": "yard_operations",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "yard_operations_visit_id_fkey",
+      "type": "f",
+      "table": "yard_operations",
+      "schema": "public",
+      "definition": "FOREIGN KEY (visit_id) REFERENCES truck_visits(id)"
+    },
+    {
+      "name": "yard_operations_visit_id_key",
+      "type": "u",
+      "table": "yard_operations",
+      "schema": "public",
+      "definition": "UNIQUE (visit_id)"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "user_roles_pkey",
+      "table": "user_roles",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX user_roles_pkey ON public.user_roles USING btree (user_id, role)"
+    },
+    {
+      "name": "clients_pkey",
+      "table": "clients",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX clients_pkey ON public.clients USING btree (id)"
+    },
+    {
+      "name": "clients_code_key",
+      "table": "clients",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX clients_code_key ON public.clients USING btree (code)"
+    },
+    {
+      "name": "armateurs_pkey",
+      "table": "armateurs",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX armateurs_pkey ON public.armateurs USING btree (id)"
+    },
+    {
+      "name": "client_armateurs_pkey",
+      "table": "client_armateurs",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX client_armateurs_pkey ON public.client_armateurs USING btree (client_id, armateur_id, valid_from)"
+    },
+    {
+      "name": "containers_pkey",
+      "table": "containers",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX containers_pkey ON public.containers USING btree (number)"
+    },
+    {
+      "name": "bookings_pkey",
+      "table": "bookings",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX bookings_pkey ON public.bookings USING btree (id)"
+    },
+    {
+      "name": "yard_operations_pkey",
+      "table": "yard_operations",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX yard_operations_pkey ON public.yard_operations USING btree (id)"
+    },
+    {
+      "name": "yard_operations_visit_id_key",
+      "table": "yard_operations",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX yard_operations_visit_id_key ON public.yard_operations USING btree (visit_id)"
+    },
+    {
+      "name": "container_stock_intervals_pkey",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX container_stock_intervals_pkey ON public.container_stock_intervals USING btree (id)"
+    },
+    {
+      "name": "one_open_stock_interval",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX one_open_stock_interval ON public.container_stock_intervals USING btree (container_number) WHERE (departed_at IS NULL)"
+    },
+    {
+      "name": "one_open_yard_position",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX one_open_yard_position ON public.container_stock_intervals USING btree (\"position\") WHERE ((departed_at IS NULL) AND (\"position\" IS NOT NULL))"
+    },
+    {
+      "name": "stock_interval_period_idx",
+      "table": "container_stock_intervals",
+      "schema": "public",
+      "definition": "CREATE INDEX stock_interval_period_idx ON public.container_stock_intervals USING btree (arrived_at, departed_at)"
+    },
+    {
+      "name": "visit_events_pkey",
+      "table": "visit_events",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX visit_events_pkey ON public.visit_events USING btree (id)"
+    },
+    {
+      "name": "visit_events_timeline_idx",
+      "table": "visit_events",
+      "schema": "public",
+      "definition": "CREATE INDEX visit_events_timeline_idx ON public.visit_events USING btree (visit_id, occurred_at, id)"
+    },
+    {
+      "name": "audit_logs_pkey",
+      "table": "audit_logs",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX audit_logs_pkey ON public.audit_logs USING btree (id)"
+    },
+    {
+      "name": "audit_logs_visit_latest_idx",
+      "table": "audit_logs",
+      "schema": "public",
+      "definition": "CREATE INDEX audit_logs_visit_latest_idx ON public.audit_logs USING btree (entity_id, occurred_at DESC, id DESC) WHERE (entity = 'truck_visit'::text)"
+    },
+    {
+      "name": "printer_settings_pkey",
+      "table": "printer_settings",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX printer_settings_pkey ON public.printer_settings USING btree (user_id, device_id)"
+    },
+    {
+      "name": "truck_visits_pkey",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX truck_visits_pkey ON public.truck_visits USING btree (id)"
+    },
+    {
+      "name": "truck_visits_fifo_idx",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CREATE INDEX truck_visits_fifo_idx ON public.truck_visits USING btree (entered_at, id) WHERE ((exited_at IS NULL) AND (canceled_at IS NULL))"
+    },
+    {
+      "name": "one_active_container_on_truck",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX one_active_container_on_truck ON public.truck_visits USING btree (container_number) WHERE ((container_number IS NOT NULL) AND (canceled_at IS NULL) AND (exited_at IS NULL) AND (((entry_kind = 'loaded'::text) AND (engin_at IS NULL)) OR ((entry_kind = 'empty'::text) AND (engin_at IS NOT NULL))))"
+    },
+    {
+      "name": "truck_visits_client_date_idx",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CREATE INDEX truck_visits_client_date_idx ON public.truck_visits USING btree (client_id, entered_at)"
+    },
+    {
+      "name": "truck_visits_armateur_date_idx",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CREATE INDEX truck_visits_armateur_date_idx ON public.truck_visits USING btree (armateur_id, entered_at)"
+    },
+    {
+      "name": "one_active_container_2_on_truck",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX one_active_container_2_on_truck ON public.truck_visits USING btree (container_number_2) WHERE ((container_number_2 IS NOT NULL) AND (canceled_at IS NULL) AND (exited_at IS NULL) AND (((entry_kind = 'loaded'::text) AND (engin_at IS NULL)) OR ((entry_kind = 'empty'::text) AND (engin_at IS NOT NULL))))"
+    },
+    {
+      "name": "visits_order_item_idx",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CREATE INDEX visits_order_item_idx ON public.truck_visits USING btree (order_item_id) WHERE (canceled_at IS NULL)"
+    },
+    {
+      "name": "visits_order_item_2_idx",
+      "table": "truck_visits",
+      "schema": "public",
+      "definition": "CREATE INDEX visits_order_item_2_idx ON public.truck_visits USING btree (order_item_id_2) WHERE (canceled_at IS NULL)"
+    },
+    {
+      "name": "evp_rules_pkey",
+      "table": "evp_rules",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX evp_rules_pkey ON public.evp_rules USING btree (effective_from, size_feet)"
+    },
+    {
+      "name": "iso_report_types_pkey",
+      "table": "iso_report_types",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX iso_report_types_pkey ON public.iso_report_types USING btree (iso_code, effective_from)"
+    },
+    {
+      "name": "generated_documents_pkey",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX generated_documents_pkey ON public.generated_documents USING btree (id)"
+    },
+    {
+      "name": "generated_documents_event_id_key",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX generated_documents_event_id_key ON public.generated_documents USING btree (event_id)"
+    },
+    {
+      "name": "generated_documents_storage_path_key",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX generated_documents_storage_path_key ON public.generated_documents USING btree (storage_path)"
+    },
+    {
+      "name": "generated_documents_visit_idx",
+      "table": "generated_documents",
+      "schema": "public",
+      "definition": "CREATE INDEX generated_documents_visit_idx ON public.generated_documents USING btree (visit_id, created_at)"
+    },
+    {
+      "name": "forced_container_actions_pkey",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX forced_container_actions_pkey ON public.forced_container_actions USING btree (id)"
+    },
+    {
+      "name": "forced_container_actions_visit_id_key",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX forced_container_actions_visit_id_key ON public.forced_container_actions USING btree (visit_id)"
+    },
+    {
+      "name": "forced_actions_unresolved_idx",
+      "table": "forced_container_actions",
+      "schema": "public",
+      "definition": "CREATE INDEX forced_actions_unresolved_idx ON public.forced_container_actions USING btree (occurred_at) WHERE (resolved_at IS NULL)"
+    },
+    {
+      "name": "document_actions_pkey",
+      "table": "document_actions",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX document_actions_pkey ON public.document_actions USING btree (id)"
+    },
+    {
+      "name": "document_actions_document_idx",
+      "table": "document_actions",
+      "schema": "public",
+      "definition": "CREATE INDEX document_actions_document_idx ON public.document_actions USING btree (document_id, occurred_at)"
+    },
+    {
+      "name": "profiles_pkey",
+      "table": "profiles",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)"
+    },
+    {
+      "name": "idx_profiles_phone_unique",
+      "table": "profiles",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX idx_profiles_phone_unique ON public.profiles USING btree (phone) WHERE ((phone IS NOT NULL) AND (phone <> ''::text))"
+    },
+    {
+      "name": "transport_order_controls_pkey",
+      "table": "transport_order_controls",
+      "schema": "private",
+      "definition": "CREATE UNIQUE INDEX transport_order_controls_pkey ON private.transport_order_controls USING btree (singleton)"
+    },
+    {
+      "name": "transport_orders_pkey",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX transport_orders_pkey ON public.transport_orders USING btree (id)"
+    },
+    {
+      "name": "transport_orders_client_idx",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "CREATE INDEX transport_orders_client_idx ON public.transport_orders USING btree (client_id) WHERE (client_id IS NOT NULL)"
+    },
+    {
+      "name": "transport_orders_reference_key",
+      "table": "transport_orders",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX transport_orders_reference_key ON public.transport_orders USING btree (upper(btrim(reference)))"
+    },
+    {
+      "name": "transport_order_items_pkey",
+      "table": "transport_order_items",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX transport_order_items_pkey ON public.transport_order_items USING btree (id)"
+    },
+    {
+      "name": "transport_order_item_carrier_iso_key",
+      "table": "transport_order_items",
+      "schema": "public",
+      "definition": "CREATE UNIQUE INDEX transport_order_item_carrier_iso_key ON public.transport_order_items USING btree (order_id, armateur_id, iso_code)"
+    },
+    {
+      "name": "transport_order_item_carrier_idx",
+      "table": "transport_order_items",
+      "schema": "public",
+      "definition": "CREATE INDEX transport_order_item_carrier_idx ON public.transport_order_items USING btree (armateur_id)"
+    },
+    {
+      "name": "transport_order_aliases_pkey",
+      "table": "transport_order_aliases",
+      "schema": "private",
+      "definition": "CREATE UNIQUE INDEX transport_order_aliases_pkey ON private.transport_order_aliases USING btree (alias_id)"
+    },
+    {
+      "name": "transport_order_alias_parent_idx",
+      "table": "transport_order_aliases",
+      "schema": "private",
+      "definition": "CREATE INDEX transport_order_alias_parent_idx ON private.transport_order_aliases USING btree (order_id)"
+    }
+  ],
+  "extensions": [
+    {
+      "name": "plpgsql",
+      "version": "1.0"
+    },
+    {
+      "name": "pg_stat_statements",
+      "version": "1.11"
+    },
+    {
+      "name": "uuid-ossp",
+      "version": "1.1"
+    },
+    {
+      "name": "pgcrypto",
+      "version": "1.3"
+    },
+    {
+      "name": "supabase_vault",
+      "version": "0.3.1"
+    }
+  ]
+}
