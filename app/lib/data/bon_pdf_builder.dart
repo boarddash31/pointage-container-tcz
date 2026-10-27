@@ -4,6 +4,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../domain/terminal_slip.dart';
 import 'terminal_slip_pdf.dart';
+import '../domain/gate_out_slip.dart';
+import 'gate_out_slip_pdf.dart';
 
 class BonPdfBuilder {
   static String decodeIso(String? iso) {
@@ -57,6 +59,7 @@ class BonPdfBuilder {
     final plate = (visitData?['plate'] ?? snapshot['plate'] ?? '-').toString().toUpperCase();
     final cin = (visitData?['driver_cin'] ?? snapshot['driver_cin'] ?? '-').toString().toUpperCase();
     final entryKind = (visitData?['entry_kind'] ?? snapshot['entry_kind'] ?? 'empty').toString().toLowerCase();
+    if(kind=='SORTIE')return GateOutSlipPdf.build(GateOutSlip.fromDocument(document,visitData:visitData));
     if(TerminalSlip.supports(kind))return TerminalSlipPdf.build(TerminalSlip.fromDocument(document,visitData:visitData));
 
     // Container 1

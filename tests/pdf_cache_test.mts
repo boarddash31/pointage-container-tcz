@@ -5,4 +5,7 @@ assert.equal(hasCurrentPdf(archived),false,'an archived TCZ PDF must be regenera
 assert.equal(documentPdfPath(archived),'visit/doc-marsa-v1.pdf','new format has its own immutable file');
 assert.equal(hasCurrentPdf({...archived,storage_path:'visit/doc-marsa-v1.pdf'}),true);
 assert.equal(hasCurrentPdf({...archived,kind:'ANNULATION'}),true);
+assert.equal(documentPdfPath({...archived,kind:'SORTIE'}),'visit/doc-gate-out-v1.pdf');
+assert.equal(hasCurrentPdf({...archived,kind:'SORTIE',storage_path:'visit/doc-marsa-v1.pdf'}),false);
+assert.equal(hasCurrentPdf({...archived,kind:'SORTIE',storage_path:'visit/doc-gate-out-v1.pdf'}),true);
 console.log('PASS: archived old layout is not reused; matching current layout is cached; cancellation archives preserved');

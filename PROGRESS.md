@@ -1,5 +1,12 @@
 # Pointage Container — progress
 
+## v3.1.1 — 2026-10-27
+
+- Bon de Sortie A4 TCZ / Marsa Maroc : présentation douanière, identification, données camion/chauffeur/agent, cadres ECOR et sortie du terminal.
+- Conservation des faits archivés, prise en charge de deux conteneurs et du camion vide après restitution ; aucune supposition sur les champs douaniers ou le poids.
+- Cache PDF SORTIE versionné gate-out-v1 ; l'ancien modèle est refusé en repli. Le générateur serveur nécessite un déploiement séparé.
+- 49 tests Flutter réussis et compilation web vérifiée. Publication GitHub uniquement.
+
 ## Version GitHub v3.1.0 (2026-10-26)
 
 - Demande utilisateur : pousser les dernières modifications avec un commit et une version. Branche `main`, nouveau tag annoté `v3.1.0` ; le tag historique `v3` est conservé. Version applicative `3.1.0+2` et documentation du fonctionnement actuel mises à jour.

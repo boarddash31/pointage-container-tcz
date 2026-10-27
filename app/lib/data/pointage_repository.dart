@@ -210,7 +210,7 @@ class PointageRepository {
 
   Future<List<Map<String, dynamic>>> documents() async =>
       List<Map<String, dynamic>>.from(await client.from('generated_documents')
-          .select('id,visit_id,kind,status,storage_path,created_at,snapshot')
+          .select('id,visit_id,event_id,kind,status,storage_path,created_at,snapshot')
           .order('created_at', ascending: false).limit(200));
 
   Future<Map<String, dynamic>> createAgent({
