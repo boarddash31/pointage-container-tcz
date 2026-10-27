@@ -1,7 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.76.1';
 import { PDFDocument, StandardFonts, rgb } from 'npm:pdf-lib@1.17.1';
 import { terminalSlipPdf } from './terminal-slip.ts';
-import { documentPdfPath,hasCurrentPdf,isTerminalForm,terminalTemplateVersion } from './pdf-cache.ts';
+import { gateOutSlipPdf } from './gate-out-pdf.ts';
+import { documentPdfPath,hasCurrentPdf,documentTemplateVersion } from './pdf-cache.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -37,6 +38,7 @@ function formatDate(rawIso: unknown): string {
 }
 
 async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
+  if (String(document.kind).toUpperCase()==='SORTIE') return gateOutSlipPdf(document);
   if (['ENTREE','DEPOSE','PRISE','SORTIE'].includes(String(document.kind).toUpperCase())) return terminalSlipPdf(document);
   const snapshot = (document.snapshot ?? {}) as Record<string, unknown>;
   const event = (snapshot.event ?? {}) as Record<string, unknown>;
@@ -322,11 +324,11 @@ Deno.serve(async (request) => {
   }
   const { data: doc, error: readError } = await userClient
     .from('generated_documents')
-    .select('id,visit_id,kind,status,storage_path,snapshot,created_at')
+    .select('id,visit_id,event_id,kind,status,storage_path,snapshot,created_at')
     .eq('id', documentId)
     .single();
   if (readError || !doc) return json(404, { error: 'Document unavailable' });
-  const templateVersion=isTerminalForm(doc.kind)?terminalTemplateVersion:'legacy';
+  const templateVersion=documentTemplateVersion(doc.kind);
   if (hasCurrentPdf(doc)) return json(200, { path: doc.storage_path,template_version:templateVersion });
   const {data: context} = await userClient.rpc('document_print_context', {p_document: doc.id});
   const admin = createClient(url, service);

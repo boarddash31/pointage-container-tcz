@@ -1,10 +1,19 @@
 # Pointage Container — progress
 
+## Bon de Sortie TCZ / Marsa Maroc — essais locaux (2026-10-27)
+
+- Modèle A4 à bordures d'après l'exemple fourni, identité TCZ / Marsa Maroc confirmée : date/autorisation, identification, filigrane DOUANE, camion/chauffeur/agent/ISO/armateur, déclaration/B/L/poids, cadres ECOR et sortie du terminal.
+- Les faits archivés priment sur les données actuelles. Plein/vide, poids et informations douanières ne sont pas déduits du code ISO ou de l'EDO. Une restitution laisse sortir le camion vide sans présenter le conteneur déposé comme livré. Un ou deux conteneurs sortants pris en charge.
+- Nouveau suffixe PDF `gate-out-v1` pour SORTIE ; refus d'un ancien modèle dans le repli serveur. Source Edge Function préparée et testée localement, sans déploiement Supabase. Si le rendu local échoue, le repli SORTIE nécessite cette future mise à jour serveur.
+- 49 tests Flutter réussis, analyse des fichiers modifiés sans remarque, contrôles Node des valeurs/cache et génération serveur avec pdf-lib réussis (simple, twin, châssis vide). PDF local inspecté visuellement sur une page A4 ; exemple `.qa/bon-sortie-tcz.pdf`.
+- Web compilé, servi et vérifié sur `http://localhost:8787/marsa-bons-v1/`, SHA256 JS `65742510f1ae7bda12d14a09e040d07d58d0bb5222526841c05d2b1ffb233ecd`. Aucun déploiement externe ni push. `site/` reste le précédent artefact publié ; l'aperçu sert `app/build/web/`.
+
 ## Comptes applicatifs — annulation AD/Entra (2026-10-27)
 
 - Dernière décision utilisateur : comptes normaux créés uniquement par Admin ; l'option AD/Entra est annulée et remplace le choix précédent. Aucun fournisseur d'identité d'entreprise à provisionner.
 - Retrait du gestionnaire CorporateAuthentication, de Negotiate et de ses configurations/tests. Le premier lot API conserve son contrat de validation JWT ; le module complet comptes/login/mots de passe reste à réaliser avant bascule. L'application Flutter actuelle continue à utiliser ses comptes Supabase.
 - Demande IT et guide de migration alignés sur des comptes applicatifs, rôles administrés, hachage des mots de passe et conservation des UUID historiques. Le lot reste local, sans publication GitHub ni bascule de production.
+- Correction conservée dans le commit local `7e9c2e2`. Archive IT remplacée par `.qa/sqlserver2025-it-20261027-7e9c2e2.zip` (28 fichiers, SHA256 `4246f01ee2530ab3ff768a6262c653d5d126be7ac9bc4307f1874372401fe392`), sans données métier ni secrets ; elle annule l'archive précédente contenant la préparation AD. Tests de conversion Node réussis, fichiers projet XML valides ; .NET/SQL à valider par IT, non exécutés ici.
 
 ## Comptes d’entreprise et validation locale IT (2026-10-27)
 

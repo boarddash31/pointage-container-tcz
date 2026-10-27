@@ -4,7 +4,7 @@ import 'package:pointage_container/data/bon_pdf_builder.dart';
 
 void main(){
   TestWidgetsFlutterBinding.ensureInitialized();
-  test('simplified delivery PDF renders a twin using the archived snapshot',()async{
+  test('gate-out PDF renders a twin using the archived snapshot',()async{
     final bytes=await BonPdfBuilder.buildA5(document:{'id':'doc-123','visit_id':'visit-123','kind':'SORTIE','created_at':'2026-10-23T12:00:00Z','snapshot':{
       'entry_kind':'empty','plate':'12345-A-06','driver_cin':'AB12345','entered_at':'2026-10-23T11:00:00Z',
       'container_number':'CSQU3054383','iso_code':'22G1','armateur_id':'MAE','carrier_booking_reference':'EDO-1',

@@ -67,7 +67,7 @@ class DocumentService {
   }
 
   Future<Map<String,dynamic>?> latest(String visitId,String kind) async =>
-    client.from('generated_documents').select('id,visit_id,kind,status,storage_path,snapshot,created_at')
+    client.from('generated_documents').select('id,visit_id,event_id,kind,status,storage_path,snapshot,created_at')
       .eq('visit_id',visitId).eq('kind',kind).order('created_at',ascending:false)
       .limit(1).maybeSingle();
 
@@ -98,6 +98,7 @@ class DocumentService {
       // Fallback to storage download if builder fails
       var path = document['storage_path'] as String?;
       final terminalForm=TerminalSlip.supports((document['kind']??'').toString());
+      final expectedTemplate=document['kind']?.toString().toUpperCase()=='SORTIE'?'gate-out-v1':'marsa-v1';
       if (terminalForm||path == null || path.isEmpty) {
         final response = await client.functions.invoke('generate-bon', body: {
           'document_id': document['id'],
@@ -106,8 +107,8 @@ class DocumentService {
           throw StateError('Génération PDF refusée (${response.status}) : ${response.data}');
         }
         final result=response.data as Map<String,dynamic>;
-        if(terminalForm&&(result['template_version']!='marsa-v1'||!(result['path']?.toString().endsWith('-marsa-v1.pdf')??false))){
-          throw StateError('Le générateur PDF ne fournit pas encore le modèle Marsa Maroc. Réessayez après sa mise à jour.');
+        if(terminalForm&&(result['template_version']!=expectedTemplate||!(result['path']?.toString().endsWith('-$expectedTemplate.pdf')??false))){
+          throw StateError('Le générateur PDF ne fournit pas encore le modèle demandé. Réessayez après sa mise à jour.');
         }
         path = result['path'] as String?;
         if (path == null) throw StateError('Chemin du PDF absent.');
