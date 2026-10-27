@@ -83,10 +83,8 @@ jobs:
         shell: bash
         run: |
           export ConnectionStrings__Pointage="Server=localhost,1433;Database=TCZ_Pointage_Test;User Id=sa;Password=$MSSQL_SA_PASSWORD;Encrypt=Mandatory;TrustServerCertificate=False"
-          export Authentication__Mode=EntraId
-          export Authentication__EntraId__TenantId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
-          export Authentication__EntraId__ApiClientId=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb
-          export Authentication__EntraId__AllowedClientIds__0=cccccccc-cccc-4ccc-8ccc-cccccccccccc
+          export Authentication__Authority=https://identity.invalid
+          export Authentication__Audience=pointage-test
           export Cors__Origins__0=https://localhost
           export ASPNETCORE_URLS=https://localhost:5443
           export ASPNETCORE_Kestrel__Certificates__Default__Path="$GITHUB_WORKSPACE/.ci/server.pfx"

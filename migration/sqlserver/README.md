@@ -10,27 +10,27 @@ This branch starts the replacement backend. Flutter v3.1.0 still connects to the
 - Reproducible SQL Server DDL and a transfer manifest. UUIDs, event/audit IDs, Unicode strings, JSON text and timestamp precision are retained. `profiles.initial_password` and the Supabase `auth` schema are excluded.
 - A read-only, repeatable-read PostgreSQL exporter and a transactional .NET bulk importer. Export snapshots are private files under ignored `.migration-data/`.
 - ASP.NET Core API for the current user, armateurs and EDO/ERO read/create/edit/increment operations. SQL enforces global reference uniqueness, item/carrier/ISO uniqueness, version conflicts and allocated-quantity/history protection. A stock-update guard enforces 24 hours from the receiving truck entry.
-- Corporate authentication handlers prepared for Entra ID or AD Windows/Negotiate. Entra checks a single tenant, the API audience, allowed client applications and a delegated scope; AD uses the Windows SID authenticated by IIS/Negotiate. The stable corporate identity must map to an active profile in `internal.identity_accounts`; application roles come from SQL. No default admin, shared password or anonymous business endpoint is provided.
+- A protected API scaffold with JWT validation and server-managed application roles. The final account mechanism will use application-managed accounts created only by an administrator; AD/Entra integration is cancelled. No default admin, shared password or anonymous business endpoint is provided. Login/password lifecycle endpoints remain a required implementation slice.
 - SQL Server 2025 syntax checks, rollback-only database tests, transfer-conversion unit checks and a CI job using a temporary SQL Server container with synthetic fixtures.
 
 ## Remaining before production
 
-1. Corporate accounts have been selected. IT must confirm the available mechanism (AD Windows integrated or Entra ID), configure its domain/tenant/application IDs and validate the prepared API handlers. Implement the corresponding browser login flow and directory-provisioning process; the current Flutter login still uses Supabase.
+1. Implement normal application accounts and the corresponding login/password lifecycle, with account creation restricted to Admin. AD/Entra was explicitly cancelled. The existing token-validation scaffold is not a finished account service; the current Flutter login still uses Supabase until the account/backend adapter slice is implemented.
 2. Port gate entry, twin reservations, yard movements, gate exit, cancellation, reconciliation, Data/reporting and admin-user operations. All reservation writers must lock parent orders before items, in deterministic order, matching the order editor.
 3. Port protected PDF generation/download/archive, transfer the actual Storage files, verify checksums and update the Windows print bridge. Exporting database metadata does not transfer PDFs.
 4. Replace Flutter's Supabase repository/auth/storage calls with the new API, including the supervisor dashboard.
-5. Run concurrency, authorization, DST/UTC, rollback and end-to-end acceptance tests on the actual Windows Server/SQL Server instance. Linux CI verifies the engine/API/transfer slice and does not prove IIS, AD or physical printing.
+5. Run concurrency, authorization, DST/UTC, rollback and end-to-end acceptance tests on the actual Windows Server/SQL Server instance. The optional Linux CI example covers the engine/API/transfer slice, not IIS or physical printing; it has not been run.
 6. Freeze writes for the final consistent export, reconcile row counts and documents, deploy the rebuilt client, monitor, and retain the old environment for rollback. No write freeze or export has been performed by creating these files.
 
 ## IT prerequisites
 
 - SQL Server 2025, dedicated empty database, compatibility level 170, DBA deployment/import account and backup plan.
 - Windows Server supported by the selected SQL Server and .NET releases, IIS if used, and .NET 10 Hosting Bundle for production. The **.NET 10 SDK** is needed on the build/validation machine, not necessarily on the production server.
-- Internal application/API DNS names, trusted HTTPS certificates, a trusted SQL Server TLS certificate, firewall rules and an agreed identity provider. PostgreSQL source connectivity is needed only by the migration workstation during transfer.
+- Internal application/API DNS names, trusted HTTPS certificates, a trusted SQL Server TLS certificate and firewall rules. Users will have normal application accounts managed by Admin; no corporate identity provider is required. PostgreSQL source connectivity is needed only by the migration workstation during transfer.
 - Protected service-account configuration. Production API SQL credentials belong to the `pointage_api` database role, with procedure execution and no direct table permissions; do not use a DBA/sa account for the application.
 - Protected backup storage for SQL backups, PDF files, application configuration and identity mappings. Recovery objectives and retention must be agreed with the operations team.
 
-The owner explicitly chose local retention and IT validation, not publication to the public repository. The local workstation has .NET runtimes but no SDK. Download of Microsoft's SDK archive was denied by the company File Transfer policy; no alternative download or local policy bypass is attempted. Use an IT-provisioned SDK for compilation/SQL integration validation. The optional CI example is stored under `it/`, outside `.github/workflows`, and is not active. No CI run has been started. See [the IT request](it/REQUEST-FOR-IT.md) for corporate authentication requirements.
+The owner explicitly chose local retention and IT validation, not publication to the public repository. The local workstation has .NET runtimes but no SDK. Download of Microsoft's SDK archive was denied by the company File Transfer policy; no alternative download or local policy bypass is attempted. Use an IT-provisioned SDK for compilation/SQL integration validation. The optional CI example is stored under `it/`, outside `.github/workflows`, and is not active. No CI run has been started. See [the IT request](it/REQUEST-FOR-IT.md) for application-account and infrastructure requirements.
 
 ## Validate locally without a database
 
@@ -49,7 +49,7 @@ dotnet build Pointage.Migration -c Release
 dotnet run --project Pointage.Checks -c Release
 ```
 
-`Pointage.Checks` parses SQL Server 2025 syntax and exercises API order validation and corporate identity checks with synthetic claims. These checks are prepared but have not been compiled or executed on this workstation. They require no source account or production database; they do not replace real AD/Entra integration tests.
+`Pointage.Checks` parses SQL Server 2025 syntax and exercises API order validation. These checks are prepared but have not been compiled or executed on this workstation. They require no source account or production database; account-service integration tests remain necessary.
 
 ## First test database
 
@@ -94,12 +94,13 @@ Provide these through the Windows service/IIS protected configuration:
 
 ```text
 ConnectionStrings__Pointage=<encrypted SQL connection with trusted certificate>
-Authentication__Mode=<EntraId or Windows>
+Authentication__Authority=<HTTPS issuer of the application account service; implementation pending>
+Authentication__Audience=<application API audience>
 Cors__Origins__0=<HTTPS application origin>
 AllowedHosts=<internal API hostname>
 ```
 
-Supply the additional mode-specific settings documented in [the IT request](it/REQUEST-FOR-IT.md). Startup fails if corporate identity settings, CORS origins or SQL connection are missing/insecure. The liveness endpoint is `/health/live`; IIS Windows authentication may additionally require an authenticated monitor. Business endpoints require an authenticated, mapped identity. The DBA maps the verified Entra tenant/oid or AD directory/SID to the intended preserved profile ID in `internal.identity_accounts`. Roles remain in `dbo.user_roles`; browser-supplied user IDs, names or role claims do not establish a mapping. Compilation and real corporate identity integration tests remain required before activation.
+The current scaffold validates signed tokens and maps their issuer/subject to preserved profile IDs. Startup fails if issuer, audience, CORS origins or SQL connection are missing/insecure. Roles remain in `dbo.user_roles`; browser-supplied user IDs or role claims do not establish a mapping. This is a preparatory contract, not a working local-account login service. The next account slice must implement normal application accounts and Admin-only creation, then validate and adapt the issuer/profile mapping before activation. No AD/Entra settings are required.
 
 First routes:
 

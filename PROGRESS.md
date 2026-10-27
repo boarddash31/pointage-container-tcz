@@ -1,5 +1,11 @@
 # Pointage Container — progress
 
+## Comptes applicatifs — annulation AD/Entra (2026-10-27)
+
+- Dernière décision utilisateur : comptes normaux créés uniquement par Admin ; l'option AD/Entra est annulée et remplace le choix précédent. Aucun fournisseur d'identité d'entreprise à provisionner.
+- Retrait du gestionnaire CorporateAuthentication, de Negotiate et de ses configurations/tests. Le premier lot API conserve son contrat de validation JWT ; le module complet comptes/login/mots de passe reste à réaliser avant bascule. L'application Flutter actuelle continue à utiliser ses comptes Supabase.
+- Demande IT et guide de migration alignés sur des comptes applicatifs, rôles administrés, hachage des mots de passe et conservation des UUID historiques. Le lot reste local, sans publication GitHub ni bascule de production.
+
 ## Comptes d’entreprise et validation locale IT (2026-10-27)
 
 - Réponses utilisateur : utiliser les comptes d’entreprise AD/Entra ID et conserver le lot localement pour validation IT. Aucune publication du lot sur le dépôt public, aucune nouvelle demande de publication et aucun workflow distant à lancer.

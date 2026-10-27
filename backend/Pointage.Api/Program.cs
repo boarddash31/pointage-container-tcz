@@ -1,13 +1,16 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.Data.SqlClient;
 using Pointage.Api;
 
 var builder = WebApplication.CreateBuilder(args);
-var authentication = CorporateAuthentication.Load(builder.Configuration);
+var authority = builder.Configuration["Authentication:Authority"];
+var audience = builder.Configuration["Authentication:Audience"];
 var origins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
+if (!Uri.TryCreate(authority, UriKind.Absolute, out var issuer) || issuer.Scheme != "https" ||
+    string.IsNullOrWhiteSpace(audience))
+    throw new InvalidOperationException("Configure an HTTPS Authentication:Authority and Authentication:Audience.");
 if (origins.Length == 0 || origins.Any(o => !Uri.TryCreate(o, UriKind.Absolute, out var u) || u.Scheme != "https" || u.AbsolutePath != "/"))
     throw new InvalidOperationException("Configure explicit HTTPS Cors:Origins.");
 var connectionString = builder.Configuration.GetConnectionString("Pointage");
@@ -23,34 +26,15 @@ builder.Services.ConfigureHttpJsonOptions(o => {
     o.SerializerOptions.PropertyNameCaseInsensitive = false;
     o.SerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow;
 });
-builder.Services.AddSingleton(authentication);
-if (authentication.Mode == "Windows")
-{
-    if (!OperatingSystem.IsWindows()) throw new InvalidOperationException("Windows authentication requires the target Windows Server/IIS environment.");
-    builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme).AddNegotiate();
-}
-else
-{
-    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o => {
-        o.Authority = authentication.Authority; o.Audience = authentication.Audience;
-        o.RequireHttpsMetadata = true; o.MapInboundClaims = false;
-        o.TokenValidationParameters.ValidateIssuer = true;
-        o.TokenValidationParameters.ValidIssuer = authentication.Authority;
-        o.TokenValidationParameters.ValidateAudience = true;
-        o.TokenValidationParameters.ValidateLifetime = true;
-        o.TokenValidationParameters.ClockSkew = TimeSpan.FromSeconds(30);
-        o.Events = new JwtBearerEvents { OnTokenValidated = context => {
-            try { _ = CorporateIdentity.Resolve(context.Principal!, authentication); }
-            catch (UnauthorizedAccessException) { context.Fail("Corporate identity or delegated scope is not permitted."); }
-            return Task.CompletedTask;
-        }};
-    });
-}
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o => {
+    o.Authority = authority; o.Audience = audience; o.RequireHttpsMetadata = true; o.MapInboundClaims = false;
+    o.TokenValidationParameters.ValidateIssuer = true;
+    o.TokenValidationParameters.ValidateAudience = true;
+    o.TokenValidationParameters.ValidateLifetime = true;
+    o.TokenValidationParameters.ClockSkew = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddAuthorization();
-builder.Services.AddCors(o => o.AddDefaultPolicy(p => {
-    p.WithOrigins(origins).AllowAnyMethod().AllowAnyHeader();
-    if (authentication.Mode == "Windows") p.AllowCredentials();
-}));
+builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(origins).AllowAnyMethod().AllowAnyHeader()));
 builder.Services.AddSingleton(new PointageDb(connectionString));
 builder.Services.AddScoped<ActorResolver>();
 var app = builder.Build();
