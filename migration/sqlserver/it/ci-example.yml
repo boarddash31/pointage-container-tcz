@@ -38,6 +38,7 @@ jobs:
         run: |
           dotnet build Pointage.Checks -c Release
           dotnet build Pointage.Migration -c Release
+          dotnet build Pointage.Admin -c Release
           dotnet run --project Pointage.Checks -c Release --no-build
           dotnet run --project Pointage.Migration -c Release --no-build -- --snapshot ../.migration-data/ci-safe --check
       - name: Create temporary test database and TLS certificates
@@ -68,7 +69,7 @@ jobs:
         shell: bash
         run: |
           docker exec pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q "CREATE DATABASE TCZ_Pointage_Test COLLATE Latin1_General_100_BIN2"'
-          for file in migration/sqlserver/001_schema.sql migration/sqlserver/002_order_api.sql migration/sqlserver/003_smoke_test.sql; do
+          for file in migration/sqlserver/001_schema.sql migration/sqlserver/002_order_api.sql migration/sqlserver/003_smoke_test.sql migration/sqlserver/005_application_accounts.sql migration/sqlserver/006_account_smoke_test.sql; do
             docker exec -i pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -d TCZ_Pointage_Test' < "$file"
           done
       - name: Import synthetic snapshot with certificate verification enabled
@@ -83,8 +84,7 @@ jobs:
         shell: bash
         run: |
           export ConnectionStrings__Pointage="Server=localhost,1433;Database=TCZ_Pointage_Test;User Id=sa;Password=$MSSQL_SA_PASSWORD;Encrypt=Mandatory;TrustServerCertificate=False"
-          export Authentication__Authority=https://identity.invalid
-          export Authentication__Audience=pointage-test
+          export Accounts__SessionHours=8
           export Cors__Origins__0=https://localhost
           export ASPNETCORE_URLS=https://localhost:5443
           export ASPNETCORE_Kestrel__Certificates__Default__Path="$GITHUB_WORKSPACE/.ci/server.pfx"

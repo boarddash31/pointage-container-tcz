@@ -20,22 +20,22 @@ La machine de compilation/validation doit disposer du **SDK .NET 10** et du dép
 - Aucun raccordement AD, Entra, Kerberos ou compte de domaine n’est requis pour les utilisateurs.
 - L’administrateur crée les comptes, attribue les rôles et active/désactive les utilisateurs. Le guichetier ne crée pas de comptes.
 - Un compte peut utiliser un identifiant/téléphone ; une adresse professionnelle n’est pas exigée.
-- Prévoir le hachage des mots de passe, la protection des sessions, le changement/rétablissement du mot de passe par un processus administrateur et la journalisation des opérations.
+- Lot local préparé : hachage Identity V3 (PBKDF2 600 000 itérations), sessions opaques vérifiées en base à chaque requête, expiration, changement initial obligatoire, réinitialisation Admin et journalisation sans secrets. Ces composants ne sont pas encore compilés/exécutés ici.
 - Aucun mot de passe partagé, compte administrateur par défaut ni ancien champ `initial_password` n’est copié par le transfert.
 - La création initiale du premier administrateur doit être organisée avec le responsable métier/IT ; son mot de passe ne sera pas placé dans le code ou les archives.
 
-Le module local de comptes/login reste à implémenter dans le lot backend suivant. Le premier lot comporte un contrat de validation de jetons et les procédures métier ; il ne constitue pas encore un service de comptes prêt à déployer. La connexion Flutter actuelle reste Supabase jusqu’à l’adaptation du client. Aucun fournisseur AD/Entra/OIDC externe n’est à provisionner.
+Le module local de comptes/login est préparé sous `backend/Pointage.Api` et `005_application_accounts.sql`, avec un outil DBA interactif `backend/Pointage.Admin` pour le premier Admin. La compilation, les tests SQL/HTTP et la recette IT sont requis avant activation. La connexion Flutter actuelle reste Supabase jusqu’à l’adaptation du client. Aucun fournisseur AD/Entra/OIDC externe n’est à provisionner.
 
 ## Conservation de l’historique
 
-Les profils et leurs UUID sont conservés pour les créateurs, agents et derniers modificateurs. Les rôles sont stockés dans `dbo.user_roles`. Les futurs comptes applicatifs devront être reliés à ces profils sans modifier les identifiants des opérations historiques.
+Les profils et leurs UUID sont conservés pour les créateurs, agents et derniers modificateurs. Les rôles sont stockés dans `dbo.user_roles`. Les comptes applicatifs peuvent être reliés à un profil existant via son UUID ; aucun nom historique n’est écrasé. Importer et contrôler les données avant de créer les comptes. Le premier Admin peut reprendre l’UUID du profil Admin conservé.
 
 ## Validation demandée
 
-1. Compiler les trois projets sous `backend/` avec .NET 10 et lancer `Pointage.Checks`.
+1. Compiler les quatre projets sous `backend/` avec .NET 10 et lancer `Pointage.Checks`.
 2. Préparer une base de test vide, appliquer `001_schema.sql`, puis `002_order_api.sql`.
-3. Exécuter `003_smoke_test.sql` sur cette base `_Test` vide ; ses données sont annulées.
+3. Exécuter `003_smoke_test.sql`, appliquer `005_application_accounts.sql`, puis exécuter `006_account_smoke_test.sql` sur cette base `_Test` vide ; les données des tests sont annulées.
 4. Valider le transfert fictif et, ensuite, un export réel contrôlé avec les outils et contrôles d’intégrité du guide principal.
-5. Valider le futur module de comptes : création Admin uniquement, rôle insuffisant, compte désactivé, réinitialisation et tentative d’accès anonyme.
+5. Valider le module de comptes en HTTPS : création Admin uniquement, rôle insuffisant, compte désactivé, réinitialisation, révocation/expiration des sessions, changement initial obligatoire, dernier Admin et tentative d’accès anonyme. Valider les seuils de limitation avec les postes derrière NAT/IIS.
 
-Le guide `migration/sqlserver/README.md` précise les commandes. La migration Gate complète, les comptes, les PDF, le raccordement Flutter et la bascule sont les lots suivants. `it/ci-example.yml` est un exemple inactif pour une CI **privée approuvée** ; aucun workflow distant n’a été exécuté.
+Le guide `migration/sqlserver/README.md` précise les commandes. La migration Gate complète, la validation des comptes, les PDF, le raccordement Flutter et la bascule restent à terminer. `it/ci-example.yml` est un exemple inactif pour une CI **privée approuvée** ; aucun workflow distant n’a été exécuté.

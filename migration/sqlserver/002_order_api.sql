@@ -15,13 +15,6 @@ CREATE OR ALTER FUNCTION api.parse_items(@items nvarchar(max)) RETURNS TABLE AS 
   FROM OPENJSON(@items) WITH(id uniqueidentifier '$.id',iso_code nvarchar(max) '$.iso_code',
     armateur_id nvarchar(max) '$.armateur_id',quantity int '$.quantity');
 GO
-CREATE OR ALTER PROCEDURE api.resolve_actor @Issuer nvarchar(256),@Subject nvarchar(256) AS
-BEGIN
-  SET NOCOUNT ON;
-  SELECT a.user_id FROM internal.identity_accounts a JOIN dbo.profiles p ON p.id=a.user_id
-    WHERE a.issuer=@Issuer AND a.subject=@Subject AND a.active=1 AND p.active=1;
-END;
-GO
 CREATE OR ALTER PROCEDURE api.user_context @ActorId uniqueidentifier AS
 BEGIN
   SET NOCOUNT ON;

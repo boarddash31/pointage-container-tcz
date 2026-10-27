@@ -26,17 +26,17 @@ public sealed class PointageDb(string connectionString)
     }
 }
 
-public sealed class ActorResolver(PointageDb database)
+public sealed class ActorResolver
 {
-    public async Task<Guid> Resolve(ClaimsPrincipal principal, CancellationToken cancellation)
+    public Task<Guid> Resolve(ClaimsPrincipal principal, CancellationToken cancellation)
     {
-        var issuer = principal.FindFirst("iss")?.Value;
-        var subject = principal.FindFirst("sub")?.Value;
-        if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(subject) || issuer.Length > 256 || subject.Length > 256)
+        cancellation.ThrowIfCancellationRequested();
+        if (principal.Identity?.IsAuthenticated != true ||
+            principal.Identity.AuthenticationType != ApplicationSessionHandler.SchemeName ||
+            !Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var actor))
             throw new UnauthorizedAccessException();
-        // Map validated external identity to a server-managed profile. Ignore role/user-id claims.
-        var result = await database.Scalar("api.resolve_actor", cancellation,
-            PointageDb.Text("@Issuer", issuer, 256), PointageDb.Text("@Subject", subject, 256));
-        return result is Guid actor ? actor : throw new UnauthorizedAccessException();
+        if (principal.FindFirstValue("must_change_password") != "false") throw new PasswordChangeRequiredException();
+        // Only the server session handler supplies this identity. Roles are checked in SQL on every operation.
+        return Task.FromResult(actor);
     }
 }

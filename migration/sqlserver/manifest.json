@@ -2,7 +2,7 @@
   "format": 1,
   "source_project": "iparzfqxopcvwqelxlad",
   "captured_on": "2026-10-27",
-  "authentication": "External identity mapping required; no Supabase passwords or initial_password are exported.",
+  "authentication": "Admin-managed application accounts link to preserved profiles; no Supabase passwords or initial_password are exported.",
   "tables": [
     {
       "source_schema": "private",

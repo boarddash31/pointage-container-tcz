@@ -4,7 +4,11 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const manifest=require('../manifest.json'),source=require('../source-schema.json');
 const {validateRow,fileHash,manifestHash}=require('./row-validation.cjs');
 const root=path.resolve(__dirname,'../../..');
-const out=path.join(root,'.migration-data','ci-safe');
+const args=process.argv.slice(2);
+if(args.length!==0&&(args.length!==2||args[0]!=='--out'))throw Error('Usage: create-test-snapshot.cjs [--out .migration-data/new-fixture]');
+const privateRoot=path.join(root,'.migration-data');
+const out=path.resolve(root,args[1]??'.migration-data/ci-safe');
+if(!out.startsWith(privateRoot+path.sep))throw Error('Synthetic fixtures must remain inside ignored .migration-data.');
 if(fs.existsSync(out))throw Error('Synthetic snapshot exists; use a clean workspace.');
 fs.mkdirSync(out,{recursive:true});
 const actor='11111111-1111-4111-8111-111111111111',order='22222222-2222-4222-8222-222222222222',

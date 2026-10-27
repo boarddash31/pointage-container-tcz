@@ -54,7 +54,7 @@ function defaultSql(value) {
   throw Error('Unmapped default: '+value);
 }
 const manifest={format:1,source_project:source.source_project,captured_on:source.captured_on,
-  authentication:'External identity mapping required; no Supabase passwords or initial_password are exported.',tables:[]};
+  authentication:'Admin-managed application accounts link to preserved profiles; no Supabase passwords or initial_password are exported.',tables:[]};
 const ddl=[`-- SQL Server 2025. Generated from the metadata snapshot; no source rows are embedded.
 -- Run against a NEW, empty database selected by your DBA, never master or an existing application database.
 SET NOCOUNT ON;
@@ -120,13 +120,6 @@ CREATE INDEX visits_order_item_2_idx ON dbo.truck_visits(order_item_id_2) INCLUD
 CREATE INDEX visits_inside_idx ON dbo.truck_visits(entered_at,id) WHERE exited_at IS NULL AND canceled_at IS NULL;
 CREATE INDEX audit_entity_idx ON dbo.audit_logs(entity,entity_id,occurred_at);
 CREATE INDEX documents_visit_idx ON dbo.generated_documents(visit_id,created_at);
-CREATE TABLE internal.identity_accounts (
-  issuer nvarchar(256) COLLATE Latin1_General_100_BIN2 NOT NULL,
-  subject nvarchar(256) COLLATE Latin1_General_100_BIN2 NOT NULL,
-  user_id uniqueidentifier NOT NULL REFERENCES dbo.profiles(id),
-  active bit NOT NULL DEFAULT 1,
-  PRIMARY KEY NONCLUSTERED(issuer,subject)
-);
 INSERT internal.schema_versions(version) VALUES(1);
 COMMIT TRANSACTION;
 GO

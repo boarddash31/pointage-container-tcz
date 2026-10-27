@@ -1,16 +1,14 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
+using System.Threading.RateLimiting;
 using Microsoft.Data.SqlClient;
 using Pointage.Api;
 
 var builder = WebApplication.CreateBuilder(args);
-var authority = builder.Configuration["Authentication:Authority"];
-var audience = builder.Configuration["Authentication:Audience"];
 var origins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
-if (!Uri.TryCreate(authority, UriKind.Absolute, out var issuer) || issuer.Scheme != "https" ||
-    string.IsNullOrWhiteSpace(audience))
-    throw new InvalidOperationException("Configure an HTTPS Authentication:Authority and Authentication:Audience.");
+if (builder.Configuration.GetValue<int>("Accounts:SessionHours") is < 1 or > 12)
+    throw new InvalidOperationException("Configure Accounts:SessionHours between 1 and 12.");
 if (origins.Length == 0 || origins.Any(o => !Uri.TryCreate(o, UriKind.Absolute, out var u) || u.Scheme != "https" || u.AbsolutePath != "/"))
     throw new InvalidOperationException("Configure explicit HTTPS Cors:Origins.");
 var connectionString = builder.Configuration.GetConnectionString("Pointage");
@@ -26,22 +24,27 @@ builder.Services.ConfigureHttpJsonOptions(o => {
     o.SerializerOptions.PropertyNameCaseInsensitive = false;
     o.SerializerOptions.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow;
 });
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o => {
-    o.Authority = authority; o.Audience = audience; o.RequireHttpsMetadata = true; o.MapInboundClaims = false;
-    o.TokenValidationParameters.ValidateIssuer = true;
-    o.TokenValidationParameters.ValidateAudience = true;
-    o.TokenValidationParameters.ValidateLifetime = true;
-    o.TokenValidationParameters.ClockSkew = TimeSpan.FromSeconds(30);
-});
+builder.Services.AddAuthentication(ApplicationSessionHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, ApplicationSessionHandler>(ApplicationSessionHandler.SchemeName, _ => { });
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options => {
+    options.RejectionStatusCode = 429;
+    options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions {
+            PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
+        }));
+});
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(origins).AllowAnyMethod().AllowAnyHeader()));
 builder.Services.AddSingleton(new PointageDb(connectionString));
 builder.Services.AddScoped<ActorResolver>();
+builder.Services.AddSingleton<AccountStore>();
 var app = builder.Build();
 app.UseExceptionHandler(errors => errors.Run(async context => {
     var error = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
     var (status, code) = error switch {
+        PasswordChangeRequiredException => (403, "password_change_required"),
         UnauthorizedAccessException => (403, "access_denied"),
+        BadHttpRequestException => (400, "invalid_request"),
         SqlException e when e.Number == 51003 => (403, "access_denied"),
         SqlException e when e.Number == 51002 => (404, "not_found"),
         SqlException e when e.Number is 51009 or 2601 or 2627 or 1205 => (409, "conflict_refresh_required"),
@@ -53,10 +56,13 @@ app.UseExceptionHandler(errors => errors.Run(async context => {
     await context.Response.WriteAsJsonAsync(new { error = code, trace_id = context.TraceIdentifier });
 }));
 app.UseHttpsRedirection();
+app.UseRouting();
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapGet("/health/live", () => Results.Ok(new { service = "pointage-api", migration_phase = 1 }));
+app.MapGet("/health/live", () => Results.Ok(new { service = "pointage-api", migration_phase = 2 }));
+AccountEndpoints.Map(app);
 OrderEndpoints.Map(app);
 app.Run();
 

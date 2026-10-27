@@ -1,7 +1,7 @@
 name: pointage_container
 description: TCZ Pointage Container mobile and web application
 publish_to: none
-version: 3.1.0+2
+version: 3.1.1+3
 environment:
   sdk: '>=3.12.0 <4.0.0'
 dependencies:
