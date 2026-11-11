@@ -229,3 +229,9 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 - Trusted future EDI ingestion can populate the existing fields, but no EDI feed, message parser or automatic booking-to-client matching is wired. No client is guessed from the line operator or shared booking text.
 - Validation: 25 Flutter tests pass, including no clerk controls, retained role navigation/printing/fullscreen behavior, client separation and twin visit counts. Extended isolated SQL tests pass. A rolled-back live TCZ test confirmed normal clerk entry, denial through both entry APIs, protected clearing, Admin assignment and trusted system assignment. Static analysis has no errors/warnings and two existing style notices.
 - Rebuilt website prepared locally; no public deployment or GitHub push performed. APK unchanged.
+
+## Production web release 3.1.1 verified (2026-11-11)
+
+- The public Pages site still served version 0.1.0 because the 3.1.0 and 3.1.1 release commits contained [skip ci]. Dispatched the existing deployment workflow on main for commit bda4669; run 43051373261 succeeded.
+- Production version.json now reports 3.1.1, build 3. Verified version.json, release.json, index.html, main.dart.js and flutter_bootstrap.js against the committed site build (normalizing Windows/Linux line endings); API health returns HTTP 200.
+- Refreshed the existing user browser tab. The updated Entrée screen loaded successfully with the saved authenticated session preserved. No database migration was needed for this web deployment.
