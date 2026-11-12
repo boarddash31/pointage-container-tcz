@@ -1,0 +1,12 @@
+{
+  "clientId": "MSCMAR",
+  "armateurIds": ["MSC"],
+  "terminalId": "",
+  "requestTimeZone": "",
+  "movementTimeZone": "",
+  "gateInPorts": [{"typeOfPort": "PORT_OF_LOADING", "portCode": "ZDP"}],
+  "gateOutPorts": [{"typeOfPort": "PORT_OF_LOADING", "portCode": "ZDP"}, {"typeOfPort": "PORT_OF_DISCHARGE", "portCode": "ZDP"}],
+  "bookingSource": "carrier_booking_reference",
+  "requireWeights": false,
+  "emptyResponsePolicy": "reject"
+}

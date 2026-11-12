@@ -31,3 +31,9 @@ backend/**/appsettings.Local.json
 backend/**/appsettings.Production.json
 backend/**/.env
 site_deploy.zip
+integrations/codeco/.state/
+integrations/codeco/config.local.json
+integrations/codeco/java/lib/*.jar
+integrations/codeco/java/build/
+/CODECO_reponse*.xml
+/CODECO_requete*.xml

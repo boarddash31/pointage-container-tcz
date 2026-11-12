@@ -4,7 +4,8 @@
   "scripts": {
     "test:db": "node tests/sql_smoke.cjs",
     "test:bridge": "node --test bridge/test/*.test.mjs",
-    "test:sqlserver-migration": "node tests/sqlserver_migration_test.cjs"
+    "test:sqlserver-migration": "node tests/sqlserver_migration_test.cjs",
+    "test:codeco": "node --test integrations/codeco/test/*.test.cjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.10",
