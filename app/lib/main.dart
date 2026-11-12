@@ -8,6 +8,7 @@ import 'data/pointage_repository.dart';
 import 'ui/pointage_screens.dart';
 import 'ui/admin_screen.dart';
 import 'ui/tcz_brand.dart';
+import 'ui/demo_access.dart';
 import 'utils/fullscreen_helper.dart';
 
 const supabaseUrl = String.fromEnvironment(
@@ -25,10 +26,39 @@ const authSiteUrl = String.fromEnvironment(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (supabaseUrl.isNotEmpty && supabasePublishableKey.isNotEmpty) {
-    await Supabase.initialize(url: supabaseUrl, publishableKey: supabasePublishableKey);
-  }
   runApp(const PointageApp());
+}
+
+Future<void>? _productionInitialization;
+Future<void> initializeProduction() {
+  try { Supabase.instance.client;return Future.value(); } catch (_) { /* Not initialized in demo. */ }
+  return _productionInitialization??=Supabase.initialize(url:supabaseUrl,
+    publishableKey:supabasePublishableKey).then((_){});
+}
+
+bool isProductionAuthLink(Uri uri)=>uri.queryParameters['mode']=='production'
+  ||uri.queryParameters['auth']=='recovery'||uri.queryParameters.containsKey('code')
+  ||uri.fragment.startsWith('access_token=')||uri.fragment.contains('&access_token=');
+
+class ProductionAccess extends StatefulWidget {
+  const ProductionAccess({super.key,required this.onBack});
+  final VoidCallback onBack;
+  @override State<ProductionAccess> createState()=>_ProductionAccessState();
+}
+class _ProductionAccessState extends State<ProductionAccess> {
+  late Future<void> ready;
+  @override void initState(){super.initState();ready=initializeProduction();}
+  @override Widget build(BuildContext context)=>FutureBuilder<void>(future:ready,builder:(context,snapshot){
+    if(snapshot.hasError) {
+      return Scaffold(body:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
+      const Text('Connexion production indisponible.'),
+      TextButton(onPressed:widget.onBack,child:const Text('Retour à la démo')),
+      FilledButton(onPressed:(){_productionInitialization=null;setState(()=>ready=initializeProduction());},child:const Text('Réessayer')),
+      ])));
+    }
+    if(snapshot.connectionState!=ConnectionState.done)return const Scaffold(body:Center(child:CircularProgressIndicator()));
+    return AuthGate(onBackToDemo:widget.onBack);
+  });
 }
 
 class PointageApp extends StatelessWidget {
@@ -48,16 +78,14 @@ class PointageApp extends StatelessWidget {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(11)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14)),
     ),
-    home: supabaseUrl.isEmpty || supabasePublishableKey.isEmpty
-      ? const Scaffold(body: Center(child: Padding(padding: EdgeInsets.all(24),
-          child: Text('Configuration Supabase manquante. Fournissez SUPABASE_URL et '
-            'SUPABASE_PUBLISHABLE_KEY via --dart-define.'))))
-      : const AuthGate(),
+    home: DemoAccessHome(initialProduction:kIsWeb&&isProductionAuthLink(Uri.base),
+      productionBuilder:(onBack)=>ProductionAccess(onBack:onBack)),
   );
 }
 
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+  const AuthGate({super.key,this.onBackToDemo});
+  final VoidCallback? onBackToDemo;
   @override State<AuthGate> createState() => _AuthGateState();
 }
 
@@ -85,13 +113,13 @@ class _AuthGateState extends State<AuthGate> {
   @override Widget build(BuildContext context) {
     final auth=Supabase.instance.client.auth;
     if(auth.currentSession==null) {
-      return LoginScreen(onAuthenticated:(profile)=>setState(()=>destination=profile));
+      return LoginScreen(onBackToDemo:widget.onBackToDemo,onAuthenticated:(profile)=>setState(()=>destination=profile));
     }
     if(recoveryFlow || auth.currentUser?.userMetadata?['must_set_password']==true){
       return PasswordSetupScreen(onComplete: () => setState(() => recoveryFlow = false));
     }
     if(destination==null) {
-      return LoginScreen(onAuthenticated:(profile)=>setState(()=>destination=profile));
+      return LoginScreen(onBackToDemo:widget.onBackToDemo,onAuthenticated:(profile)=>setState(()=>destination=profile));
     }
     return PointageShell(key: ValueKey('${auth.currentUser!.id}-$destination'),
       repository: PointageRepository(Supabase.instance.client),
@@ -154,8 +182,9 @@ bool canOpenQuickProfile(List<String> roles,String profile) {
 }
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key,this.onAuthenticated,this.sessionRoles});
+  const LoginScreen({super.key,this.onAuthenticated,this.sessionRoles,this.onBackToDemo});
   final ValueChanged<String>? onAuthenticated;
+  final VoidCallback? onBackToDemo;
   final Future<List<String>?> Function()? sessionRoles;
   @override State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -364,6 +393,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       const Text('Déjà connecté sur cet appareil ? Touchez votre profil pour l’ouvrir directement.',
         textAlign:TextAlign.center,style:TextStyle(fontSize:12,color:Color(0xff49677e))),
+      if(widget.onBackToDemo!=null)TextButton(onPressed:widget.onBackToDemo,child:const Text('Retour à la démo')),
     ])))))));
 }
 

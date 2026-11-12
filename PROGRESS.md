@@ -244,3 +244,12 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 - Corrected Supabase Site URL to https://pointage-container-tcz.pages.dev and added exact root/recovery redirect URLs. Entrée activation is pending email acceptance. Admin is confirmed and active.
 - All 54 Flutter tests passed, including saved-session opening, denied role escalation, role-query failure, direct Sortie navigation and a second Admin role check. Static analysis has no errors/warnings and the two existing style notices in pointage_screens.dart. Web build/deployment verification follows.
 - Release web build succeeded and site/ was synchronized with version 3.1.2+4. No APK was built or published.
+
+## Public local demo and direct profiles (2026-11-12)
+
+- Following the owner's explicit choice of a public demo with synthetic data, the root page now opens Admin / Entrée / Sortie in one click without credentials. Production remains accessible through Connexion production and retains Supabase authentication, RBAC and recovery links.
+- Demo Admin can create named Admin, Entrée and Sortie profiles, activate/deactivate them, and open them from the direct-access chooser. Profiles, visits, stock positions and event history persist only in this browser under tcz_demo_v1. No production accounts, sessions or database rows are changed by demo actions.
+- Added local entry/deposit/pickup/exit flows, mono/twin truck illustrations with live values, plate/container validation, the full packaged operator catalog, stock and clearly watermarked demo PDF downloads. No Supabase initialization or network API calls occur during demo use.
+- Fixed dialog controller lifetime through route unmount. All 62 Flutter tests passed, including profile creation/opening, storage isolation, atomic stock lifecycle, role limits and 390px mobile navigation. Static analysis retains only the two existing style notices in pointage_screens.dart.
+- Web release 3.2.0+5: build and deployment verification in progress. No APK.
+- Release build succeeded. Packaged site/ version 3.2.0+5 and refreshed bundle checksum; Cloudflare deployment follows.

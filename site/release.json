@@ -1,5 +1,5 @@
 {
-  "application_version": "3.1.2+4",
+  "application_version": "3.2.0+5",
   "features": [
     "gate-out-a4-tcz-marsa",
     "archived-identity",
@@ -7,11 +7,15 @@
     "empty-chassis",
     "versioned-pdf-fallback",
     "saved-session-quick-profiles",
-    "role-checked-admin-landing"
+    "role-checked-admin-landing",
+    "public-local-demo",
+    "direct-demo-admin-entree-sortie",
+    "admin-created-local-demo-profiles",
+    "isolated-demo-stock-and-pdf"
   ],
   "git_tag": null,
-  "release": "v3.1.2",
+  "release": "v3.2.0",
   "status": "production",
-  "bundle_sha256": "43b268a6cd0d99ca64376e4e00d3501d4fd43eb1c817e0537fe91c664389669a",
+  "bundle_sha256": "ac9cb64dee5aaeeadea98d4cb90e8846baa6b92eeba7386497290114f8c31f5c",
   "bundle_hash_line_endings": "LF"
 }
