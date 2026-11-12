@@ -214,6 +214,7 @@ class PointageRepository {
           .order('created_at', ascending: false).limit(200));
 
   Future<Map<String, dynamic>> createAgent({
+    required String username,
     required String phone,
     required String firstName,
     required String lastName,
@@ -222,24 +223,25 @@ class PointageRepository {
     String? avatarUrl,
     String? adminCode,
   }) async {
-    final res = await client.rpc('admin_create_agent', params: {
+    final res = await client.rpc('admin_save_username_account', params: {
+      'p_username': username.trim().toLowerCase(),
       'p_phone': phone,
       'p_first_name': firstName,
       'p_last_name': lastName,
       'p_role': role,
       'p_password': password,
       'p_avatar_url': avatarUrl,
-      'p_admin_code': adminCode,
     });
     return Map<String, dynamic>.from(res as Map);
   }
 
   Future<List<Map<String, dynamic>>> listAgents() async {
-    final rows = await client.rpc('admin_list_agents');
+    final rows = await client.rpc('admin_list_username_accounts');
     return [for (final r in rows as List) Map<String, dynamic>.from(r as Map)];
   }
 
   Future<Map<String, dynamic>> updateAgent({
+    required String username,
     required String userId,
     required String phone,
     required String firstName,
@@ -249,7 +251,8 @@ class PointageRepository {
     bool active = true,
     String? adminCode,
   }) async {
-    final res = await client.rpc('admin_update_agent', params: {
+    final res = await client.rpc('admin_save_username_account', params: {
+      'p_username': username.trim().toLowerCase(),
       'p_user_id': userId,
       'p_phone': phone,
       'p_first_name': firstName,
@@ -257,7 +260,6 @@ class PointageRepository {
       'p_role': role,
       'p_password': password,
       'p_active': active,
-      'p_admin_code': adminCode,
     });
     return Map<String, dynamic>.from(res as Map);
   }

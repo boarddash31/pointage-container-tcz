@@ -15,7 +15,8 @@ class AdminFixture extends PointageRepository {
 }
 
 void main() {
-  testWidgets('saved Admin opens production administration and creates an assigned account in the web form', (tester) async {
+  for (final phone in ['', '0612345678']) {
+  testWidgets('phone=$phone: saved Admin opens production administration and creates an assigned account in the web form', (tester) async {
     tester.view.physicalSize = const Size(1440, 1100);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -24,9 +25,9 @@ void main() {
     final client = SupabaseClient('https://example.supabase.co', 'test-key',
       authOptions: const AuthClientOptions(autoRefreshToken: false),
       httpClient: MockClient((request) async {
-        if (request.url.path.endsWith('/rpc/admin_create_agent')) {
+        if (request.url.path.endsWith('/rpc/admin_save_username_account')) {
           submitted = jsonDecode(request.body) as Map<String, dynamic>;
-          return http.Response(jsonEncode({'full_name': 'Karim Test', 'phone': '0612345678', 'role': 'sortie'}), 200,
+          return http.Response(jsonEncode({'username': 'karim.test', 'full_name': 'Karim Test', 'phone': phone, 'role': 'sortie'}), 200,
             request: request, headers: {'content-type': 'application/json'});
         }
         return http.Response('[]', 200, request: request, headers: {'content-type': 'application/json'});
@@ -42,9 +43,10 @@ void main() {
     expect(find.text('Administration · TCZ'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('admin-create-profile')));
     await tester.pump(const Duration(milliseconds: 500));
+    await tester.enterText(find.widgetWithText(TextField, 'Username *'), 'karim.test');
     await tester.enterText(find.widgetWithText(TextField, 'Prénom *'), 'Karim');
     await tester.enterText(find.widgetWithText(TextField, 'Nom *'), 'Test');
-    await tester.enterText(find.widgetWithText(TextField, 'Téléphone (WhatsApp) *'), '0612345678');
+    await tester.enterText(find.widgetWithText(TextField, 'Téléphone (optionnel)'), phone);
     await tester.tap(find.byType(DropdownButtonFormField<String>).last);
     await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.text('AGENT SORTIE (Gate-Out)').last);
@@ -56,14 +58,16 @@ void main() {
     await tester.runAsync(() async { await tester.pump(); await Future<void>.delayed(const Duration(milliseconds: 200)); });
     await tester.pump(const Duration(milliseconds: 500));
     expect(submitted?['p_role'], 'sortie');
-    expect(submitted?['p_phone'], '0612345678');
+    expect(submitted?['p_phone'], phone);
+    expect(submitted?['p_username'], 'karim.test');
     expect(submitted?['p_admin_code'], isNull);
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('Collaborateur enregistré !'), findsOneWidget);
-    await tester.tap(find.text('Plus tard'));
+    await tester.tap(find.text('Fermer'));
     await tester.pump(const Duration(milliseconds: 500));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+  }
 }

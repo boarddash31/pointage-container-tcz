@@ -220,7 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final rawInput = email.text.trim();
     final targetPassword = password.text;
     if (rawInput.isEmpty || targetPassword.isEmpty) {
-      setState(() => error = 'Veuillez renseigner votre téléphone (ou e-mail) et mot de passe.');
+      setState(() => error = 'Veuillez renseigner votre username et votre mot de passe.');
       return;
     }
     if (kIsWeb && MediaQuery.sizeOf(context).width < 800) {
@@ -229,21 +229,16 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { busy = true; error = null; notice = null; });
     try {
       String targetEmail = rawInput;
-      // If user provided a phone number (no @ symbol)
+      // Resolve a username or a legacy phone identifier without asking for email.
       if (!rawInput.contains('@')) {
-        final clean = PointageRepository.normalizePhone(rawInput);
-        try {
           final res = await Supabase.instance.client.rpc('get_login_identifier', params: {
             'p_identifier': rawInput,
           });
           if (res is Map && res['email'] != null && res['email'].toString().isNotEmpty) {
             targetEmail = res['email'].toString();
           } else {
-            targetEmail = '$clean@tcz.local';
+            throw const AuthException('Username ou mot de passe incorrect.');
           }
-        } catch (_) {
-          targetEmail = '$clean@tcz.local';
-        }
       }
 
       await Supabase.instance.client.auth.signInWithPassword(
@@ -263,7 +258,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         final raw = e.toString();
         if (raw.contains('Invalid login credentials')) {
-          setState(() => error = 'Identifiants incorrects. Vérifiez votre numéro de téléphone et votre mot de passe.');
+          setState(() => error = 'Username ou mot de passe incorrect.');
         } else {
           setState(() => error = raw);
         }
@@ -320,8 +315,8 @@ class _LoginScreenState extends State<LoginScreen> {
           autofillHints:const [AutofillHints.username],
           onChanged:(_){if(selectedProfile!=null)setState(()=>selectedProfile=null);},
           decoration:const InputDecoration(
-            labelText:'Numéro de téléphone ou e-mail',
-            hintText:'Ex: 0661998877 ou agent@tcz.ma',
+            labelText:'Username',
+            hintText:'Ex: admin ou agent.entree',
             prefixIcon:Icon(Icons.person_pin_rounded,size:20),
           )),
         const SizedBox(height:12),

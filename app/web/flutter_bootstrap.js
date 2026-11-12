@@ -4,7 +4,7 @@
 // Finish removing an older Flutter worker before requesting the new program/assets.
 // Supabase's persisted session is in localStorage and is retained.
 window.tczBootReady = (async function () {
-  const release = 'production-v3.2.1';
+  const release = 'usernames-v3.3.0';
   try {
     if ('serviceWorker' in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations();

@@ -74,7 +74,7 @@
         <div><h2 class="text-lg font-extrabold text-slate-900">Connexion Administration</h2><p class="text-xs text-slate-500">Session sécurisée sur cet appareil</p></div>
       </div>
       <form id="adminLoginForm" onsubmit="handleAdminLogin(event)" class="space-y-3">
-        <label class="block text-xs font-bold text-slate-700">E-mail ou identifiant
+        <label class="block text-xs font-bold text-slate-700">Username
           <input id="adminLoginEmail" autocomplete="username" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-100">
         </label>
         <label class="block text-xs font-bold text-slate-700">Mot de passe
@@ -480,11 +480,11 @@
               </div>
               <div>
                 <h2 class="text-base font-bold text-slate-800">Ajouter un Collaborateur</h2>
-                <p class="text-xs text-slate-400">Création de compte & envoi WhatsApp direct</p>
+                <p class="text-xs text-slate-400">Username, identité & habilitations</p>
               </div>
             </div>
             <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-semibold">
-              Accès Téléphone
+              Accès Username
             </span>
           </div>
 
@@ -492,6 +492,7 @@
           <div id="formAlert" class="hidden p-3.5 rounded-xl text-xs font-medium border"></div>
 
           <form id="agentForm" onsubmit="handleCreateAgent(event)" class="space-y-4">
+<label class="block text-xs font-bold">Username *<input id="agentUsername" required pattern="[a-zA-Z0-9][a-zA-Z0-9_.-]{2,39}" placeholder="agent.entree" class="mt-1 w-full px-3 py-2.5 border rounded-xl"></label>
             <!-- Nom & Prénom Row -->
             <div class="grid grid-cols-2 gap-3">
               <div>
@@ -507,14 +508,14 @@
             <!-- Phone Number (WhatsApp) -->
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                <span>Numéro Téléphone / WhatsApp <span class="text-rose-500">*</span></span>
-                <span class="text-[10px] text-slate-400 font-normal">Sert d'identifiant de connexion</span>
+                <span>Téléphone (optionnel)</span>
+                <span class="text-[10px] text-slate-400 font-normal">Facultatif</span>
               </label>
               <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs font-bold">
                   🇲🇦 +212
                 </div>
-                <input type="tel" id="agentPhone" required placeholder="06 61 99 88 77" class="w-full text-xs font-medium pl-16 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none mono">
+                <input type="tel" id="agentPhone" placeholder="06 61 99 88 77" class="w-full text-xs font-medium pl-16 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none mono">
               </div>
             </div>
 
@@ -565,7 +566,7 @@
                 </button>
               </div>
               <div class="relative">
-                <input type="text" id="agentPassword" required value="tcz123" class="w-full text-xs font-bold px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none mono text-slate-800">
+                <input type="text" minlength="6" id="agentPassword" required value="tcz123" class="w-full text-xs font-bold px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none mono text-slate-800">
                 <span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-[10px] text-slate-400">
                   Simple & facile
                 </span>
@@ -626,7 +627,7 @@
               <thead>
                 <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   <th class="py-2.5 px-3">Collaborateur</th>
-                  <th class="py-2.5 px-3">Téléphone (Login)</th>
+                  <th class="py-2.5 px-3">Username / Téléphone</th>
                   <th class="py-2.5 px-3">Rôle</th>
                   <th class="py-2.5 px-3">Mot de passe</th>
                   <th class="py-2.5 px-3 text-right">Actions</th>
@@ -644,7 +645,7 @@
           </div>
 
           <div class="pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
-            <span>* Les agents se connectent via leur numéro de téléphone ou e-mail.</span>
+            <span>* Les agents se connectent avec leur username et leur mot de passe.</span>
             <span class="font-semibold text-slate-700">TCZ Sécurité</span>
           </div>
         </div>
@@ -674,6 +675,7 @@
 
       <form id="editAgentForm" onsubmit="handleUpdateAgent(event)" class="space-y-4 text-xs">
         <input type="hidden" id="editAgentId">
+<label class="block text-xs font-bold">Username *<input id="editAgentUsername" required pattern="[a-zA-Z0-9][a-zA-Z0-9_.-]{2,39}" class="mt-1 w-full px-3 py-2.5 border rounded-xl"></label>
 
         <!-- Nom et Prénom -->
         <div class="grid grid-cols-2 gap-3">
@@ -689,12 +691,12 @@
 
         <!-- Téléphone -->
         <div>
-          <label class="block text-slate-600 font-bold mb-1">Numéro Téléphone / Login WhatsApp *</label>
+          <label class="block text-slate-600 font-bold mb-1">Téléphone (optionnel)</label>
           <div class="flex rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-sky-500 overflow-hidden">
             <span class="inline-flex items-center px-3 bg-slate-50 text-slate-500 font-bold border-r border-slate-200 text-xs">🇲🇦 +212</span>
-            <input type="tel" id="editAgentPhone" required class="flex-1 px-3 py-2.5 font-bold mono focus:outline-none text-xs" placeholder="06XXXXXXXX">
+            <input type="tel" id="editAgentPhone" class="flex-1 px-3 py-2.5 font-bold mono focus:outline-none text-xs" placeholder="06XXXXXXXX">
           </div>
-          <span class="text-[10px] text-slate-400 mt-1 block">Ce numéro servira d'identifiant de connexion au terminal</span>
+          <span class="text-[10px] text-slate-400 mt-1 block">Le username sert à se connecter</span>
         </div>
 
         <!-- Rôle -->
@@ -711,10 +713,10 @@
         <!-- Mot de passe -->
         <div>
           <div class="flex items-center justify-between mb-1">
-            <label class="block text-slate-600 font-bold">Mot de passe de connexion *</label>
+            <label class="block text-slate-600 font-bold">Nouveau mot de passe (vide = conserver)</label>
             <button type="button" onclick="generateEditPassword()" class="text-sky-600 hover:text-sky-700 font-bold hover:underline">Générer code facile</button>
           </div>
-          <input type="text" id="editAgentPassword" required class="w-full text-xs font-bold mono px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none text-slate-800">
+          <input type="text" minlength="6" placeholder="Laisser vide pour conserver" id="editAgentPassword" class="w-full text-xs font-bold mono px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:outline-none text-slate-800">
         </div>
 
         <!-- Statut Actif -->
@@ -901,11 +903,17 @@
       const button = document.getElementById('adminLoginButton');
       const rawLogin = document.getElementById('adminLoginEmail').value.trim();
       const password = document.getElementById('adminLoginPassword').value;
-      const login = rawLogin.includes('@') ? rawLogin : `${rawLogin.replace(/\D/g, '')}@tcz.local`;
+      let login = rawLogin;
       button.disabled = true;
       button.textContent = 'Connexion…';
       setAdminGateMessage('');
       try {
+        if (!rawLogin.includes('@')) {
+          const {data: identifier, error: identifierError} = await dashboardAuth.rpc('get_login_identifier', {p_identifier: rawLogin});
+          if (identifierError) throw identifierError;
+          if (!identifier?.email) throw new Error('Username ou mot de passe incorrect.');
+          login = identifier.email;
+        }
         const { data, error } = await dashboardAuth.auth.signInWithPassword({ email: login, password });
         if (error) throw error;
         await enterDashboardWithSession(data.session);
@@ -1183,7 +1191,7 @@
     async function loadAgentsList() {
       const tbody = document.getElementById('agentsTableBody');
       try {
-        const agents = await callRpc('admin_list_agents');
+        const agents = await callRpc('admin_list_username_accounts');
         cachedAgentsList = agents || [];
         document.getElementById('agentsTableCount').textContent = cachedAgentsList.length;
 
@@ -1196,7 +1204,7 @@
           const name = a.display_name || `${a.first_name || ''} ${a.last_name || ''}`.trim() || 'Agent';
           const phone = a.phone || 'Non renseigné';
           const role = (a.roles && a.roles[0]) ? a.roles[0].toUpperCase() : 'ENTREE';
-          const pwd = a.initial_password || '••••••';
+          const pwd = '••••••';
 
           // Color per role
           let roleBadge = 'bg-sky-50 text-sky-700 border-sky-200';
@@ -1212,7 +1220,7 @@ Voici vos identifiants d'accès au système de Pointage Container TCZ :
 📱 *Téléphone :* ${phone}
 🔑 *Mot de passe :* ${pwd}
 🏢 *Poste affecté :* ${role}
-🌐 *Lien d'accès :* http://localhost:8085 (ou https://pointage-tcz-test.netlify.app)
+🌐 *Lien d'accès :* https://pointage-container-tcz.pages.dev/
 
 Connectez-vous directement avec votre numéro de téléphone et votre mot de passe.`
           );
@@ -1235,7 +1243,7 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
                   </div>
                 </div>
               </td>
-              <td class="py-3 px-3 mono font-semibold text-slate-700">${phone}</td>
+              <td class="py-3 px-3 mono font-semibold text-slate-700">${a.username || phone}<br><small>${phone}</small></td>
               <td class="py-3 px-3">
                 <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${roleBadge}">
                   ${role}
@@ -1248,7 +1256,7 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
                     <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
                     <span>Modifier</span>
                   </button>
-                  ${phone && phone !== 'Non renseigné' ? `
+                  ${false ? `
                   <a href="${waUrl}" target="_blank" class="inline-flex items-center space-x-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 px-2.5 py-1 rounded-lg text-[11px] font-bold transition shadow-xs" title="Envoyer identifiants sur WhatsApp">
                     <i data-lucide="message-square" class="w-3.5 h-3.5 text-emerald-600"></i>
                     <span>WhatsApp</span>
@@ -1283,10 +1291,11 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
       document.getElementById('editAgentFirstName').value = fName;
       document.getElementById('editAgentLastName').value = lName;
       document.getElementById('editAgentPhone').value = agent.phone || '';
+      document.getElementById('editAgentUsername').value = agent.username || '';
 
       const role = (agent.roles && agent.roles[0]) ? agent.roles[0].toLowerCase() : 'entree';
       document.getElementById('editAgentRole').value = role;
-      document.getElementById('editAgentPassword').value = agent.initial_password || 'tcz123';
+      document.getElementById('editAgentPassword').value = '';
       document.getElementById('editAgentActive').checked = agent.active !== false;
 
       const alertBox = document.getElementById('editFormAlert');
@@ -1323,22 +1332,23 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
       const lastName = document.getElementById('editAgentLastName').value.trim();
       const phone = document.getElementById('editAgentPhone').value.trim();
       const role = document.getElementById('editAgentRole').value;
-      const password = document.getElementById('editAgentPassword').value.trim();
+      const password = document.getElementById('editAgentPassword').value;
       const active = document.getElementById('editAgentActive').checked;
 
       try {
-        const result = await callRpc('admin_update_agent', {
+        const result = await callRpc('admin_save_username_account', {
+          p_username: document.getElementById('editAgentUsername').value.trim(),
           p_user_id: id,
           p_phone: phone,
           p_first_name: firstName,
           p_last_name: lastName,
           p_role: role,
-          p_password: password,
+          p_password: password || null,
           p_active: active
         });
 
         alertBox.className = 'p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 block';
-        alertBox.textContent = `Profil de ${result.display_name || (firstName + ' ' + lastName)} (${result.phone}) mis à jour avec succès !`;
+        alertBox.textContent = `Profil de ${result.display_name || (firstName + ' ' + lastName)} (${result.username}) mis à jour avec succès !`;
 
         await loadAgentsList();
 
@@ -1371,42 +1381,24 @@ Connectez-vous directement avec votre numéro de téléphone et votre mot de pas
       const lastName = document.getElementById('agentLastName').value.trim();
       const phone = document.getElementById('agentPhone').value.trim();
       const role = document.querySelector('input[name="agentRole"]:checked').value;
-      const password = document.getElementById('agentPassword').value.trim();
+      const password = document.getElementById('agentPassword').value;
       const avatarUrl = document.getElementById('agentAvatar').value.trim() || null;
 
       try {
-        const result = await callRpc('admin_create_agent', {
+        const result = await callRpc('admin_save_username_account', {
+          p_username: document.getElementById('agentUsername').value.trim(),
           p_phone: phone,
           p_first_name: firstName,
           p_last_name: lastName,
           p_role: role,
-          p_password: password,
+          p_password: password || null,
           p_avatar_url: avatarUrl
         });
 
         alertBox.className = 'p-3.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border-emerald-200 block';
-        alertBox.textContent = `Collaborateur ${result.full_name} (${result.phone}) créé avec succès !`;
+        alertBox.textContent = `Collaborateur ${result.full_name} (${result.username}) créé avec succès !`;
 
-        // Pre-fill WhatsApp link
-        const cleanPhone = result.phone.replace(/\D/g, '').replace(/^0/, '');
-        const roleLabel = role.toUpperCase();
-        const msg = encodeURIComponent(
-`🇲🇦 *Terminal Conteneur Zenata (TCZ)*
-Bonjour *${result.full_name}*,
-
-Voici vos identifiants d'accès au système de Pointage Container TCZ :
-📱 *Téléphone :* ${result.phone}
-🔑 *Mot de passe :* ${result.password}
-🏢 *Poste affecté :* ${roleLabel}
-🌐 *Lien d'accès :* http://localhost:8085 (ou https://pointage-tcz-test.netlify.app)
-
-Connectez-vous directement avec votre numéro de téléphone et votre mot de passe.`
-        );
-
-        const waLink = document.getElementById('whatsappShareLink');
-        waLink.href = `https://wa.me/212${cleanPhone}?text=${msg}`;
-        shareBox.classList.remove('hidden');
-
+        shareBox.classList.add('hidden');
         // Reload agents list
         await loadAgentsList();
 

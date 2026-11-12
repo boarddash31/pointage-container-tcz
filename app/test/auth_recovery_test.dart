@@ -5,7 +5,7 @@ import 'package:pointage_container/main.dart';
 void main() {
   testWidgets('profile shortcuts select the account and require its password', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
-    final emailField = find.widgetWithText(TextField, 'Numéro de téléphone ou e-mail');
+    final emailField = find.widgetWithText(TextField, 'Username');
     final passwordField = find.widgetWithText(TextField, 'Mot de passe');
     expect(tester.widget<TextField>(passwordField).controller!.text,isEmpty);
     expect(tester.widget<TextField>(passwordField).obscureText,true);
@@ -65,7 +65,7 @@ void main() {
 
   testWidgets('password recovery asks for an email before contacting Auth', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
-    final emailField = find.widgetWithText(TextField, 'Numéro de téléphone ou e-mail');
+    final emailField = find.widgetWithText(TextField, 'Username');
     await tester.enterText(emailField, '');
     await tester.ensureVisible(find.text('Mot de passe oublié ?'));
     await tester.pumpAndSettle();

@@ -40,7 +40,7 @@ class _AdminScreenState extends State<AdminScreen> {
     setState(() {
       activity = db.rpc('hourly_activity', params: {'p_day': dateString(day)})
           .then((x) => List<Map<String, dynamic>>.from(x as List));
-      profiles = db.from('profiles').select('id,display_name,first_name,last_name,phone,avatar_url,initial_password,active,created_at,user_roles(role)').order('created_at', ascending: false)
+      profiles = db.from('profiles').select('id,username,display_name,first_name,last_name,phone,avatar_url,active,created_at,user_roles(role)').order('created_at', ascending: false)
           .then((x) => List<Map<String, dynamic>>.from(x));
       clients = db.from('clients').select('id,code,name').order('name')
           .then((x) => List<Map<String, dynamic>>.from(x));
@@ -80,27 +80,8 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  void sendWhatsAppInvite({
-    required String name,
-    required String phone,
-    required String role,
-    required String password,
-  }) {
-    final cleanPhone = PointageRepository.normalizePhone(phone).replaceAll(RegExp(r'^0'), '');
-    final msg = Uri.encodeComponent(
-      '🇲🇦 *Terminal Conteneur Zenata (TCZ)*\n'
-      'Bonjour *$name*,\n\n'
-      'Voici vos identifiants d\'accès au système de Pointage Container TCZ :\n'
-      '📱 *Téléphone :* $phone\n'
-      '🔑 *Mot de passe :* $password\n'
-      '🏢 *Poste affecté :* ${role.toUpperCase()}\n'
-      '🌐 *Lien d\'accès :* https://pointage-container-tcz.pages.dev/\n\n'
-      'Connectez-vous directement avec votre numéro de téléphone et votre mot de passe.'
-    );
-    launchUrl(Uri.parse('https://wa.me/212$cleanPhone?text=$msg'), mode: LaunchMode.externalApplication);
-  }
-
   Future<void> inviteUser() async {
+    final username = TextEditingController();
     final firstName = TextEditingController();
     final lastName = TextEditingController();
     final phone = TextEditingController();
@@ -119,7 +100,7 @@ class _AdminScreenState extends State<AdminScreen> {
               children: [
                 Icon(Icons.person_add_rounded, color: Color(0xff075a8d)),
                 SizedBox(width: 8),
-                Text('Ajouter un collaborateur'),
+                Text('Créer un profil'),
               ],
             ),
             content: SingleChildScrollView(
@@ -127,9 +108,13 @@ class _AdminScreenState extends State<AdminScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Renseignez les détails du collaborateur. Le numéro de téléphone servira d\'identifiant.',
+                  const Text('Connexion avec le username et le mot de passe. Aucun e-mail requis.',
                     style: TextStyle(fontSize: 12, color: Color(0xff64748b))),
                   const SizedBox(height: 14),
+                  TextField(controller: username, decoration: const InputDecoration(
+                    labelText: 'Username *', hintText: 'Ex: agent.entree',
+                    prefixIcon: Icon(Icons.person_outline))),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
@@ -157,7 +142,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     controller: phone,
                     keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
-                      labelText: 'Téléphone (WhatsApp) *',
+                      labelText: 'Téléphone (optionnel)',
                       hintText: 'Ex: 0661998877',
                       prefixIcon: Icon(Icons.phone_android_rounded, size: 20),
                     ),
@@ -223,22 +208,23 @@ class _AdminScreenState extends State<AdminScreen> {
                     message(dialog, 'Nom et Prénom obligatoires.');
                     return;
                   }
-                  if (phone.text.trim().length < 8) {
-                    message(dialog, 'Numéro de téléphone invalide.');
+                  if (!RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9_.-]{2,39}$').hasMatch(username.text.trim())) {
+                    message(dialog, 'Username : 3 à 40 lettres, chiffres, point, tiret ou underscore.');
                     return;
                   }
-                  if (password.text.trim().length < 4) {
+                  if (password.text.length < 6) {
                     message(dialog, 'Mot de passe trop court.');
                     return;
                   }
                   update(() => saving = true);
                   try {
                     final agentRes = await widget.repository.createAgent(
+                      username: username.text.trim(),
                       phone: phone.text.trim(),
                       firstName: firstName.text.trim(),
                       lastName: lastName.text.trim(),
                       role: role,
-                      password: password.text.trim(),
+                      password: password.text,
                       avatarUrl: avatar.text.trim().isNotEmpty ? avatar.text.trim() : null,
 
                     );
@@ -259,8 +245,9 @@ class _AdminScreenState extends State<AdminScreen> {
       if (res != null && mounted) {
         refresh();
         final agentName = res['full_name'] as String? ?? '${firstName.text} ${lastName.text}';
-        final agentPhone = res['phone'] as String? ?? phone.text;
+
         final agentRole = res['role'] as String? ?? role;
+        final agentUsername = res['username'] as String? ?? username.text.trim();
         final agentPwd = res['password'] as String? ?? password.text;
 
         await showDialog(
@@ -275,32 +262,20 @@ class _AdminScreenState extends State<AdminScreen> {
               ],
             ),
             content: Text(
-              'Le collaborateur $agentName ($agentPhone) a été créé avec succès.\n\n'
+              'Le collaborateur $agentName a été créé avec succès.\n\n'
+              'Username : $agentUsername\n'
               'Mot de passe : $agentPwd\n'
               'Rôle : ${agentRole.toUpperCase()}\n\n'
-              'Souhaitez-vous lui envoyer ses accès sur WhatsApp dès maintenant ?',
+              'Le compte peut se connecter immédiatement.',
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(waDialog), child: const Text('Plus tard')),
-              FilledButton.icon(
-                icon: const Icon(Icons.message_rounded, size: 16),
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xff16a34a)),
-                onPressed: () {
-                  Navigator.pop(waDialog);
-                  sendWhatsAppInvite(
-                    name: agentName,
-                    phone: agentPhone,
-                    role: agentRole,
-                    password: agentPwd,
-                  );
-                },
-                label: const Text('Envoyer sur WhatsApp'),
-              ),
+              TextButton(onPressed: () => Navigator.pop(waDialog), child: const Text('Fermer')),
             ],
           ),
         );
       }
     } finally {
+      username.dispose();
       firstName.dispose();
       lastName.dispose();
       phone.dispose();
@@ -309,14 +284,15 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  void openEditAgentDialog(Map<String, dynamic> profile) {
+  Future<void> openEditAgentDialog(Map<String, dynamic> profile) async {
+    final usernameController = TextEditingController(text: (profile['username'] ?? '').toString());
     final id = profile['id'] as String;
     final fullName = (profile['display_name'] ?? '').toString();
     final parts = fullName.split(' ');
     final fNameController = TextEditingController(text: (profile['first_name'] ?? (parts.isNotEmpty ? parts[0] : '')).toString());
     final lNameController = TextEditingController(text: (profile['last_name'] ?? (parts.length > 1 ? parts.sublist(1).join(' ') : '')).toString());
     final phoneController = TextEditingController(text: (profile['phone'] ?? '').toString());
-    final passwordController = TextEditingController(text: (profile['initial_password'] ?? 'tcz123').toString());
+    final passwordController = TextEditingController();
     
     final currentRoles = (profile['user_roles'] as List).map((x) => x['role'].toString()).toList();
     String selectedRole = currentRoles.contains('admin') ? 'admin'
@@ -325,7 +301,7 @@ class _AdminScreenState extends State<AdminScreen> {
     bool isActive = profile['active'] != false;
     bool saving = false;
 
-    showDialog(
+    final editRoute = DialogRoute<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, update) => AlertDialog(
@@ -350,6 +326,8 @@ class _AdminScreenState extends State<AdminScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  TextField(controller: usernameController, decoration: const InputDecoration(labelText: 'Username *')),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
@@ -372,7 +350,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     controller: phoneController,
                     keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
-                      labelText: 'Numéro Téléphone / WhatsApp *',
+                      labelText: 'Téléphone (optionnel)',
                       hintText: '06XXXXXXXX',
                       prefixText: '+212 ',
                       prefixIcon: Icon(Icons.phone_iphone_rounded),
@@ -399,7 +377,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       Expanded(
                         child: TextField(
                           controller: passwordController,
-                          decoration: const InputDecoration(labelText: 'Mot de passe *', border: OutlineInputBorder()),
+                          decoration: const InputDecoration(labelText: 'Nouveau mot de passe (laisser vide pour conserver)', border: OutlineInputBorder()),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -431,19 +409,20 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
             FilledButton(
               onPressed: saving ? null : () async {
-                if (fNameController.text.trim().isEmpty || lNameController.text.trim().isEmpty || phoneController.text.trim().isEmpty) {
+                if (fNameController.text.trim().isEmpty || lNameController.text.trim().isEmpty || usernameController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veuillez remplir tous les champs obligatoires')));
                   return;
                 }
                 update(() => saving = true);
                 try {
                   await widget.repository.updateAgent(
+                    username: usernameController.text.trim(),
                     userId: id,
                     phone: phoneController.text.trim(),
                     firstName: fNameController.text.trim(),
                     lastName: lNameController.text.trim(),
                     role: selectedRole,
-                    password: passwordController.text.trim(),
+                    password: passwordController.text.isEmpty ? null : passwordController.text,
                     active: isActive,
                   );
                   if (ctx.mounted) {
@@ -470,6 +449,11 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
       ),
     );
+    await Navigator.of(context).push(editRoute);
+    await editRoute.completed;
+    for (final controller in [usernameController, fNameController, lNameController, phoneController, passwordController]) {
+      controller.dispose();
+    }
   }
 
   Future<void> addClient() async {
@@ -1223,7 +1207,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xff166534)),
                                   ),
                                 ),
-                              if (p['initial_password'] != null && (p['initial_password'] as String).isNotEmpty)
+                              if (p['username'] != null && (p['username'] as String).isNotEmpty)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                   decoration: BoxDecoration(
@@ -1232,7 +1216,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                     border: Border.all(color: const Color(0xffe2e8f0)),
                                   ),
                                   child: Text(
-                                    '🔑 ${p['initial_password']}',
+                                    '${p['username']}',
                                     style: const TextStyle(fontSize: 10, color: Color(0xff475569)),
                                   ),
                                 ),
@@ -1260,20 +1244,6 @@ class _AdminScreenState extends State<AdminScreen> {
                               tooltip: 'Modifier ce collaborateur',
                               onPressed: () => openEditAgentDialog(p),
                             ),
-                            if (p['phone'] != null && (p['phone'] as String).isNotEmpty)
-                              IconButton(
-                                icon: const Icon(Icons.message_rounded, color: Color(0xff16a34a), size: 20),
-                                tooltip: 'Envoyer identifiants sur WhatsApp',
-                                onPressed: () {
-                                  final roles = (p['user_roles'] as List).map((x) => x['role'].toString()).join(', ');
-                                  sendWhatsAppInvite(
-                                    name: p['display_name'] ?? 'Agent',
-                                    phone: p['phone'] ?? '',
-                                    role: roles.isNotEmpty ? roles : 'entree',
-                                    password: p['initial_password'] ?? 'tcz123',
-                                  );
-                                },
-                              ),
                             const Icon(Icons.expand_more_rounded, color: Color(0xff94a3b8)),
                           ],
                         ),

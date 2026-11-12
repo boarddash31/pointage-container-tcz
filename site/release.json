@@ -1,5 +1,5 @@
 {
-  "application_version": "3.2.1+6",
+  "application_version": "3.3.0+7",
   "features": [
     "gate-out-a4-tcz-marsa",
     "archived-identity",
@@ -10,11 +10,14 @@
     "role-checked-admin-landing",
     "production-default",
     "automatic-saved-role-landing",
-    "in-app-admin-account-and-role-creation"
+    "in-app-admin-account-and-role-creation",
+    "unique-username-auth",
+    "optional-phone",
+    "admin-managed-username-accounts"
   ],
   "git_tag": null,
-  "release": "v3.2.1",
+  "release": "v3.3.0",
   "status": "production",
-  "bundle_sha256": "b256c64b7d9728c6621f0f2839496e620ba6e86a4daed31333e20aef7bc056f6",
+  "bundle_sha256": "ec6af83aadf60134b5fe138770768bb49f6e30257f362add96e06b80ffe44212",
   "bundle_hash_line_endings": "LF"
 }
