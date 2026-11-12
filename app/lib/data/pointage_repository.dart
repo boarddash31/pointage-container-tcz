@@ -229,7 +229,7 @@ class PointageRepository {
       'p_role': role,
       'p_password': password,
       'p_avatar_url': avatarUrl,
-      'p_admin_code': adminCode ?? '01010909',
+      'p_admin_code': adminCode,
     });
     return Map<String, dynamic>.from(res as Map);
   }
@@ -257,7 +257,7 @@ class PointageRepository {
       'p_role': role,
       'p_password': password,
       'p_active': active,
-      'p_admin_code': adminCode ?? '01010909',
+      'p_admin_code': adminCode,
     });
     return Map<String, dynamic>.from(res as Map);
   }

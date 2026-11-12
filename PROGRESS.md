@@ -255,3 +255,12 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 - Release build succeeded. Packaged site/ version 3.2.0+5 and refreshed bundle checksum; Cloudflare deployment follows.
 - Deployed commit fec1743 through GitHub Actions run 43203054006 successfully. Live version.json, release.json, index.html, flutter_bootstrap.js and main.dart.js exactly match the packaged release after LF normalization. Browser verification in progress.
 - Live browser verification passed: public Admin opens directly; Admin created Test démo (Entrée), which appears in quick access and opens its entry workflow without login; direct Sortie displays the synthetic queue. Connexion production still shows the authenticated login form. Left the demo chooser open and saved visual evidence outside the repository.
+
+## Restore production and in-app account administration (2026-11-12)
+
+- Owner rejected the public demo after reviewing it and clarified that this URL must open the real production workflows. Removed the demo source, UI and tests; restored the production application from 374a73e without rolling back the existing booking, EDO/ERO, twin, PDF or stock modules. No production data or account was deleted.
+- Existing authenticated sessions now open their real role automatically, including direct Admin administration. Changer de profil retains the session and opens the role chooser. Devices without a valid session still require production authentication; no shared Admin password or public authorization bypass was added.
+- Added a visible Create profile action to the Admin header, retaining the full in-app collaborator form and role selection. Accounts are saved through the existing authorized admin_create_agent RPC, and the on-site list refreshes after success. No Supabase dashboard step is required for everyday account creation.
+- Fixed creation-dialog controller lifetime, blocked duplicate submissions, removed unused supervisor-code defaults from create/update requests, and corrected the optional WhatsApp link to the current production domain. No invitation/message was sent.
+- Release 3.2.1+6 prepared. Baseline production suite passed (54 tests); added an Admin form/API request regression test and final deployment checks follow.
+- Final verification: all 55 Flutter tests passed, including automatic Admin landing and the in-app creation form issuing admin_create_agent with the selected Sortie role; static analysis has no errors/warnings and two existing style notices. Release web build succeeded.

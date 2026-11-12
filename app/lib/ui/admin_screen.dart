@@ -94,7 +94,7 @@ class _AdminScreenState extends State<AdminScreen> {
       '📱 *Téléphone :* $phone\n'
       '🔑 *Mot de passe :* $password\n'
       '🏢 *Poste affecté :* ${role.toUpperCase()}\n'
-      '🌐 *Lien d\'accès :* http://localhost:8085 (ou https://pointage-tcz-test.netlify.app)\n\n'
+      '🌐 *Lien d\'accès :* https://pointage-container-tcz.pages.dev/\n\n'
       'Connectez-vous directement avec votre numéro de téléphone et votre mot de passe.'
     );
     launchUrl(Uri.parse('https://wa.me/212$cleanPhone?text=$msg'), mode: LaunchMode.externalApplication);
@@ -107,9 +107,10 @@ class _AdminScreenState extends State<AdminScreen> {
     final password = TextEditingController(text: 'tcz123');
     final avatar = TextEditingController();
     String role = 'entree';
+    bool saving = false;
 
     try {
-      final res = await showDialog<Map<String, dynamic>>(
+      final creationRoute = DialogRoute<Map<String, dynamic>>(
         context: context,
         builder: (dialog) => StatefulBuilder(
           builder: (dialog, update) => AlertDialog(
@@ -213,11 +214,11 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Annuler')),
+              TextButton(onPressed: saving ? null : () => Navigator.pop(dialog), child: const Text('Annuler')),
               FilledButton.icon(
                 icon: const Icon(Icons.save_rounded, size: 16),
                 style: FilledButton.styleFrom(backgroundColor: const Color(0xff075a8d)),
-                onPressed: () async {
+                onPressed: saving ? null : () async {
                   if (firstName.text.trim().isEmpty || lastName.text.trim().isEmpty) {
                     message(dialog, 'Nom et Prénom obligatoires.');
                     return;
@@ -230,6 +231,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     message(dialog, 'Mot de passe trop court.');
                     return;
                   }
+                  update(() => saving = true);
                   try {
                     final agentRes = await widget.repository.createAgent(
                       phone: phone.text.trim(),
@@ -238,11 +240,11 @@ class _AdminScreenState extends State<AdminScreen> {
                       role: role,
                       password: password.text.trim(),
                       avatarUrl: avatar.text.trim().isNotEmpty ? avatar.text.trim() : null,
-                      adminCode: '01010909',
+
                     );
                     if (dialog.mounted) Navigator.pop(dialog, agentRes);
                   } catch (e) {
-                    if (dialog.mounted) message(dialog, 'Erreur création : $e');
+                    if (dialog.mounted) { update(() => saving = false); message(dialog, 'Erreur création : $e'); }
                   }
                 },
                 label: const Text('Enregistrer'),
@@ -252,6 +254,8 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
       );
 
+      final res = await Navigator.of(context).push(creationRoute);
+      await creationRoute.completed;
       if (res != null && mounted) {
         refresh();
         final agentName = res['full_name'] as String? ?? '${firstName.text} ${lastName.text}';
@@ -711,6 +715,7 @@ class _AdminScreenState extends State<AdminScreen> {
         ],
       ),
       actions: [
+        IconButton(key: const ValueKey('admin-create-profile'), tooltip: 'Créer un profil', onPressed: inviteUser, icon: const Icon(Icons.person_add_alt_1)),
         if(widget.onSwitchProfile!=null)IconButton(
           tooltip:'Changer de profil',icon:const Icon(Icons.switch_account_outlined),
           onPressed:widget.onSwitchProfile),
@@ -1135,7 +1140,7 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
               onPressed: inviteUser,
               icon: const Icon(Icons.person_add_rounded, size: 16),
-              label: const Text('Inviter un agent', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              label: const Text('Créer un profil', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
