@@ -1,14 +1,17 @@
 {
-    "application_version":  "3.1.1+3",
-    "features":  [
-                     "gate-out-a4-tcz-marsa",
-                     "archived-identity",
-                     "twin-containers",
-                     "empty-chassis",
-                     "versioned-pdf-fallback"
-                 ],
-    "git_tag":  "v3.1.1",
-    "release":  "v3.1.1",
-    "status":  "git-release",
-    "bundle_sha256":  "65742510f1ae7bda12d14a09e040d07d58d0bb5222526841c05d2b1ffb233ecd"
+  "application_version": "3.1.2+4",
+  "features": [
+    "gate-out-a4-tcz-marsa",
+    "archived-identity",
+    "twin-containers",
+    "empty-chassis",
+    "versioned-pdf-fallback",
+    "saved-session-quick-profiles",
+    "role-checked-admin-landing"
+  ],
+  "git_tag": null,
+  "release": "v3.1.2",
+  "status": "production",
+  "bundle_sha256": "43b268a6cd0d99ca64376e4e00d3501d4fd43eb1c817e0537fe91c664389669a",
+  "bundle_hash_line_endings": "LF"
 }

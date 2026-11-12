@@ -6,8 +6,9 @@ import '../domain/container_number.dart';
 import 'pointage_screens.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key, required this.repository});
+  const AdminScreen({super.key, required this.repository,this.onSwitchProfile});
   final PointageRepository repository;
+  final VoidCallback? onSwitchProfile;
   @override State<AdminScreen> createState() => _AdminScreenState();
 }
 
@@ -710,6 +711,12 @@ class _AdminScreenState extends State<AdminScreen> {
         ],
       ),
       actions: [
+        if(widget.onSwitchProfile!=null)IconButton(
+          tooltip:'Changer de profil',icon:const Icon(Icons.switch_account_outlined),
+          onPressed:widget.onSwitchProfile),
+        if(widget.onSwitchProfile!=null)IconButton(
+          tooltip:'Déconnexion',icon:const Icon(Icons.logout),
+          onPressed:()=>widget.repository.client.auth.signOut()),
         IconButton(
           icon: const Icon(Icons.refresh_rounded, color: Color(0xff475569)),
           tooltip: 'Actualiser les données',

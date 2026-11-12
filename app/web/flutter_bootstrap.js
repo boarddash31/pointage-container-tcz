@@ -4,7 +4,7 @@
 // Finish removing an older Flutter worker before requesting the new program/assets.
 // Supabase's persisted session is in localStorage and is retained.
 window.tczBootReady = (async function () {
-  const release = 'marsa-bons-v1';
+  const release = 'quick-profiles-v3.1.2';
   try {
     if ('serviceWorker' in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations();

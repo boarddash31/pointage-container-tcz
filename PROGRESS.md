@@ -235,3 +235,12 @@ Have the first admin open the recovery email within 60 minutes and set a passwor
 - The public Pages site still served version 0.1.0 because the 3.1.0 and 3.1.1 release commits contained [skip ci]. Dispatched the existing deployment workflow on main for commit bda4669; run 43051373261 succeeded.
 - Production version.json now reports 3.1.1, build 3. Verified version.json, release.json, index.html, main.dart.js and flutter_bootstrap.js against the committed site build (normalizing Windows/Linux line endings); API health returns HTTP 200.
 - Refreshed the existing user browser tab. The updated Entrée screen loaded successfully with the saved authenticated session preserved. No database migration was needed for this web deployment.
+
+## Saved-session profile access and account provisioning (2026-11-12)
+
+- Login now offers Admin, Entrée and Sortie destinations that reuse the device's existing Supabase session after checking active server roles. Admin opens Administration directly; gate choices open their requested workflow. Profile switching returns to the chooser without signing out. A first device connection still requires authentication; no shared passwords or alternate refresh-token copies are embedded or stored by the shortcuts.
+- Updated shortcut identifiers to the approved boarddash31 addresses and removed the retired APK link from login. Web recovery now uses the current site's origin. Version prepared: 3.1.2+4, with a new bootstrap cache version.
+- In production Supabase, granted the confirmed boarddash31 account the Admin role and the invited boarddash31+tcz-entree account only Entrée, with audit entries. Existing accounts/passwords were preserved. Sortie invitation was rejected by the Supabase email rate limit (HTTP 429); after the owner's steering, it remains for creation from Admin. Operational provisioning SQL is in scripts/provision_boarddash_roles.sql.
+- Corrected Supabase Site URL to https://pointage-container-tcz.pages.dev and added exact root/recovery redirect URLs. Entrée activation is pending email acceptance. Admin is confirmed and active.
+- All 54 Flutter tests passed, including saved-session opening, denied role escalation, role-query failure, direct Sortie navigation and a second Admin role check. Static analysis has no errors/warnings and the two existing style notices in pointage_screens.dart. Web build/deployment verification follows.
+- Release web build succeeded and site/ was synchronized with version 3.1.2+4. No APK was built or published.

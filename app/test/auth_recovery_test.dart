@@ -10,17 +10,57 @@ void main() {
     expect(tester.widget<TextField>(passwordField).controller!.text,isEmpty);
     expect(tester.widget<TextField>(passwordField).obscureText,true);
     for(final profile in [
-      ('Admin','dahhaknouamane@gmail.com'),
-      ('Entrée','dahhaknouamane+tcz-entree@gmail.com'),
-      ('Sortie','dahhaknouamane+tcz-sortie@gmail.com'),
+      ('Admin','boarddash31@gmail.com'),
+      ('Entrée','boarddash31+tcz-entree@gmail.com'),
+      ('Sortie','boarddash31+tcz-sortie@gmail.com'),
     ]) {
       await tester.ensureVisible(find.text(profile.$1));
       await tester.pumpAndSettle();
       await tester.tap(find.text(profile.$1));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(tester.widget<TextField>(emailField).controller!.text,profile.$2);
       expect(tester.widget<TextField>(passwordField).controller!.text,isEmpty);
     }
+  });
+
+  testWidgets('saved admin session opens each selected destination without a password', (tester) async {
+    String? opened;
+    await tester.pumpWidget(MaterialApp(home:LoginScreen(
+      sessionRoles:() async=>['admin'],onAuthenticated:(profile)=>opened=profile)));
+    for(final label in ['Admin','Entrée','Sortie']) {
+      opened=null;
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+      expect(opened,label);
+      final passwordField=find.widgetWithText(TextField,'Mot de passe');
+      expect(tester.widget<TextField>(passwordField).controller!.text,isEmpty);
+    }
+  });
+
+  testWidgets('saved entry session cannot open Admin or Sortie', (tester) async {
+    String? opened;
+    await tester.pumpWidget(MaterialApp(home:LoginScreen(
+      sessionRoles:() async=>['entree'],onAuthenticated:(profile)=>opened=profile)));
+    for(final label in ['Admin','Sortie']) {
+      await tester.tap(find.text(label));
+      await tester.pumpAndSettle();
+      expect(opened,isNull);
+      expect(find.text('Connectez le compte autorisé pour ce profil.'),findsOneWidget);
+    }
+    await tester.tap(find.text('Entrée'));
+    await tester.pumpAndSettle();
+    expect(opened,'Entrée');
+  });
+
+  testWidgets('failed session role verification never opens a destination', (tester) async {
+    var opened=false;
+    await tester.pumpWidget(MaterialApp(home:LoginScreen(
+      sessionRoles:() async=>throw Exception('network unavailable'),
+      onAuthenticated:(_)=>opened=true)));
+    await tester.tap(find.text('Admin'));
+    await tester.pumpAndSettle();
+    expect(opened,isFalse);
+    expect(find.text('Session indisponible. Réessayez ou reconnectez-vous.'),findsOneWidget);
   });
 
   testWidgets('password recovery asks for an email before contacting Auth', (tester) async {

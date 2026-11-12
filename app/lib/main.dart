@@ -20,7 +20,7 @@ const supabasePublishableKey = String.fromEnvironment(
 );
 const authSiteUrl = String.fromEnvironment(
   'AUTH_SITE_URL',
-  defaultValue: 'https://marsa.digital',
+  defaultValue: 'https://pointage-container-tcz.pages.dev',
 );
 
 Future<void> main() async {
@@ -63,6 +63,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   late final StreamSubscription<AuthState> _subscription;
+  String? destination;
   bool recoveryFlow = kIsWeb && Uri.base.queryParameters['auth'] == 'recovery';
   @override void initState() {
     super.initState();
@@ -74,6 +75,7 @@ class _AuthGateState extends State<AuthGate> {
           }
           if (state.event == AuthChangeEvent.signedOut) {
             recoveryFlow = false;
+            destination = null;
           }
         });
       }
@@ -82,12 +84,19 @@ class _AuthGateState extends State<AuthGate> {
   @override void dispose() { _subscription.cancel(); super.dispose(); }
   @override Widget build(BuildContext context) {
     final auth=Supabase.instance.client.auth;
-    if(auth.currentSession==null)return const LoginScreen();
+    if(auth.currentSession==null) {
+      return LoginScreen(onAuthenticated:(profile)=>setState(()=>destination=profile));
+    }
     if(recoveryFlow || auth.currentUser?.userMetadata?['must_set_password']==true){
       return PasswordSetupScreen(onComplete: () => setState(() => recoveryFlow = false));
     }
-    return PointageShell(key: ValueKey(auth.currentUser!.id),
-      repository: PointageRepository(Supabase.instance.client));
+    if(destination==null) {
+      return LoginScreen(onAuthenticated:(profile)=>setState(()=>destination=profile));
+    }
+    return PointageShell(key: ValueKey('${auth.currentUser!.id}-$destination'),
+      repository: PointageRepository(Supabase.instance.client),
+      initialDestination:destination!,
+      onSwitchProfile:()=>setState(()=>destination=null));
   }
 }
 
@@ -137,23 +146,44 @@ class _PasswordSetupScreenState extends State<PasswordSetupScreen> {
         ])))))));
 }
 
+bool canOpenQuickProfile(List<String> roles,String profile) {
+  final requiredRole=switch(profile) {
+    'Admin'=>'admin','Entrée'=>'entree','Sortie'=>'sortie',_=>null,
+  };
+  return requiredRole!=null && (roles.contains('admin') || roles.contains(requiredRole));
+}
+
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key,this.onAuthenticated,this.sessionRoles});
+  final ValueChanged<String>? onAuthenticated;
+  final Future<List<String>?> Function()? sessionRoles;
   @override State<LoginScreen> createState() => _LoginScreenState();
 }
 class _LoginScreenState extends State<LoginScreen> {
-  final email = TextEditingController(text: 'dahhaknouamane@gmail.com'), password = TextEditingController();
+  final email = TextEditingController(text: 'boarddash31@gmail.com'), password = TextEditingController();
   final passwordFocus = FocusNode();
   String? selectedProfile = 'Admin';
   bool obscurePassword = true;
   bool busy = false; String? error, notice;
   static const quickProfiles = [
-    ('Admin', 'dahhaknouamane@gmail.com', Icons.admin_panel_settings_outlined),
-    ('Entrée', 'dahhaknouamane+tcz-entree@gmail.com', Icons.login_rounded),
-    ('Sortie', 'dahhaknouamane+tcz-sortie@gmail.com', Icons.logout_rounded),
+    ('Admin', 'boarddash31@gmail.com', Icons.admin_panel_settings_outlined),
+    ('Entrée', 'boarddash31+tcz-entree@gmail.com', Icons.login_rounded),
+    ('Sortie', 'boarddash31+tcz-sortie@gmail.com', Icons.logout_rounded),
   ];
-  void chooseProfile(String label, String address) {
+  SupabaseClient? get optionalClient {
+    try { return Supabase.instance.client; } catch (_) { return null; }
+  }
+
+  Future<List<String>?> savedSessionRoles() async {
+    if(widget.sessionRoles!=null)return widget.sessionRoles!();
+    final client=optionalClient;
+    if(client?.auth.currentSession==null)return null;
+    return PointageRepository(client!).roles();
+  }
+
+  Future<void> chooseProfile(String label, String address) async {
     setState(() {
+      busy = true;
       selectedProfile = label;
       email.value = TextEditingValue(
         text: address,
@@ -163,7 +193,26 @@ class _LoginScreenState extends State<LoginScreen> {
       error = null;
       notice = null;
     });
-    passwordFocus.requestFocus();
+    var opened=false;
+    try {
+      final roles=await savedSessionRoles();
+      if(!mounted)return;
+      if(roles!=null && canOpenQuickProfile(roles,label)) {
+        opened=true;
+        widget.onAuthenticated?.call(label);
+      } else {
+        setState(()=>notice=roles==null
+          ? 'Première connexion sur cet appareil : saisissez vos identifiants.'
+          : 'Connectez le compte autorisé pour ce profil.');
+      }
+    } catch (_) {
+      if(mounted)setState(()=>error='Session indisponible. Réessayez ou reconnectez-vous.');
+    } finally {
+      if(mounted) {
+        setState(()=>busy=false);
+        if(!opened)passwordFocus.requestFocus();
+      }
+    }
   }
 
   @override void dispose() { email.dispose(); password.dispose(); passwordFocus.dispose(); super.dispose(); }
@@ -199,6 +248,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
       await Supabase.instance.client.auth.signInWithPassword(
         email: targetEmail, password: targetPassword);
+      final roles=await PointageRepository(Supabase.instance.client).roles();
+      if(!mounted)return;
+      if(roles.isEmpty) {
+        setState(()=>error='Ce compte est désactivé ou n’a aucun rôle actif.');
+        return;
+      }
+      final profile=selectedProfile!=null && canOpenQuickProfile(roles,selectedProfile!)
+        ? selectedProfile!
+        : roles.contains('admin') ? 'Admin' : roles.contains('entree') ? 'Entrée' : 'Sortie';
+      password.clear();
+      widget.onAuthenticated?.call(profile);
     } catch (e) {
       if (mounted) {
         final raw = e.toString();
@@ -220,7 +280,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     setState(() { busy=true; error=null; notice=null; });
     try {
-      final base=authSiteUrl.isNotEmpty ? Uri.parse(authSiteUrl) : (kIsWeb ? Uri.base : null);
+      final base=kIsWeb ? Uri.base : (authSiteUrl.isNotEmpty ? Uri.parse(authSiteUrl) : null);
       final redirect=base?.replace(path:'/',queryParameters:{'auth':'recovery'},fragment:'');
       await Supabase.instance.client.auth.resetPasswordForEmail(address,
         redirectTo:redirect?.toString());
@@ -251,8 +311,13 @@ class _LoginScreenState extends State<LoginScreen> {
             onSelected:busy?null:(_)=>chooseProfile(profile.$1,profile.$2)),
       ]),
       const SizedBox(height:14),
+      if(optionalClient?.auth.currentSession!=null) Padding(
+        padding:const EdgeInsets.only(bottom:10),
+        child:Text('Session enregistrée · ${optionalClient?.auth.currentUser?.email ?? ''}',
+          textAlign:TextAlign.center,style:const TextStyle(fontSize:12,color:Color(0xff087e79)))),
       Column(children:[
         TextField(controller:email,keyboardType:TextInputType.text,
+          autofillHints:const [AutofillHints.username],
           onChanged:(_){if(selectedProfile!=null)setState(()=>selectedProfile=null);},
           decoration:const InputDecoration(
             labelText:'Numéro de téléphone ou e-mail',
@@ -261,6 +326,7 @@ class _LoginScreenState extends State<LoginScreen> {
           )),
         const SizedBox(height:12),
         TextField(controller:password,
+          focusNode:passwordFocus,autofillHints:const [AutofillHints.password],
           obscureText:obscurePassword,onSubmitted:(_)=>signIn(),
           decoration:InputDecoration(
             labelText:'Mot de passe',
@@ -296,26 +362,28 @@ class _LoginScreenState extends State<LoginScreen> {
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
         ),
       ),
-      const Text('Saisissez votre numéro de téléphone (ou email) et votre mot de passe attribué.',
+      const Text('Déjà connecté sur cet appareil ? Touchez votre profil pour l’ouvrir directement.',
         textAlign:TextAlign.center,style:TextStyle(fontSize:12,color:Color(0xff49677e))),
-      if(kIsWeb) Padding(padding:const EdgeInsets.only(top:10),
-        child:TextButton.icon(onPressed:()=>launchUrl(
-          Uri.base.resolve('downloads/pointage-tcz.apk'),
-          mode:LaunchMode.externalApplication),
-          icon:const Icon(Icons.android),label:const Text('Télécharger l’APK Android'))),
     ])))))));
 }
 
 class PointageShell extends StatefulWidget {
-  const PointageShell({super.key,required this.repository});
+  const PointageShell({super.key,required this.repository,
+    this.initialDestination='Entrée',this.onSwitchProfile});
   final PointageRepository repository;
+  final String initialDestination;
+  final VoidCallback? onSwitchProfile;
   @override State<PointageShell> createState() => _PointageShellState();
 }
 class _PointageShellState extends State<PointageShell> {
   int section = 0, process = 0;
   bool? _isFullScreenUserPref;
   late Future<List<String>> roleFuture;
-  @override void initState() { super.initState(); roleFuture = widget.repository.roles(); }
+  @override void initState() {
+    super.initState();
+    process=widget.initialDestination=='Sortie' ? 1 : 0;
+    roleFuture = widget.repository.roles();
+  }
   @override Widget build(BuildContext context) => FutureBuilder<List<String>>(
     future: roleFuture, builder: (context, snapshot) {
       if (snapshot.hasError) {
@@ -351,6 +419,16 @@ class _PointageShellState extends State<PointageShell> {
       final canEnter = allowed('entree'), canExit = allowed('sortie');
       final activeProcess = canEnter && canExit ? process : (canEnter ? 0 : 1);
       final repo = widget.repository;
+
+      if(widget.initialDestination=='Admin') {
+        if(admin)return AdminScreen(repository:repo,onSwitchProfile:widget.onSwitchProfile);
+        return Scaffold(appBar:AppBar(title:const Text('Accès Administration')),
+          body:Center(child:Column(mainAxisSize:MainAxisSize.min,children:[
+            const PermissionScreen(role:'Admin'),
+            if(widget.onSwitchProfile!=null)TextButton(
+              onPressed:widget.onSwitchProfile,child:const Text('Changer de profil')),
+          ])));
+      }
 
       final isMobile = MediaQuery.sizeOf(context).width < 800;
       final isFullScreen = _isFullScreenUserPref ?? (isMobile && section == 0);
@@ -621,6 +699,9 @@ class _PointageShellState extends State<PointageShell> {
           backgroundColor: const Color(0xff063e66),
           foregroundColor: Colors.white,
           actions: [
+            if(widget.onSwitchProfile!=null)IconButton(
+              tooltip:'Changer de profil',icon:const Icon(Icons.switch_account_outlined),
+              onPressed:widget.onSwitchProfile),
             if (admin) ...[
               if (kIsWeb)
                 IconButton(

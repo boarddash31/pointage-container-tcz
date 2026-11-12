@@ -37,6 +37,23 @@ class NoRoleFixture extends QueueFixture {
 }
 
 void main() {
+  testWidgets('Sortie quick access opens exit directly for a permitted session',(tester)async{
+    await tester.pumpWidget(MaterialApp(home:PointageShell(
+      repository:QueueFixture(),initialDestination:'Sortie')));
+    await tester.pumpAndSettle();
+    expect(find.text('Validation de la sortie'),findsOneWidget);
+    expect(find.text('Enregistrement de l’entrée'),findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Admin destination is denied again after server roles are loaded',(tester)async{
+    await tester.pumpWidget(MaterialApp(home:PointageShell(
+      repository:SingleRoleFixture('entree'),initialDestination:'Admin')));
+    await tester.pumpAndSettle();
+    expect(find.text('Accès Admin non autorisé pour ce compte.'),findsOneWidget);
+    expect(find.text('Administration · TCZ'),findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   testWidgets('gate clerk has no client or client-order assignment controls',(tester)async{
     await tester.pumpWidget(MaterialApp(home:Scaffold(body:EntryScreen(repository:QueueFixture(),canCorrect:false))));
     await tester.pumpAndSettle();
