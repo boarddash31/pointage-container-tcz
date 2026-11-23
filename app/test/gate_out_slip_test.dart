@@ -61,13 +61,13 @@ void main() {
     },
   );
   test(
-    'two outgoing containers retain separate lines and ISO codes without guessing empty/full',
+    'two outgoing containers retain separate lines and ISO codes with the confirmed default empty status',
     () {
       final doc = sample(twin: true);
       (doc['snapshot'] as Map)['exit_document'] = {};
       final slip = GateOutSlip.fromDocument(doc);
       expect(slip.containers.length, 2);
-      expect(slip.containers.map((c) => c.status), ['', '']);
+      expect(slip.containers.map((c) => c.status), ['Vide', 'Vide']);
       expect(slip.containerValues((c) => c.iso), '1 : 45G1 / 2 : 22G1');
       expect(slip.containers.last.line, 'MAE');
       expect(slip.fields['customs_office'], '');
@@ -86,12 +86,12 @@ void main() {
   );
   for (final twin in [false, true]) {
     test(
-      'gate-out A4 form renders ${twin ? 2 : 1} container(s) on one page',
+      'gate-out A5 form renders ${twin ? 2 : 1} container(s) in three copies',
       () async {
         final bytes = await BonPdfBuilder.buildA5(document: sample(twin: twin));
         expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
         final text = String.fromCharCodes(bytes);
-        expect(RegExp(r'/Type\s*/Page\b').allMatches(text).length, 1);
+        expect(RegExp(r'/Type\s*/Page\b').allMatches(text).length, 3);
         expect(bytes.length, greaterThan(3000));
         const preview = String.fromEnvironment('GATE_OUT_PDF_PREVIEW');
         if (preview.isNotEmpty && !twin) {
@@ -100,4 +100,14 @@ void main() {
       },
     );
   }
+  test('archived transport and twin seals are preserved independently', () {
+    final doc=sample(twin:true);
+    (doc['snapshot'] as Map)['operational_details']={
+      'haulier':'Transport test','seal_number':'TC1-SEAL','seal_number_2':'TC2-SEAL',
+    };
+    final slip=GateOutSlip.fromDocument(doc,visitData:{'operational_details':{'haulier':'CHANGED','seal_number':'CHANGED'}});
+    expect(slip.fields['haulier'],'Transport test');
+    expect(slip.containers.map((c)=>c.seal),['TC1-SEAL','TC2-SEAL']);
+    expect(slip.orderKind,'EDO');
+  });
 }

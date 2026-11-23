@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../data/pointage_repository.dart';
 import '../domain/container_number.dart';
 import 'pointage_screens.dart';
+import 'sql_dashboard.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key, required this.repository});
@@ -12,6 +14,7 @@ class AdminScreen extends StatefulWidget {
 }
 
 class _AdminScreenState extends State<AdminScreen> {
+  String newPassword(){const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';final random=Random.secure();return List.generate(16,(_)=>alphabet[random.nextInt(alphabet.length)]).join();}
   DateTime day = DateTime.now();
   String? selectedClient, selectedArmateur;
   late Future<List<Map<String, dynamic>>> activity, profiles, clients, armateurs, audit, forced;
@@ -35,18 +38,17 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   void refresh() {
-    final db = widget.repository.client;
+    final repo = widget.repository;
     setState(() {
-      activity = db.rpc('hourly_activity', params: {'p_day': dateString(day)})
+      activity = repo.read('hourly', {'day': dateString(day)})
           .then((x) => List<Map<String, dynamic>>.from(x as List));
-      profiles = db.from('profiles').select('id,display_name,first_name,last_name,phone,avatar_url,initial_password,active,created_at,user_roles(role)').order('created_at', ascending: false)
+      profiles = repo.read('profiles')
           .then((x) => List<Map<String, dynamic>>.from(x));
-      clients = db.from('clients').select('id,code,name').order('name')
+      clients = repo.read('clients')
           .then((x) => List<Map<String, dynamic>>.from(x));
-      armateurs = db.from('armateurs').select('id,name').order('name')
+      armateurs = repo.read('operators')
           .then((x) => List<Map<String, dynamic>>.from(x));
-      audit = db.from('audit_logs').select('entity,entity_id,action,actor_id,occurred_at,reason')
-          .order('occurred_at', ascending: false).limit(100)
+      audit = repo.read('audit')
           .then((x) => List<Map<String, dynamic>>.from(x));
       forced = widget.repository.forcedActions();
       visits = widget.repository.visits(insideOnly: false);
@@ -68,7 +70,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Future<void> setRole(String user, String role, bool enabled) async {
     try {
-      await widget.repository.client.rpc('set_user_role', params: {
+      await widget.repository.settings('role', {
         'p_user': user,
         'p_role': role,
         'p_enabled': enabled,
@@ -103,7 +105,7 @@ class _AdminScreenState extends State<AdminScreen> {
     final firstName = TextEditingController();
     final lastName = TextEditingController();
     final phone = TextEditingController();
-    final password = TextEditingController(text: 'tcz123');
+    final password = TextEditingController();
     final avatar = TextEditingController();
     String role = 'entree';
 
@@ -153,10 +155,10 @@ class _AdminScreenState extends State<AdminScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: phone,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Téléphone (WhatsApp) *',
-                      hintText: 'Ex: 0661998877',
+                    keyboardType: widget.repository.usesSql ? TextInputType.text : TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: widget.repository.usesSql ? 'Identifiant *' : 'Téléphone (WhatsApp) *',
+                      hintText: widget.repository.usesSql ? 'Nom d’utilisateur ou e-mail' : 'Ex: 0661998877',
                       prefixIcon: Icon(Icons.phone_android_rounded, size: 20),
                     ),
                   ),
@@ -191,11 +193,10 @@ class _AdminScreenState extends State<AdminScreen> {
                       ),
                       const SizedBox(width: 6),
                       IconButton(
-                        tooltip: 'Générer mot de passe facile',
+                        tooltip: 'Générer un mot de passe',
                         icon: const Icon(Icons.refresh_rounded, color: Color(0xff075a8d)),
                         onPressed: () {
-                          final rnd = 100 + (DateTime.now().millisecondsSinceEpoch % 900);
-                          update(() => password.text = 'tcz$rnd');
+                          update(() => password.text = newPassword());
                         },
                       ),
                     ],
@@ -221,12 +222,12 @@ class _AdminScreenState extends State<AdminScreen> {
                     message(dialog, 'Nom et Prénom obligatoires.');
                     return;
                   }
-                  if (phone.text.trim().length < 8) {
+                  if (phone.text.trim().length < (widget.repository.usesSql ? 3 : 8)) {
                     message(dialog, 'Numéro de téléphone invalide.');
                     return;
                   }
-                  if (password.text.trim().length < 4) {
-                    message(dialog, 'Mot de passe trop court.');
+                  if (password.text.length < (widget.repository.usesSql ? 12 : 4)) {
+                    message(dialog, widget.repository.usesSql ? 'Mot de passe : 12 caract?res minimum.' : 'Mot de passe trop court.');
                     return;
                   }
                   try {
@@ -235,7 +236,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       firstName: firstName.text.trim(),
                       lastName: lastName.text.trim(),
                       role: role,
-                      password: password.text.trim(),
+                      password: widget.repository.usesSql ? password.text : password.text.trim(),
                       avatarUrl: avatar.text.trim().isNotEmpty ? avatar.text.trim() : null,
                       adminCode: '01010909',
                     );
@@ -254,6 +255,7 @@ class _AdminScreenState extends State<AdminScreen> {
       if (res != null && mounted) {
         refresh();
         final agentName = res['full_name'] as String? ?? '${firstName.text} ${lastName.text}';
+        if (widget.repository.usesSql) { refresh(); message(context, 'Compte cr??. Le mot de passe devra ?tre chang? ? la premi?re connexion.'); return; }
         final agentPhone = res['phone'] as String? ?? phone.text;
         final agentRole = res['role'] as String? ?? role;
         final agentPwd = res['password'] as String? ?? password.text;
@@ -310,8 +312,8 @@ class _AdminScreenState extends State<AdminScreen> {
     final parts = fullName.split(' ');
     final fNameController = TextEditingController(text: (profile['first_name'] ?? (parts.isNotEmpty ? parts[0] : '')).toString());
     final lNameController = TextEditingController(text: (profile['last_name'] ?? (parts.length > 1 ? parts.sublist(1).join(' ') : '')).toString());
-    final phoneController = TextEditingController(text: (profile['phone'] ?? '').toString());
-    final passwordController = TextEditingController(text: (profile['initial_password'] ?? 'tcz123').toString());
+    final phoneController = TextEditingController(text: (widget.repository.usesSql ? profile['username'] ?? '' : profile['phone'] ?? '').toString());
+    final passwordController = TextEditingController();
     
     final currentRoles = (profile['user_roles'] as List).map((x) => x['role'].toString()).toList();
     String selectedRole = currentRoles.contains('admin') ? 'admin'
@@ -365,9 +367,10 @@ class _AdminScreenState extends State<AdminScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Numéro Téléphone / WhatsApp *',
+                    keyboardType: widget.repository.usesSql ? TextInputType.text : TextInputType.phone,
+                    readOnly: widget.repository.usesSql && profile['account_linked']==true,
+                    decoration: InputDecoration(
+                      labelText: widget.repository.usesSql ? 'Identifiant *' : 'Numéro Téléphone / WhatsApp *',
                       hintText: '06XXXXXXXX',
                       prefixText: '+212 ',
                       prefixIcon: Icon(Icons.phone_iphone_rounded),
@@ -399,11 +402,10 @@ class _AdminScreenState extends State<AdminScreen> {
                       ),
                       const SizedBox(width: 8),
                       IconButton(
-                        tooltip: 'Générer code facile',
+                        tooltip: 'Générer un mot de passe',
                         icon: const Icon(Icons.refresh_rounded, color: Color(0xff0284c7)),
                         onPressed: () {
-                          final rnd = (100 + (DateTime.now().millisecondsSinceEpoch % 900)).toString();
-                          update(() => passwordController.text = 'tcz$rnd');
+                          update(() => passwordController.text = newPassword());
                         },
                       ),
                     ],
@@ -438,7 +440,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     firstName: fNameController.text.trim(),
                     lastName: lNameController.text.trim(),
                     role: selectedRole,
-                    password: passwordController.text.trim(),
+                    password: widget.repository.usesSql ? passwordController.text : passwordController.text.trim(),
                     active: isActive,
                   );
                   if (ctx.mounted) {
@@ -494,7 +496,7 @@ class _AdminScreenState extends State<AdminScreen> {
             style: FilledButton.styleFrom(backgroundColor: const Color(0xff075a8d)),
             onPressed: () async {
               try {
-                await widget.repository.client.rpc('create_client', params: {
+                await widget.repository.settings('client', {
                   'p_code': code.text,
                   'p_name': name.text,
                 });
@@ -519,7 +521,7 @@ class _AdminScreenState extends State<AdminScreen> {
       return;
     }
     try {
-      await widget.repository.client.rpc('assign_client_armateur', params: {
+      await widget.repository.settings('assignment', {
         'p_client': selectedClient,
         'p_armateur': selectedArmateur,
         'p_from': dateString(day),
@@ -647,7 +649,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     return;
                   }
                   try {
-                    await widget.repository.client.rpc('register_observed_container', params: {
+                    await widget.repository.settings('container', {
                       'p_number': canonical,
                       'p_iso': iso.text.trim().toUpperCase(),
                       'p_armateur': line,
@@ -778,7 +780,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
                   ),
-                  onPressed: () => launchUrl(
+                  onPressed: () => widget.repository.usesSql ? Navigator.push(context,MaterialPageRoute(builder:(_)=>SqlDashboard(repository:widget.repository))) : launchUrl(
                     Uri.base.resolve('dashboard.html'),
                     mode: LaunchMode.platformDefault,
                   ),

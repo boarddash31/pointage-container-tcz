@@ -1,13 +1,17 @@
 # Validation IT — Pointage TCZ / SQL Server
 
+**Mise à jour du 21/11/2026 :** l’IT a confirmé `PRD-DB-ZENATA\MMSQL01`, port TCP **54013**, base **toszps**, utilisateur de déploiement **toszps** avec `db_owner`. Résolution DNS vers **172.17.18.209** et accès TCP vérifiés depuis le poste de préparation. Authentification SQL, certificat et recette restent à valider. Voir [la procédure de premier déploiement](../deployment/LISEZ-MOI.md). Les mentions « instance/port/base à confirmer » ci-dessous décrivent la demande initiale, désormais renseignée. Prévoir séparément un compte d’exécution API sans `db_owner`.
+
 Décisions retenues le 27/10/2026 : **Windows Server**, **SQL Server 2025**, **comptes propres à l’application créés uniquement par Admin**, **lot conservé localement**. L’option AD/Entra a été annulée. Aucune publication sur le dépôt public n’est autorisée.
+
+Topologie précisée le 16/11/2026 : **172.17.18.208 pour l’applicatif**, **172.17.18.209 pour SQL Server**. Ce sont deux machines distinctes. Aucun nom DNS applicatif n’est encore prévu ; le port/instance SQL et le nom de base restent à confirmer. Voir [le plan et les modèles de configuration](../../../deployment/windows/README.md).
 
 ## Informations à fournir par l’IT
 
 | Sujet | Informations attendues |
 | --- | --- |
-| Machine | Version de Windows Server, FQDN, accès de déploiement et site IIS |
-| SQL Server | Instance/port, base de test vide (`TCZ_Pointage_Test`), certificat TLS et compte DBA de préparation |
+| Serveur applicatif 172.17.18.208 | Version de Windows Server, éventuel FQDN, accès de déploiement, certificat HTTPS et mode IIS/service |
+| Serveur SQL 172.17.18.209 | Version de Windows Server, instance/port TCP fixe, base de test vide (`TCZ_Pointage_Test` proposé), certificat TLS et compte DBA de préparation |
 | API | FQDN HTTPS, certificat approuvé par les postes et compte de service |
 | Application | URL interne HTTPS et origine autorisée pour les appels API |
 | PDF/impression | Stockage privé des PDF, droits du service, poste d’impression et imprimante de recette |

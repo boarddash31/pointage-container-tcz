@@ -24,7 +24,7 @@ assert.deepEqual(receiving.containers,[]);
 const twin=gateOutValues({...document,snapshot:{...document.snapshot,is_twin:true,
   iso_code:'22G1',container_number_2:'CSQU3054383',iso_code_2:'22G1',armateur_id_2:'MAE',exit_document:{}}});
 assert.equal(twin.containers.length,2);
-assert.deepEqual(twin.containers.map(c=>c.status),['','']);
+assert.deepEqual(twin.containers.map(c=>c.status),['Vide','Vide']);
 assert.deepEqual(twin.containers.map(c=>c.weight),['','']);
 assert.equal(twin.containers[1].number,'CSQU3054383');
 const utc=gateOutValues({...document,print_context:{},event_id:null});

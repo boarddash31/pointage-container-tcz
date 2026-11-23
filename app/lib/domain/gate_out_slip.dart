@@ -5,9 +5,9 @@ class GateOutContainer {
     this.iso,
     this.line,
     this.status,
-    this.weight,
+    this.weight, [this.seal = '']
   );
-  final String number, iso, line, status, weight;
+  final String number, iso, line, status, weight, seal;
 }
 
 class GateOutSlip {
@@ -27,6 +27,7 @@ class GateOutSlip {
   final List<GateOutContainer> containers;
   final Map<String, String> fields;
   final List<String> orders;
+  String get orderKind => emptyChassis ? 'ERO' : 'EDO';
   static Map<String, dynamic> map(dynamic value) =>
       value is Map ? Map<String, dynamic>.from(value) : {};
   static String text(dynamic value) => value?.toString().trim() ?? '';
@@ -35,7 +36,7 @@ class GateOutSlip {
   static String status(dynamic value) => switch (text(value).toUpperCase()) {
     'MTY' || 'EMPTY' || 'VIDE' => 'Vide',
     'FULL' || 'PLEIN' || 'FCL' => 'Plein',
-    _ => text(value),
+    _ => text(value).isEmpty ? 'Vide' : text(value),
   };
   factory GateOutSlip.fromDocument(
     Map<String, dynamic> document, {
@@ -43,7 +44,8 @@ class GateOutSlip {
   }) {
     final snapshot = map(document['snapshot']),
         context = map(document['print_context']);
-    final v = {...?visitData, ...snapshot};
+    final facts = {...?visitData, ...snapshot};
+    final v = {...facts, ...map(snapshot.isNotEmpty ? snapshot['operational_details'] : visitData?['operational_details'])};
     final event = map(snapshot['event']);
     final exit = map(snapshot['exit_document']);
     final emptyChassis = v['entry_kind'] == 'loaded';
@@ -62,6 +64,7 @@ class GateOutSlip {
               exit['gross_weight_kg$suffix'] ??
                   snapshot['gross_weight_kg$suffix'],
             ),
+            text(v['seal_number$suffix']),
           ),
         );
       }
@@ -93,9 +96,12 @@ class GateOutSlip {
       'gate_date',
       'gate_time',
       'gate_number',
+      'haulier',
+      'damage_reservations',
+      'damage_reservations_2',
     ]) {
       // Customs/control fields must be explicitly archived, never inferred from a booking or ISO.
-      fields[key] = text(exit[key] ?? snapshot[key]);
+      fields[key] = text(exit[key] ?? v[key]);
     }
     final orders = <String>{
       first([
@@ -105,6 +111,7 @@ class GateOutSlip {
       ]),
       if (v['is_twin'] == true) text(v['booking_reference_2']),
     }..remove('');
+    fields['agent_id'] = first([document['created_by'],snapshot['exited_by'],snapshot['entered_by']]);
     return GateOutSlip._(
       date: date,
       reference: first([

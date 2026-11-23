@@ -11,7 +11,10 @@ BEGIN
 END;
 GO
 CREATE OR ALTER FUNCTION api.parse_items(@items nvarchar(max)) RETURNS TABLE AS RETURN
-  SELECT id,UPPER(TRIM(iso_code)) iso_code,armateur_id,quantity
+  -- OPENJSON inherits the database/input collation. These identifiers join
+  -- BIN2 business columns, including when the database default is French_CI_AS.
+  SELECT id,UPPER(TRIM(iso_code)) COLLATE Latin1_General_100_BIN2 AS iso_code,
+    armateur_id COLLATE Latin1_General_100_BIN2 AS armateur_id,quantity
   FROM OPENJSON(@items) WITH(id uniqueidentifier '$.id',iso_code nvarchar(max) '$.iso_code',
     armateur_id nvarchar(max) '$.armateur_id',quantity int '$.quantity');
 GO

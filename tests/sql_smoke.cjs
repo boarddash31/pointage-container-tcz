@@ -138,6 +138,7 @@ await require('./order_assignment.cjs')(db, actor, 'supabase/migrations/20261023
 await require('./transport_rules.cjs')(db,actor,'supabase/migrations/20261023144404_transport_orders_and_24h_delivery.sql');
 await require('./document_printing.cjs')(db,actor,'supabase/migrations/20261023151708_document_author_and_print_context.sql');
 await require('./editable_orders.cjs')(db,actor,'supabase/migrations/20261026125117_editable_globally_unique_transport_orders.sql');
+await require('./ops_review.cjs')(db,actor);
 // The following migration only repairs French message encoding; PGlite lacks WIN1252 conversion.
 // It is verified on ZENATA's PostgreSQL instead of this WASM runtime.
 console.log('PASS: transaction number stability, creator, last changer, agent access, profile isolation and unauthorized denial');

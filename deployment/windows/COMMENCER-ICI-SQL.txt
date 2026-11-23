@@ -1,0 +1,32 @@
+RUNTIME SQL COMPLET - SERVEUR 208 - 22 NOVEMBRE 2026
+
+Option demandee : compte SQL existant toszps et connexion chiffree sans
+verification du certificat serveur. Aucun fichier .cer necessaire.
+Le chiffrement reste actif ; l'identite du serveur SQL n'est pas verifiee.
+
+1. Extraire ZENATA-RUNTIME-SQL dans un nouveau dossier definitif sur 208.
+   Conserver l'ancien runtime et ses parametres.
+2. Lancer COMPILER-RUNTIME-SQL.cmd avec le SDK deja installe sur208.
+   Attendre : RUNTIME SQL COMPILE ET PRET A CONFIGURER.
+   La compilation de cette nouvelle version reste a effectuer sur208.
+3. Le schema6 est deja installe : NE PAS REJOUER LE SCRIPT SQL15.
+   Passer la creation de pointage_runtime et le script SQL16.
+4. Lancer UTILISER-TOSZPS-SANS-VALIDATION-CERTIFICAT.cmd.
+   Garder toszps et saisir son mot de passe SQL dans la console.
+   Attendre : CONNEXION RUNTIME SQL VALIDEE.
+5. Aucun transfert : les anciennes donnees Supabase etaient des essais.
+   Lancer CREER-PREMIER-ADMIN-SQL.cmd et creer votre nouvel Admin local.
+   Puis CONFIGURER-RUNTIME-SQL.cmd et LANCER-SQL-9091.cmd.
+   Si vous appliquez le correctif a un runtime deja compile, lancer d'abord
+   ACTUALISER-INITIALISATION-ADMIN.cmd selon le guide LIRE-MOI.md.
+
+Passer les scripts SOURCE, l'export et l'import. Ne supprimer aucune base.
+Le choix de connexion SQL est protege avec les identifiants par Windows ;
+la creation du premier Admin et l'API le reutilisent.
+Pour reactiver la verification : UTILISER-COMPTE-TOSZPS.cmd puis reconfigurer.
+Aucun changement de configuration SQL ni redemarrage de209 n'est requis.
+
+Cible web : http://172.17.18.208:9091/
+Cible SQL : PRD-DB-ZENATA:54013 / instance MMSQL01 / base toszps
+Aucun mot de passe ni donnees metier reelles ne sont inclus.
+La copie et la compilation ne realisent ni import ni bascule.

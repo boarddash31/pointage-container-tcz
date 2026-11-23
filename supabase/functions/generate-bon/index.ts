@@ -2,6 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.76.1';
 import { PDFDocument, StandardFonts, rgb } from 'npm:pdf-lib@1.17.1';
 import { terminalSlipPdf } from './terminal-slip.ts';
 import { gateOutSlipPdf } from './gate-out-pdf.ts';
+import { zpsLogoBase64 } from './zps-logo.ts';
 import { documentPdfPath,hasCurrentPdf,documentTemplateVersion } from './pdf-cache.ts';
 
 const cors = {
@@ -78,7 +79,8 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
   );
 
   // 1. Header: Terminal Conteneurs Zenata
-  page.drawText('TCZ', { x: 20, y: 562, font: bold, size: 20, color: navy });
+  const logo=await pdf.embedJpg(Uint8Array.from(atob(zpsLogoBase64),c=>c.charCodeAt(0)));
+  page.drawImage(logo,{x:20,y:541,width:68,height:40});
   page.drawText('TERMINAL CONTENEURS ZENATA', { x: 20, y: 550, font: bold, size: 7, color: navy });
   page.drawText('TCZ ZENATA - GUICHET UNIQUE & CONTROLE D\'ACCES', { x: 20, y: 541, font: normal, size: 5.5, color: muted });
 
@@ -292,7 +294,7 @@ async function pdfFor(document: Record<string, unknown>): Promise<Uint8Array> {
 
   // 6. Footer: TCZ Zenata
   page.drawLine({ start: { x: 20, y: 22 }, end: { x: 400, y: 22 }, thickness: 0.6, color: borderGray });
-  page.drawText('Document d\'exploitation officiel TCZ Zenata - Valable pour une seule rotation - TOS Navis N4.', {
+  page.drawText('Zenata Port Sec', {
     x: 20,
     y: 12,
     font: normal,

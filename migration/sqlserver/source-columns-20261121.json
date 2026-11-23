@@ -1,0 +1,949 @@
+{
+  "source_project": "iparzfqxopcvwqelxlad",
+  "captured_on": "2026-11-21",
+  "scope": "Metadata only, read-only ZENATA connection. No business rows or authentication secrets.",
+  "tables": [
+    {
+      "table_schema": "private",
+      "table_name": "transport_order_aliases",
+      "columns": [
+        {
+          "name": "alias_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "original_header",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "private",
+      "table_name": "transport_order_controls",
+      "columns": [
+        {
+          "name": "singleton",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "required",
+          "type": "bool",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "armateurs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "bic",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "official_logo_path",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "official_logo_verified",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "audit_logs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false
+        },
+        {
+          "name": "entity",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "entity_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "before_data",
+          "type": "jsonb",
+          "nullable": true
+        },
+        {
+          "name": "after_data",
+          "type": "jsonb",
+          "nullable": true
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "bookings",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "reference",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "client_armateurs",
+      "columns": [
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "valid_from",
+          "type": "date",
+          "nullable": false
+        },
+        {
+          "name": "valid_to",
+          "type": "date",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "clients",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "container_stock_intervals",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "container_number",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "start_visit_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "end_visit_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "arrived_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "departed_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "position",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "containers",
+      "columns": [
+        {
+          "name": "number",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "document_actions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false
+        },
+        {
+          "name": "document_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "evp_rules",
+      "columns": [
+        {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": false
+        },
+        {
+          "name": "size_feet",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "factor",
+          "type": "numeric",
+          "nullable": false
+        },
+        {
+          "name": "source_note",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "forced_container_actions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "visit_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "container_number",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "resolved_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "resolved_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "external_reference",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "generated_documents",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "visit_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "event_id",
+          "type": "int8",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "storage_path",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "snapshot",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "iso_report_types",
+      "columns": [
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "size_feet",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "source_note",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "printer_settings",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "device_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "printer_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "profiles",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "first_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "last_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "avatar_url",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "initial_password",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "username",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "transport_order_items",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "quantity",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "transport_orders",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "direction",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "reference",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "client_order_reference",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "version",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updated_by",
+          "type": "uuid",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "truck_visits",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "plate",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "driver_cin",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "entry_kind",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "container_number",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "booking_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "entered_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "entered_by",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "engin_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "engin_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "exited_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "exited_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "canceled_at",
+          "type": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "canceled_by",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "cancel_reason",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "version",
+          "type": "int4",
+          "nullable": false
+        },
+        {
+          "name": "is_twin",
+          "type": "bool",
+          "nullable": false
+        },
+        {
+          "name": "container_number_2",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "iso_code_2",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "armateur_id_2",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "booking_reference_2",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "client_order_reference",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "carrier_booking_reference",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "carrier_booking_armateur_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "carrier_booking_armateur_id_2",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_item_id",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "order_item_id_2",
+          "type": "uuid",
+          "nullable": true
+        },
+        {
+          "name": "order_controlled",
+          "type": "bool",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "user_roles",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "visit_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false
+        },
+        {
+          "name": "visit_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "details",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "table_schema": "public",
+      "table_name": "yard_operations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "visit_id",
+          "type": "uuid",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "container_number",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "performed_at",
+          "type": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "performed_by",
+          "type": "uuid",
+          "nullable": false
+        }
+      ]
+    }
+  ]
+}

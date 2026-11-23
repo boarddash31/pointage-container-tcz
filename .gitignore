@@ -37,3 +37,6 @@ integrations/codeco/java/lib/*.jar
 integrations/codeco/java/build/
 /CODECO_reponse*.xml
 /CODECO_requete*.xml
+deployment/windows/.state/
+integrations/reports/.state/
+**/runtime.env

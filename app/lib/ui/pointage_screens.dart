@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'operational_screens.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/bon_pdf_builder.dart';
 import '../data/document_service.dart';
@@ -15,6 +17,7 @@ import '../domain/transport_order.dart';
 import 'transport_orders_screen.dart';
 import '../domain/truck_plate.dart';
 import 'truck_diagram.dart';
+import 'gate_mission_icon.dart';
 import '../utils/fullscreen_helper.dart';
 
 void message(BuildContext context,String text) => ScaffoldMessenger.of(context)
@@ -93,6 +96,7 @@ class _EntryScreenState extends State<EntryScreen> {
   final form=GlobalKey<FormState>();
   final plate=TextEditingController(),cin=TextEditingController(),booking=TextEditingController();
   final booking2=TextEditingController();
+  final haulier=TextEditingController(),lane=TextEditingController(),damage=TextEditingController(),damage2=TextEditingController(),seal=TextEditingController(),seal2=TextEditingController();
   final plateFocus=FocusNode(),cinFocus=FocusNode(),bookingFocus=FocusNode(),bookingFocus2=FocusNode();
   final isoFocus=FocusNode(),iso2Focus=FocusNode();
   final modeScrollController=ScrollController();
@@ -125,6 +129,13 @@ class _EntryScreenState extends State<EntryScreen> {
       else{orderItem=selected;booking.text=selected.reference;iso=selected.iso;isoController.text=iso;operator=op;}
     });
   }
+  Widget orderReferenceField({bool second=false}) => TextFormField(
+    controller: second ? booking2 : booking,
+    focusNode: second ? bookingFocus2 : bookingFocus,
+    readOnly: true, onTap:()=>pickOrder(second:second),
+    decoration: InputDecoration(labelText: isTwin ? 'EDO Conteneur ${second?2:1} *' : 'Référence EDO *'),
+    validator:(value)=>value==null||value.trim().isEmpty?'EDO requis':null,
+  );
   void selectGateMode(String selectedKind, bool selectedTwin) {
     setState(() {
       if(kind!=selectedKind){orderItem=null;orderItem2=null;booking.clear();booking2.clear();}
@@ -207,7 +218,7 @@ class _EntryScreenState extends State<EntryScreen> {
       }catch(_){ if(mounted)message(context,'Catalogue des armateurs indisponible.'); }
     }
   }
-  @override void dispose(){for(final c in [plate,cin,booking,booking2,isoController,iso2Controller,...boxes,...boxes2]){c.dispose();}
+  @override void dispose(){for(final c in [plate,cin,booking,booking2,haulier,lane,damage,damage2,seal,seal2,isoController,iso2Controller,...boxes,...boxes2]){c.dispose();}
     for(final f in [plateFocus,cinFocus,bookingFocus,bookingFocus2,isoFocus,iso2Focus,...focus,...focus2]){f.dispose();}
     _twinPageController.dispose();
     modeScrollController.dispose();super.dispose();}
@@ -415,12 +426,19 @@ class _EntryScreenState extends State<EntryScreen> {
         iso2:isTwin?iso2.trim():null,
         armateur2:isTwin?(operator2?.id??operator!.id):null,
         orderItemId:orderItem?.id,orderItemId2:isTwin?orderItem2?.id:null,
+        operationalDetails: {
+          'haulier':haulier.text.trim(), 'lane':lane.text.trim(),
+          'damage_reservations':damage.text.trim(),
+          if(isTwin)'damage_reservations_2':damage2.text.trim(),
+          if(kind=='empty')'seal_number':seal.text.trim(),
+          if(kind=='empty'&&isTwin)'seal_number_2':seal2.text.trim(),
+        },
         booking2:(isTwin&&kind=='empty')?booking2.text.trim():null,
       );
       if(!mounted)return;
       DocumentOutcome? outcome;
       try{
-        final documents=DocumentService(widget.repository.client);
+        final documents=widget.repository.documentService;
         outcome=await documents.finalizeLatest(visitId,'ENTREE');
         if(mounted){message(context,outcome.warning!=null?
           'Entrée enregistrée et bon cloud archivé. ${outcome.warning}':(outcome.printed?
@@ -466,7 +484,7 @@ class _EntryScreenState extends State<EntryScreen> {
       _lastVisitId = visitId;
       _lastPlate = savedPlate;
 
-      form.currentState!.reset();for(final c in [plate,cin,booking,booking2,isoController,iso2Controller,...boxes,...boxes2]){c.clear();}
+      form.currentState!.reset();for(final c in [plate,cin,booking,booking2,haulier,lane,damage,damage2,seal,seal2,isoController,iso2Controller,...boxes,...boxes2]){c.clear();}
       setState((){
         orderItem=null;orderItem2=null;operator=null;
         operator2=null;
@@ -841,32 +859,16 @@ class _EntryScreenState extends State<EntryScreen> {
         final cleanInput = currentPlate.replaceAll(RegExp(r'[^A-Z0-9]'), '').toUpperCase();
 
         // 1. Exact formatted search
-        visitData = await widget.repository.client
-            .from('truck_visits')
-            .select('*,bookings(reference)')
-            .eq('plate', formattedPlate)
-            .order('entered_at', ascending: false)
-            .limit(1)
-            .maybeSingle();
+        visitData = await widget.repository.visitData(plate: formattedPlate);
 
         // 2. Exact raw search if different
         if (visitData == null && currentPlate != formattedPlate) {
-          visitData = await widget.repository.client
-              .from('truck_visits')
-              .select('*,bookings(reference)')
-              .eq('plate', currentPlate)
-              .order('entered_at', ascending: false)
-              .limit(1)
-              .maybeSingle();
+          visitData = await widget.repository.visitData(plate: currentPlate);
         }
 
         // 3. Flexible normalized plate search in recent visits
         if (visitData == null && cleanInput.isNotEmpty) {
-          final candidates = await widget.repository.client
-              .from('truck_visits')
-              .select('*,bookings(reference)')
-              .order('entered_at', ascending: false)
-              .limit(100);
+          final candidates = await widget.repository.visitRows(limit:100);
           for (final c in candidates) {
             final p = (c['plate'] as String? ?? '').replaceAll(RegExp(r'[^A-Z0-9]'), '').toUpperCase();
             if (p == cleanInput || p.contains(cleanInput) || cleanInput.contains(p)) {
@@ -890,12 +892,7 @@ class _EntryScreenState extends State<EntryScreen> {
           targetPlate = _lastPlate ?? '';
           bytesToPrint = _lastBonBytes;
         } else {
-          visitData = await widget.repository.client
-              .from('truck_visits')
-              .select('*,bookings(reference)')
-              .order('entered_at', ascending: false)
-              .limit(1)
-              .maybeSingle();
+          visitData = await widget.repository.visitData();
           if (visitData != null) {
             targetVisitId = visitData['id'] as String;
             targetPlate = visitData['plate'] as String? ?? '';
@@ -908,20 +905,14 @@ class _EntryScreenState extends State<EntryScreen> {
 
       // Generate or retrieve PDF bytes
       if (bytesToPrint == null && targetVisitId.isNotEmpty) {
-        final docs = DocumentService(widget.repository.client);
+        final docs = widget.repository.documentService;
         try {
           bytesToPrint = await docs.prepareLatest(targetVisitId, 'ENTREE');
         } catch (_) {}
 
         // Fallback: build directly via BonPdfBuilder
         if (bytesToPrint == null) {
-          if (visitData == null) {
-            visitData = await widget.repository.client
-                .from('truck_visits')
-                .select('*,bookings(reference)')
-                .eq('id', targetVisitId)
-                .maybeSingle();
-          }
+          visitData ??= await widget.repository.visitData(id: targetVisitId);
           if (visitData != null) {
             bytesToPrint = await BonPdfBuilder.buildA5(
               document: {'kind': 'ENTREE', 'visit_id': targetVisitId, 'created_at': visitData['entered_at'] ?? DateTime.now().toIso8601String()},
@@ -1158,181 +1149,34 @@ class _EntryScreenState extends State<EntryScreen> {
                 ],
               ),
             ),
-          // PINNED / FIXED TOP: Visualiseur du camion + (Plaque & CIN si Mobile F11)
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  offset: const Offset(0, 2),
-                  blurRadius: 4,
-                ),
-              ],
-              border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-            ),
-            padding: isMobileF11
-                ? const EdgeInsets.fromLTRB(10, 4, 10, 8)
-                : const EdgeInsets.fromLTRB(12, 6, 12, 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!widget.isFullScreen && MediaQuery.sizeOf(context).width >= 600) ...[
-                  const Text('État du camion à l’arrivée',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Color(0xff063e66))),
-                  const SizedBox(height: 2),
-                  const Text('↔ Glissez pour changer de mode · Touchez la plaque ou le conteneur pour saisir',
-                    style: TextStyle(fontSize: 10, color: Color(0xff49677e), fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 6),
-                ],
-                SizedBox(
-                  height: (widget.isFullScreen || isMobile) ? 142 : 160,
-                child: Scrollbar(
-                  controller: modeScrollController,
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    controller: modeScrollController,
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final option in [
-                          ('loaded', false, 'Restituer 1 conteneur'),
-                          ('loaded', true, 'Restituer 2 conteneurs'),
-                          ('empty', false, 'Livraison de 1 conteneur'),
-                          ('empty', true, 'Livraison de 2 conteneurs'),
-                        ])
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8, bottom: 4),
-                            child: InkWell(
-                              key: ValueKey('gate-${option.$1}-${option.$2}'),
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: kind == option.$1 && isTwin == option.$2
-                                  ? null
-                                  : () => selectGateMode(option.$1, option.$2),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                onEnd: () {
-                                  if (kind == option.$1 && isTwin == option.$2 && modeScrollController.hasClients) {
-                                    final index = (option.$1 == 'empty' ? 2 : 0) + (option.$2 ? 1 : 0);
-                                    modeScrollController.animateTo(
-                                      (index * 232.0).clamp(0.0, modeScrollController.position.maxScrollExtent),
-                                      duration: const Duration(milliseconds: 180),
-                                      curve: Curves.easeOut,
-                                    );
-                                  }
-                                },
-                                width: kind == option.$1 && isTwin == option.$2
-                                    ? (MediaQuery.sizeOf(context).width < 600 ? 300 : 380)
-                                    : 216,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: kind == option.$1 && isTwin == option.$2
-                                      ? const Color(0xfff0f8fd)
-                                      : const Color(0xfffafcfe),
-                                  border: Border.all(
-                                    color: kind == option.$1 && isTwin == option.$2
-                                        ? const Color(0xff168dcc)
-                                        : const Color(0xffdfe8ef),
-                                    width: kind == option.$1 && isTwin == option.$2 ? 1.8 : 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Expanded(
-                                      child: TruckScene(
-                                        kind: option.$1,
-                                        isTwin: option.$2,
-                                        width: double.infinity,
-                                        height: (widget.isFullScreen || isMobile) ? 96 : 115,
-                                        plate: kind == option.$1 && isTwin == option.$2 ? plate.text : null,
-                                        driverCin: kind == option.$1 && isTwin == option.$2 ? cin.text : null,
-                                        containerNumber: kind == option.$1 && isTwin == option.$2 && option.$1 == 'loaded' ? number : null,
-                                        iso: kind == option.$1 && isTwin == option.$2 ? iso : null,
-                                        operator: kind == option.$1 && isTwin == option.$2 ? (operator?.name ?? operator?.id) : null,
-                                        containerNumber2: kind == option.$1 && isTwin == option.$2 && option.$2 && option.$1 == 'loaded' ? number2 : null,
-                                        iso2: kind == option.$1 && isTwin == option.$2 && option.$2 ? iso2 : null,
-                                        operator2: kind == option.$1 && isTwin == option.$2 && option.$2 ? (operator2?.name ?? operator2?.id) : null,
-                                        booking: kind == option.$1 && isTwin == option.$2 && option.$1 == 'empty' ? booking.text : null,
-                                        booking2: kind == option.$1 && isTwin == option.$2 && option.$2 && option.$1 == 'empty' ? booking2.text : null,
-                                        highlightMissing: kind == option.$1 && isTwin == option.$2,
-                                        activeContainerIndex: (kind == option.$1 && isTwin == option.$2 && option.$2) ? _activeTwinIndex : null,
-                                        onPlateTap: kind == option.$1 && isTwin == option.$2 ? () => _focusAndScroll(plateFocus) : null,
-                                        onCinTap: kind == option.$1 && isTwin == option.$2 ? () => _focusAndScroll(cinFocus) : null,
-                                        onContainerNumberTap: kind == option.$1 && isTwin == option.$2 ? focusGateField : null,
-                                        onIsoTap: kind == option.$1 && isTwin == option.$2
-                                            ? (idx) {
-                                                if (isTwin) {
-                                                  if (_twinPageController.hasClients && _activeTwinIndex != idx) {
-                                                    _twinPageController.animateToPage(idx, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
-                                                  }
-                                                  setState(() => _activeTwinIndex = idx);
-                                                }
-                                                _focusAndScroll(idx == 0 ? isoFocus : iso2Focus);
-                                              }
-                                            : null,
-                                        onLineTap: kind == option.$1 && isTwin == option.$2
-                                            ? (idx) {
-                                                if (isTwin) {
-                                                  if (_twinPageController.hasClients && _activeTwinIndex != idx) {
-                                                    _twinPageController.animateToPage(idx, duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
-                                                  }
-                                                  setState(() => _activeTwinIndex = idx);
-                                                }
-                                                pickOperator(forSecond: idx == 1);
-                                              }
-                                            : null,
-                                        onContainerTap: kind == option.$1 && isTwin == option.$2 ? focusGateField : null,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          option.$1 == 'loaded' ? Icons.south_west_rounded : Icons.north_east_rounded,
-                                          size: 13,
-                                          color: kind == option.$1 && isTwin == option.$2 ? const Color(0xff075a8d) : const Color(0xff64748b),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Flexible(
-                                          child: Text(
-                                            option.$3,
-                                            textAlign: TextAlign.center,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: kind == option.$1 && isTwin == option.$2 ? FontWeight.w800 : FontWeight.w600,
-                                              color: kind == option.$1 && isTwin == option.$2 ? const Color(0xff075a8d) : const Color(0xff173c5b),
-                                            ),
-                                          ),
-                                        ),
-                                        if (kind == option.$1 && isTwin == option.$2) ...[
-                                          const SizedBox(width: 4),
-                                          const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xff168dcc)),
-                                        ],
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(spacing: 10, children: [
+              for (final option in [
+                ('loaded', false, 'Restituer 1 conteneur'),
+                ('loaded', true, 'Restituer 2 conteneurs'),
+                ('empty', false, 'Livraison de 1 conteneur'),
+                ('empty', true, 'Livraison de 2 conteneurs'),
+              ])
+                Semantics(selected: kind == option.$1 && isTwin == option.$2,
+                  button: true, child: InkWell(
+                    key: ValueKey('gate-${option.$1}-${option.$2}'),
+                    onTap: busy ? null : () => selectGateMode(option.$1, option.$2),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(width: 220, padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: kind == option.$1 && isTwin == option.$2 ? const Color(0xffe5f3fb) : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: kind == option.$1 && isTwin == option.$2 ? const Color(0xff075a8d) : const Color(0xffdfe8ef)),
+                      ),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        GateMissionIcon(restitution: option.$1 == 'loaded', count: option.$2 ? 2 : 1),
+                        const SizedBox(height: 6),
+                        Text(option.$3, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      ]),
                     ),
-                  ),
-                ),
-              ),
-              // Plaque camion & CIN chauffeur PINNED en haut en mode mobile F11
-                if (isMobileF11) ...[
-                  const SizedBox(height: 6),
-                  _buildPlateAndCinRow(dense: true),
-                ],
-              ],
-            ),
+                  )),
+            ])),
           ),
         // SCROLLABLE FORM AREA
         Expanded(
@@ -1341,18 +1185,30 @@ class _EntryScreenState extends State<EntryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (!isMobileF11) ...[
-                  _buildPlateAndCinRow(),
-                  const SizedBox(height: 12),
-                ],
+                Text('1 · Informations ${kind == 'loaded' ? 'ERO · Restitution' : 'EDO · Livraison'}',
+                  style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
 
                   Wrap(spacing:8,runSpacing:8,children:[
                     OutlinedButton.icon(onPressed:()=>pickOrder(),icon:const Icon(Icons.receipt_long),
-                      label:Text(orderItem==null?'EDO / ERO · Conteneur 1':'${orderItem!.kind} ${orderItem!.reference} · ${orderItem!.iso} · ${orderItem!.remaining} disponibles')),
+                      label:Text(orderItem==null?'${kind == 'loaded' ? 'ERO' : 'EDO'} · Conteneur 1':'${orderItem!.kind} ${orderItem!.reference} · ${orderItem!.iso} · ${orderItem!.remaining} disponibles')),
                     if(isTwin)OutlinedButton.icon(onPressed:()=>pickOrder(second:true),icon:const Icon(Icons.receipt_long),
-                      label:Text(orderItem2==null?'EDO / ERO · Conteneur 2':'${orderItem2!.kind} ${orderItem2!.reference} · ${orderItem2!.iso} · ${orderItem2!.remaining} disponibles')),
+                      label:Text(orderItem2==null?'${kind == 'loaded' ? 'ERO' : 'EDO'} · Conteneur 2':'${orderItem2!.kind} ${orderItem2!.reference} · ${orderItem2!.iso} · ${orderItem2!.remaining} disponibles')),
                   ]),
                   const SizedBox(height:12),
+                  if(kind=='empty') ...[
+                    orderReferenceField(),
+                    if(isTwin) ...[const SizedBox(height:12),orderReferenceField(second:true)],
+                  ],
+                  const Divider(height: 32),
+                  Text('2 · Camion et chauffeur', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  _buildPlateAndCinRow(),
+                  const SizedBox(height: 12),
+                  TextFormField(controller: haulier, decoration: const InputDecoration(labelText: 'Transporteur (facultatif)'), maxLength: 100),
+                  const Divider(height: 24),
+                  Text('3 · Informations conteneur', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
                   // 4. Conteneur 1 (ou Mono)
                   if (isTwin) ...[
                     LayoutBuilder(builder: (context, space) {
@@ -1374,29 +1230,7 @@ class _EntryScreenState extends State<EntryScreen> {
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d)),
                             ),
                             const SizedBox(height: 8),
-                            if (kind == 'loaded')
-                              containerBoxes()
-                            else
-                              TextFormField(
-                                controller: booking,
-                                readOnly:true,onTap:()=>pickOrder(),
-                                focusNode: bookingFocus,
-                                textInputAction: TextInputAction.next,
-                                onChanged: (_) => setState(() {}),
-                                onFieldSubmitted: (_) {
-                                  isoFocus.requestFocus();
-                                  isoController.selection = TextSelection(baseOffset: 0, extentOffset: isoController.text.length);
-                                },
-                                textCapitalization: TextCapitalization.characters,
-                                style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
-                                decoration: InputDecoration(
-                                  isDense: true,
-                                  labelText: 'Booking Conteneur 1 *',
-                                  prefixIcon: Icon(Icons.receipt_long, size: widget.isFullScreen ? 18 : 20),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 7 : 12),
-                                ),
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Booking requis' : null,
-                              ),
+                            if (kind == 'loaded') containerBoxes(),
                             if (!widget.isFullScreen && lookupHint != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 6),
@@ -1504,29 +1338,7 @@ class _EntryScreenState extends State<EntryScreen> {
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xff075a8d)),
                             ),
                             const SizedBox(height: 8),
-                            if (kind == 'loaded')
-                              containerBoxes(second: true)
-                            else
-                              TextFormField(
-                                controller: booking2,
-                                readOnly:true,onTap:()=>pickOrder(second:true),
-                                focusNode: bookingFocus2,
-                                textInputAction: TextInputAction.next,
-                                onChanged: (_) => setState(() {}),
-                                onFieldSubmitted: (_) {
-                                  iso2Focus.requestFocus();
-                                  iso2Controller.selection = TextSelection(baseOffset: 0, extentOffset: iso2Controller.text.length);
-                                },
-                                textCapitalization: TextCapitalization.characters,
-                                style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
-                                decoration: InputDecoration(
-                                  isDense: true,
-                                  labelText: 'Booking Conteneur 2 *',
-                                  prefixIcon: Icon(Icons.receipt_long, size: widget.isFullScreen ? 18 : 20),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 7 : 12),
-                                ),
-                                validator: (v) => v == null || v.trim().isEmpty ? 'Booking requis' : null,
-                              ),
+                            if (kind == 'loaded') containerBoxes(second: true),
                             if (!widget.isFullScreen && lookupHint2 != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 6),
@@ -1761,30 +1573,7 @@ class _EntryScreenState extends State<EntryScreen> {
                     }),
                   ] else ...[
                     // 4. Numéro de conteneur ou Booking (Mono)
-                    if (kind == 'loaded')
-                      containerBoxes()
-                    else
-                      TextFormField(
-                        controller: booking,
-                        readOnly:true,onTap:()=>pickOrder(),
-                        focusNode: bookingFocus,
-                        textInputAction: TextInputAction.next,
-                        onChanged: (_) => setState(() {}),
-                        onFieldSubmitted: (_) {
-                          isoFocus.requestFocus();
-                          isoController.selection = TextSelection(baseOffset: 0, extentOffset: isoController.text.length);
-                        },
-                        textCapitalization: TextCapitalization.characters,
-                        style: TextStyle(fontSize: widget.isFullScreen ? 13 : 14, fontWeight: FontWeight.w600),
-                        decoration: InputDecoration(
-                          isDense: true,
-                          labelText: 'Référence Booking / EDO *',
-                          helperText: widget.isFullScreen ? null : 'Sélectionnez un article avec une quantité disponible',
-                          prefixIcon: Icon(Icons.receipt_long, size: widget.isFullScreen ? 18 : 20),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: widget.isFullScreen ? 7 : 12),
-                        ),
-                        validator: (v) => v == null || v.trim().isEmpty ? 'Booking requis' : null,
-                      ),
+                    if (kind == 'loaded') containerBoxes(),
                     if (!widget.isFullScreen && lookupHint != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 7),
@@ -1858,6 +1647,16 @@ class _EntryScreenState extends State<EntryScreen> {
                       ],
                     ),
                   ],
+                const SizedBox(height: 16),
+                TextFormField(controller: lane, maxLength: 40, decoration: const InputDecoration(labelText: 'Voie (facultatif)')),
+                TextFormField(controller: damage, maxLength: 1000, minLines: 2, maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Réserves / dommages · Conteneur 1 (facultatif)')),
+                if (isTwin) TextFormField(controller: damage2, maxLength: 1000, minLines: 2, maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Réserves / dommages · Conteneur 2 (facultatif)')),
+                if (kind == 'empty') ...[
+                  TextFormField(controller: seal, maxLength: 60, decoration: const InputDecoration(labelText: 'N° scellé · Conteneur 1 (facultatif)')),
+                  if (isTwin) TextFormField(controller: seal2, maxLength: 60, decoration: const InputDecoration(labelText: 'N° scellé · Conteneur 2 (facultatif)')),
+                ],
                   // 7. Bouton enregistrer (quand pas en mobile F11)
                   if (!isMobileF11) ...[
                     const SizedBox(height: 18),
@@ -2125,6 +1924,7 @@ class ExitScreen extends StatefulWidget {
 
 class _ExitScreenState extends State<ExitScreen> {
   final searchController = TextEditingController();
+  final seal1 = TextEditingController(), seal2 = TextEditingController(), haulier = TextEditingController();
   final reasonController = TextEditingController();
   late Future<List<TruckVisit>> visitsFuture;
   TruckVisit? selectedVisit;
@@ -2217,6 +2017,7 @@ class _ExitScreenState extends State<ExitScreen> {
   @override
   void dispose() {
     searchController.dispose();
+    seal1.dispose(); seal2.dispose(); haulier.dispose();
     reasonController.dispose();
     iso1Controller.dispose();
     iso2Controller.dispose();
@@ -2249,7 +2050,10 @@ class _ExitScreenState extends State<ExitScreen> {
     currentVisitId = visit.id;
     isDeposited = true;
     isPickedUp = true;
-    isTwin = false;
+    isTwin = visit.isTwin;
+    seal1.text = visit.operationalDetails['seal_number']?.toString() ?? '';
+    seal2.text = visit.operationalDetails['seal_number_2']?.toString() ?? '';
+    haulier.text = visit.operationalDetails['haulier']?.toString() ?? '';
     iso1 = visit.iso;
     iso1Controller.text = iso1;
     iso2 = visit.iso2 ?? '';
@@ -2259,6 +2063,35 @@ class _ExitScreenState extends State<ExitScreen> {
     for (final b in [...boxes1, ...boxes2]) {
       b.clear();
     }
+  }
+
+  Future<void> pickStock(TruckVisit visit, {bool second = false}) async {
+    final expectedIso = second ? visit.iso2 ?? visit.iso : visit.iso;
+    final expectedLine = second ? visit.armateur2 ?? visit.armateur : visit.armateur;
+    final available = widget.repository.stock(iso: expectedIso, armateur: expectedLine);
+    final selected = await showDialog<Map<String,dynamic>>(context: context, builder: (dialog) => AlertDialog(
+      title: Text('Stock · $expectedLine · $expectedIso'),
+      content: SizedBox(width: 560, height: 400, child: FutureBuilder<List<Map<String,dynamic>>>(future: available, builder: (context, state) {
+        if (state.hasError) return const Text('Stock indisponible. Réessayez.');
+        if (!state.hasData) return const Center(child: CircularProgressIndicator());
+        final rows = state.data!.where((r) => r['container_number'] != (second ? number1 : number2)).toList();
+        if (rows.isEmpty) return const Text('Aucun conteneur correspondant à cet article dans le stock.');
+        return ListView(children: [for (final row in rows) ListTile(
+          title: Text(row['container_number'].toString()), subtitle: Text('${row['iso_code']} · ${row['armateur_id']} · ${row['position'] ?? 'Position non renseignée'}'),
+          onTap: () => Navigator.pop(dialog, row),
+        )]);
+      })), actions: [TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Fermer'))],
+    ));
+    if (selected == null || !mounted) return;
+    final container = selected['container_number'].toString();
+    final line = operators.where((o) => o.id == selected['armateur_id']).firstOrNull;
+    if (line == null || !ContainerNumber.isValid(container)) { message(context,'Référentiel du conteneur à vérifier.'); return; }
+    setState(() {
+      final boxes = second ? boxes2 : boxes1;
+      for (var i=0;i<boxes.length;i++) { boxes[i].text = container[i]; }
+      if(second) { iso2=selected['iso_code'].toString();iso2Controller.text=iso2;operator2=line; }
+      else { iso1=selected['iso_code'].toString();iso1Controller.text=iso1;operator1=line; }
+    });
   }
 
   Future<void> pickOperator({bool forSecond = false}) async {
@@ -2308,9 +2141,13 @@ class _ExitScreenState extends State<ExitScreen> {
     setState(() => busy = true);
     DocumentOutcome? outcome;
     try {
-      await widget.repository.exit(visit.id);
+      if(visit.entryKind=='loaded' && visit.needsEngin) {
+        await widget.repository.engin(visit.id);
+      } else {
+        await widget.repository.exit(visit.id);
+      }
       try {
-        final documents = DocumentService(widget.repository.client);
+        final documents = widget.repository.documentService;
         outcome = await documents.finalizeLatest(visit.id, 'SORTIE');
       } catch (_) {
         /* Retry in Bons. */
@@ -2451,9 +2288,11 @@ class _ExitScreenState extends State<ExitScreen> {
         pickupContainer2: isTwin ? c2 : null,
         pickupIso2: isTwin ? iso2 : null,
         pickupArmateur2: isTwin ? (operator2?.id ?? operator1?.id ?? visit.armateur) : null,
+        operationalDetails: {'haulier':haulier.text.trim(),'seal_number':seal1.text.trim(),
+          if(isTwin)'seal_number_2':seal2.text.trim()},
       );
       try {
-        final documents = DocumentService(widget.repository.client);
+        final documents = widget.repository.documentService;
         outcome = await documents.finalizeLatest(visit.id, 'SORTIE');
       } catch (_) {
         /* Retry in Bons. */
@@ -2540,7 +2379,7 @@ class _ExitScreenState extends State<ExitScreen> {
       );
 
       try {
-        final documents = DocumentService(widget.repository.client);
+        final documents = widget.repository.documentService;
         outcome = await documents.finalizeLatest(visit.id, 'ANNULATION');
       } catch (_) {
         /* Retry in Bons. */
@@ -2605,7 +2444,7 @@ class _ExitScreenState extends State<ExitScreen> {
         adminCode: approval.code,
       );
       try {
-        final documents = DocumentService(widget.repository.client);
+        final documents = widget.repository.documentService;
         outcome = await documents.finalizeLatest(visit.id, 'ANNULATION');
       } catch (_) {
         /* Retry in Bons. */
@@ -2953,32 +2792,16 @@ class _ExitScreenState extends State<ExitScreen> {
         final cleanPlate = currentPlate.replaceAll(RegExp(r'[^A-Z0-9]'), '').toUpperCase();
 
         // 1. Exact formatted
-        visitData = await widget.repository.client
-            .from('truck_visits')
-            .select('*,bookings(reference)')
-            .eq('plate', formattedPlate)
-            .order('entered_at', ascending: false)
-            .limit(1)
-            .maybeSingle();
+        visitData = await widget.repository.visitData(plate: formattedPlate);
 
         // 2. Raw plate
         if (visitData == null && currentPlate != formattedPlate) {
-          visitData = await widget.repository.client
-              .from('truck_visits')
-              .select('*,bookings(reference)')
-              .eq('plate', currentPlate)
-              .order('entered_at', ascending: false)
-              .limit(1)
-              .maybeSingle();
+          visitData = await widget.repository.visitData(plate: currentPlate);
         }
 
         // 3. Flexible normalized plate search in recent visits
         if (visitData == null && cleanPlate.isNotEmpty) {
-          final candidates = await widget.repository.client
-              .from('truck_visits')
-              .select('*,bookings(reference)')
-              .order('entered_at', ascending: false)
-              .limit(100);
+          final candidates = await widget.repository.visitRows(limit:100);
           for (final c in candidates) {
             final p = (c['plate'] as String? ?? '').replaceAll(RegExp(r'[^A-Z0-9]'), '').toUpperCase();
             if (p == cleanPlate || p.contains(cleanPlate) || cleanPlate.contains(p)) {
@@ -3001,12 +2824,7 @@ class _ExitScreenState extends State<ExitScreen> {
         targetVisitId = _lastExitVisitId ?? '';
         targetPlate = _lastExitPlate ?? '';
       } else {
-        visitData = await widget.repository.client
-            .from('truck_visits')
-            .select('*,bookings(reference)')
-            .order('entered_at', ascending: false)
-            .limit(1)
-            .maybeSingle();
+        visitData = await widget.repository.visitData();
         if (visitData != null) {
           targetVisitId = visitData['id'] as String;
           targetPlate = visitData['plate'] as String? ?? '';
@@ -3019,7 +2837,7 @@ class _ExitScreenState extends State<ExitScreen> {
 
       // Prepare bytes
       if (bytesToPrint == null && targetVisitId.isNotEmpty) {
-        final docs = DocumentService(widget.repository.client);
+        final docs = widget.repository.documentService;
         try {
           bytesToPrint = await docs.prepareLatest(targetVisitId, targetKind);
         } catch (_) {}
@@ -3033,13 +2851,7 @@ class _ExitScreenState extends State<ExitScreen> {
 
         // Fallback: build with BonPdfBuilder
         if (bytesToPrint == null) {
-          if (visitData == null) {
-            visitData = await widget.repository.client
-                .from('truck_visits')
-                .select('*,bookings(reference)')
-                .eq('id', targetVisitId)
-                .maybeSingle();
-          }
+          visitData ??= await widget.repository.visitData(id: targetVisitId);
           if (visitData != null) {
             bytesToPrint = await BonPdfBuilder.buildA5(
               document: {'kind': targetKind, 'visit_id': targetVisitId, 'created_at': visitData['entered_at'] ?? DateTime.now().toIso8601String()},
@@ -3763,7 +3575,7 @@ class _ExitScreenState extends State<ExitScreen> {
                                 const SizedBox(height: 8),
                                 if (isDeposited)
                                   const Text(
-                                    '✓ Le conteneur est enregistré en stock du parc. Le camion ressort vide.',
+                                    'La confirmation enregistre la restitution et clôture automatiquement la visite du camion vide.',
                                     style: TextStyle(fontSize: 12, color: Color(0xff168846), fontWeight: FontWeight.w500),
                                   )
                                 else
@@ -3790,7 +3602,7 @@ class _ExitScreenState extends State<ExitScreen> {
                                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                   : const Icon(Icons.exit_to_app, size: 22),
                               label: Text(
-                                busy ? 'Validation de la sortie…' : 'Valider la sortie du camion',
+                                busy ? 'Enregistrement de la restitution…' : 'Confirmer la restitution · Clôture automatique',
                                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                             )
@@ -4074,6 +3886,17 @@ class _ExitScreenState extends State<ExitScreen> {
                             ],
 
                             // Action button: Confirmer chargement et valider sortie
+                            Wrap(spacing: 12, runSpacing: 8, children: [
+                              OutlinedButton.icon(onPressed: busy ? null : () => pickStock(activeVisit!),
+                                icon: const Icon(Icons.inventory_2_outlined), label: const Text('Choisir dans le stock · TC1')),
+                              if(isTwin) OutlinedButton.icon(onPressed: busy ? null : () => pickStock(activeVisit!,second:true),
+                                icon: const Icon(Icons.inventory_2_outlined), label: const Text('Choisir dans le stock · TC2')),
+                            ]),
+                            const SizedBox(height: 12),
+                            TextFormField(controller: haulier, maxLength:100, decoration: const InputDecoration(labelText:'Transporteur (facultatif)')),
+                            TextFormField(controller: seal1, maxLength:60, decoration: const InputDecoration(labelText:'N° scellé · Conteneur 1 (facultatif)')),
+                            if(isTwin) TextFormField(controller: seal2, maxLength:60, decoration: const InputDecoration(labelText:'N° scellé · Conteneur 2 (facultatif)')),
+                            const SizedBox(height: 12),
                             FilledButton.icon(
                               style: FilledButton.styleFrom(
                                 backgroundColor: const Color(0xff168846),
@@ -4524,6 +4347,9 @@ class _BonPdfScreenState extends State<BonPdfScreen> {
         ],
       ),
       body: PdfPreview(
+        maxPageWidth: 620,
+        initialPageFormat: PdfPageFormat.a5,
+        useActions: false,
         build: (_) => widget.bytes,
         allowPrinting: true,
         allowSharing: true,
@@ -4686,7 +4512,7 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
     await run(()async {await widget.repository.engin(widget.visit.id,
       containerNumber:widget.visit.entryKind=='empty'?ContainerNumber.normalize(container.text):null,
       position:null);
-      try{final documents=DocumentService(widget.repository.client);
+      try{final documents=widget.repository.documentService;
         final kind=widget.visit.entryKind=='loaded'?'DEPOSE':'PRISE';
         await documents.finalizeLatest(widget.visit.id,kind);
       }catch(_){/* Retry in Bons. */}},
@@ -4708,7 +4534,7 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
     await run(()async {
       await widget.repository.forcePickup(widget.visit.id,
         ContainerNumber.normalize(container.text),reason.text.trim());
-      try{final documents=DocumentService(widget.repository.client);
+      try{final documents=widget.repository.documentService;
         await documents.finalizeLatest(widget.visit.id,'PRISE');}
       catch(_){/* Retry in Bons. */}
     },'Prise forcée tracée pour rapprochement externe.');
@@ -4719,7 +4545,7 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
     try {
       await widget.repository.exit(widget.visit.id);
       try {
-        final documents=DocumentService(widget.repository.client);
+        final documents=widget.repository.documentService;
         outcome=await documents.finalizeLatest(widget.visit.id,'SORTIE');
       } catch(_) {/* Retry in Bons. */}
       if(!mounted)return;
@@ -4776,7 +4602,7 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
             await run(() async {
               await widget.repository.cancel(v.id, approval.reason, adminCode: approval.code);
               try {
-                final documents = DocumentService(widget.repository.client);
+                final documents = widget.repository.documentService;
                 outcome = await documents.finalizeLatest(v.id, 'ANNULATION');
               } catch (_) {}
             }, 'Visite annulée avec visa responsable.');
@@ -4804,7 +4630,8 @@ class _VisitActionSheetState extends State<VisitActionSheet> {
 }
 
 class DataScreen extends StatefulWidget {
-  const DataScreen({super.key,required this.repository});final PointageRepository repository;
+  const DataScreen({super.key,required this.repository,this.canManageBlocks=false});final PointageRepository repository;
+  final bool canManageBlocks;
   @override State<DataScreen> createState()=>_DataScreenState();
 }
 class _DataScreenState extends State<DataScreen> {
@@ -4854,6 +4681,8 @@ class _DataScreenState extends State<DataScreen> {
   ));
   @override Widget build(BuildContext context)=>ListView(padding:const EdgeInsets.all(16),children:[
     Text('Data · visites & stock',style:Theme.of(context).textTheme.headlineSmall),
+    if(widget.canManageBlocks) ListTile(leading: const Icon(Icons.block), title: const Text('Blocages conteneurs'),
+      onTap: ()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ContainerBlocksScreen(repository:widget.repository)))),
     const SizedBox(height:12),
     SegmentedButton<bool>(segments:const[
       ButtonSegment(value:true,label:Text('Par ordre client'),icon:Icon(Icons.folder_copy_outlined)),
@@ -4920,7 +4749,7 @@ class _FreepoolScreenState extends State<FreepoolScreen> {
   late FreepoolExport report;
   DateTime day=DateTime.now();bool anyTime=false,busy=false;
   List<Map<String,dynamic>>? rows;String? error;
-  @override void initState(){super.initState();report=FreepoolExport(widget.repository.client);load();}
+  @override void initState(){super.initState();report=FreepoolExport.repository(widget.repository);load();}
   Future<void> load() async {
     setState((){busy=true;error=null;});
     try{final values=await report.rows(day,anyTime:anyTime);
@@ -4974,7 +4803,7 @@ class _BonsScreenState extends State<BonsScreen> {
   late DocumentService service;
   final preferences=SharedPreferencesAsync();
   String preferredPrinter='';
-  @override void initState(){super.initState();service=DocumentService(widget.repository.client);refresh();loadPreference();}
+  @override void initState(){super.initState();service=widget.repository.documentService;refresh();loadPreference();}
   Future<void> loadPreference() async {
     final value=await preferences.getString('preferred_printer_name')??'';
     if(mounted)setState(()=>preferredPrinter=value);

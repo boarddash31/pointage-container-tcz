@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Data.SqlClient;
 
 namespace Pointage.Api;
 
@@ -66,9 +67,10 @@ public static class OrderEndpoints
     {
         var errors = OrderRules.Create(request);
         if (errors.Length != 0) return Results.ValidationProblem(new Dictionary<string, string[]> { ["order"] = errors });
-        return Results.Content(await db.Json("api.create_order", await actors.Resolve(user, ct), ct,
+        try { return Results.Content(await db.Json("api.create_order", await actors.Resolve(user, ct), ct,
             PointageDb.Text("@Kind", request.Kind, 32), PointageDb.Text("@Reference", request.Reference.Trim().ToUpperInvariant()),
-            PointageDb.Text("@Items", JsonSerializer.Serialize(request.Items, Json))), "application/json", statusCode: 201);
+            PointageDb.Text("@Items", JsonSerializer.Serialize(request.Items, Json))), "application/json", statusCode: 201); }
+        catch(SqlException e) when(e.Number is 2601 or 2627){return Results.Conflict(new{error="duplicate_reference"});}
     }
     private static async Task<IResult> Update(Guid id, UpdateOrderInput request, ClaimsPrincipal user, ActorResolver actors, PointageDb db, CancellationToken ct)
     {

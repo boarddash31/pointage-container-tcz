@@ -3,35 +3,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pointage_container/main.dart';
 
 void main() {
-  testWidgets('profile shortcuts select the account and require its password', (tester) async {
+  testWidgets('neutral login has no preset account or role shortcuts', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
-    final emailField = find.widgetWithText(TextField, 'Numéro de téléphone ou e-mail');
-    final passwordField = find.widgetWithText(TextField, 'Mot de passe');
-    expect(tester.widget<TextField>(passwordField).controller!.text,isEmpty);
-    expect(tester.widget<TextField>(passwordField).obscureText,true);
-    for(final profile in [
-      ('Admin','dahhaknouamane@gmail.com'),
-      ('Entrée','dahhaknouamane+tcz-entree@gmail.com'),
-      ('Sortie','dahhaknouamane+tcz-sortie@gmail.com'),
-    ]) {
-      await tester.ensureVisible(find.text(profile.$1));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(profile.$1));
-      await tester.pump();
-      expect(tester.widget<TextField>(emailField).controller!.text,profile.$2);
-      expect(tester.widget<TextField>(passwordField).controller!.text,isEmpty);
-    }
+    final identifier = find.widgetWithText(TextField, 'Identifiant');
+    final password = find.widgetWithText(TextField, 'Mot de passe');
+    expect(tester.widget<TextField>(identifier).controller!.text,isEmpty);
+    expect(tester.widget<TextField>(password).controller!.text,isEmpty);
+    expect(tester.widget<TextField>(password).obscureText,true);
+    expect(find.text('Gestion des flux'),findsOneWidget);
+    expect(find.text('Accès rapide'),findsNothing);
+    expect(find.byType(ChoiceChip),findsNothing);
   });
 
   testWidgets('password recovery asks for an email before contacting Auth', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
-    final emailField = find.widgetWithText(TextField, 'Numéro de téléphone ou e-mail');
+    final emailField = find.widgetWithText(TextField, 'Identifiant');
     await tester.enterText(emailField, '');
     await tester.ensureVisible(find.text('Mot de passe oublié ?'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mot de passe oublié ?'));
     await tester.pump();
-    expect(find.text('Saisissez votre e-mail professionnel pour recevoir le lien.'),
+    expect(find.text('Saisissez votre adresse e-mail pour recevoir le lien.'),
         findsOneWidget);
   });
 

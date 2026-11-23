@@ -1,0 +1,1437 @@
+{
+  "format": 1,
+  "source_project": "iparzfqxopcvwqelxlad",
+  "captured_on": "2026-11-21",
+  "authentication": "Admin-managed application accounts link to preserved profiles; no Supabase passwords or initial_password are exported.",
+  "tables": [
+    {
+      "source_schema": "private",
+      "source_table": "transport_order_aliases",
+      "target_schema": "internal",
+      "target_table": "transport_order_aliases",
+      "columns": [
+        {
+          "name": "alias_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "original_header",
+          "type": "jsonb",
+          "nullable": false,
+          "sql_type": "nvarchar(max)",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "alias_id"
+      ],
+      "import_order": 4
+    },
+    {
+      "source_schema": "private",
+      "source_table": "transport_order_controls",
+      "target_schema": "internal",
+      "target_table": "transport_order_controls",
+      "columns": [
+        {
+          "name": "singleton",
+          "type": "bool",
+          "nullable": false,
+          "sql_type": "bit",
+          "identity": false
+        },
+        {
+          "name": "required",
+          "type": "bool",
+          "nullable": false,
+          "sql_type": "bit",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "singleton"
+      ],
+      "import_order": 5
+    },
+    {
+      "source_schema": "public",
+      "source_table": "armateurs",
+      "target_schema": "dbo",
+      "target_table": "armateurs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "bic",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "official_logo_path",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "official_logo_verified",
+          "type": "bool",
+          "nullable": false,
+          "sql_type": "bit",
+          "identity": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "nullable": false,
+          "sql_type": "bit",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 0
+    },
+    {
+      "source_schema": "public",
+      "source_table": "audit_logs",
+      "target_schema": "dbo",
+      "target_table": "audit_logs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false,
+          "sql_type": "bigint",
+          "identity": true
+        },
+        {
+          "name": "entity",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "entity_id",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(150) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "before_data",
+          "type": "jsonb",
+          "nullable": true,
+          "sql_type": "nvarchar(max)",
+          "identity": false
+        },
+        {
+          "name": "after_data",
+          "type": "jsonb",
+          "nullable": true,
+          "sql_type": "nvarchar(max)",
+          "identity": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 6
+    },
+    {
+      "source_schema": "public",
+      "source_table": "bookings",
+      "target_schema": "dbo",
+      "target_table": "bookings",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "reference",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(150) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(4) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 7
+    },
+    {
+      "source_schema": "public",
+      "source_table": "client_armateurs",
+      "target_schema": "dbo",
+      "target_table": "client_armateurs",
+      "columns": [
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "valid_from",
+          "type": "date",
+          "nullable": false,
+          "sql_type": "date",
+          "identity": false
+        },
+        {
+          "name": "valid_to",
+          "type": "date",
+          "nullable": true,
+          "sql_type": "date",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "client_id",
+        "armateur_id",
+        "valid_from"
+      ],
+      "import_order": 8
+    },
+    {
+      "source_schema": "public",
+      "source_table": "clients",
+      "target_schema": "dbo",
+      "target_table": "clients",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(150) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "nullable": false,
+          "sql_type": "bit",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 1
+    },
+    {
+      "source_schema": "public",
+      "source_table": "container_stock_intervals",
+      "target_schema": "dbo",
+      "target_table": "container_stock_intervals",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "container_number",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(11) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(4) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "start_visit_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "end_visit_id",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "arrived_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "departed_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "position",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 12
+    },
+    {
+      "source_schema": "public",
+      "source_table": "containers",
+      "target_schema": "dbo",
+      "target_table": "containers",
+      "columns": [
+        {
+          "name": "number",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(11) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(4) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(16) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "number"
+      ],
+      "import_order": 9
+    },
+    {
+      "source_schema": "public",
+      "source_table": "document_actions",
+      "target_schema": "dbo",
+      "target_table": "document_actions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false,
+          "sql_type": "bigint",
+          "identity": true
+        },
+        {
+          "name": "document_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 15
+    },
+    {
+      "source_schema": "public",
+      "source_table": "evp_rules",
+      "target_schema": "dbo",
+      "target_table": "evp_rules",
+      "columns": [
+        {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": false,
+          "sql_type": "date",
+          "identity": false
+        },
+        {
+          "name": "size_feet",
+          "type": "int4",
+          "nullable": false,
+          "sql_type": "int",
+          "identity": false
+        },
+        {
+          "name": "factor",
+          "type": "numeric",
+          "nullable": false,
+          "sql_type": "decimal(38,18)",
+          "identity": false
+        },
+        {
+          "name": "source_note",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "effective_from",
+        "size_feet"
+      ],
+      "import_order": 16
+    },
+    {
+      "source_schema": "public",
+      "source_table": "forced_container_actions",
+      "target_schema": "dbo",
+      "target_table": "forced_container_actions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "visit_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "container_number",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(11) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "resolved_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "resolved_by",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "external_reference",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 17
+    },
+    {
+      "source_schema": "public",
+      "source_table": "generated_documents",
+      "target_schema": "dbo",
+      "target_table": "generated_documents",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "visit_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "event_id",
+          "type": "int8",
+          "nullable": false,
+          "sql_type": "bigint",
+          "identity": false
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(32) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "storage_path",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(450) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(16) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "snapshot",
+          "type": "jsonb",
+          "nullable": false,
+          "sql_type": "nvarchar(max)",
+          "identity": false
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 14
+    },
+    {
+      "source_schema": "public",
+      "source_table": "iso_report_types",
+      "target_schema": "dbo",
+      "target_table": "iso_report_types",
+      "columns": [
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(4) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": false,
+          "sql_type": "date",
+          "identity": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "size_feet",
+          "type": "int4",
+          "nullable": false,
+          "sql_type": "int",
+          "identity": false
+        },
+        {
+          "name": "source_note",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "iso_code",
+        "effective_from"
+      ],
+      "import_order": 18
+    },
+    {
+      "source_schema": "public",
+      "source_table": "printer_settings",
+      "target_schema": "dbo",
+      "target_table": "printer_settings",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "device_id",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(200) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "printer_name",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "user_id",
+        "device_id"
+      ],
+      "import_order": 19
+    },
+    {
+      "source_schema": "public",
+      "source_table": "profiles",
+      "target_schema": "dbo",
+      "target_table": "profiles",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "nullable": false,
+          "sql_type": "bit",
+          "identity": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(32) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "first_name",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "last_name",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "avatar_url",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "username",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 2
+    },
+    {
+      "source_schema": "public",
+      "source_table": "transport_order_items",
+      "target_schema": "dbo",
+      "target_table": "transport_order_items",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "order_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(4) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "quantity",
+          "type": "int4",
+          "nullable": false,
+          "sql_type": "int",
+          "identity": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 10
+    },
+    {
+      "source_schema": "public",
+      "source_table": "transport_orders",
+      "target_schema": "dbo",
+      "target_table": "transport_orders",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(32) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "direction",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(16) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "reference",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(150) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "client_order_reference",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(150) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "nullable": false,
+          "sql_type": "bit",
+          "identity": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "version",
+          "type": "int4",
+          "nullable": false,
+          "sql_type": "int",
+          "identity": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "updated_by",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 3
+    },
+    {
+      "source_schema": "public",
+      "source_table": "truck_visits",
+      "target_schema": "dbo",
+      "target_table": "truck_visits",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "plate",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "driver_cin",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "entry_kind",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(8) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "container_number",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(11) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "booking_id",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "iso_code",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(4) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "armateur_id",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "client_id",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "entered_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "entered_by",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "engin_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "engin_by",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "exited_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "exited_by",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "canceled_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "canceled_by",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "cancel_reason",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "version",
+          "type": "int4",
+          "nullable": false,
+          "sql_type": "int",
+          "identity": false
+        },
+        {
+          "name": "is_twin",
+          "type": "bool",
+          "nullable": false,
+          "sql_type": "bit",
+          "identity": false
+        },
+        {
+          "name": "container_number_2",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(11) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "iso_code_2",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(4) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "armateur_id_2",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "booking_reference_2",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(150) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "client_order_reference",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(150) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "carrier_booking_reference",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(150) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "carrier_booking_armateur_id",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "carrier_booking_armateur_id_2",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "order_item_id",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "order_item_id_2",
+          "type": "uuid",
+          "nullable": true,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "order_controlled",
+          "type": "bool",
+          "nullable": false,
+          "sql_type": "bit",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 11
+    },
+    {
+      "source_schema": "public",
+      "source_table": "user_roles",
+      "target_schema": "dbo",
+      "target_table": "user_roles",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(16) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "user_id",
+        "role"
+      ],
+      "import_order": 20
+    },
+    {
+      "source_schema": "public",
+      "source_table": "visit_events",
+      "target_schema": "dbo",
+      "target_table": "visit_events",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int8",
+          "nullable": false,
+          "sql_type": "bigint",
+          "identity": true
+        },
+        {
+          "name": "visit_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(64) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "details",
+          "type": "jsonb",
+          "nullable": false,
+          "sql_type": "nvarchar(max)",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 13
+    },
+    {
+      "source_schema": "public",
+      "source_table": "yard_operations",
+      "target_schema": "dbo",
+      "target_table": "yard_operations",
+      "columns": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "visit_id",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(32) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "container_number",
+          "type": "text",
+          "nullable": false,
+          "sql_type": "nvarchar(11) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "position",
+          "type": "text",
+          "nullable": true,
+          "sql_type": "nvarchar(max) COLLATE Latin1_General_100_BIN2",
+          "identity": false
+        },
+        {
+          "name": "performed_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "sql_type": "datetimeoffset(6)",
+          "identity": false
+        },
+        {
+          "name": "performed_by",
+          "type": "uuid",
+          "nullable": false,
+          "sql_type": "uniqueidentifier",
+          "identity": false
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "import_order": 21
+    }
+  ],
+  "profile": "zenata-transfer-v5",
+  "target_schema_version": 5,
+  "base_manifest_sha256": "8e4202fea58798f47e21024e831bffd53204be853dd917a60f5a7d2bc33fb6fd",
+  "target_empty_tables": [
+    {
+      "target_schema": "dbo",
+      "target_table": "container_blocks"
+    },
+    {
+      "target_schema": "internal",
+      "target_table": "local_accounts"
+    },
+    {
+      "target_schema": "internal",
+      "target_table": "application_sessions"
+    }
+  ],
+  "target_defaults": [
+    {
+      "target_schema": "dbo",
+      "target_table": "truck_visits",
+      "column": "operational_details",
+      "value": "{}"
+    }
+  ],
+  "source_notes": [
+    "The source catalog has 22 tables; profiles.username is newer than the legacy foundation. SQL upgrade 011 preserves it without creating login accounts.",
+    "There is no operational_details column or container_blocks table in the source catalog on 2026-11-21.",
+    "Historical visit operational_details default to {} in SQL schema 4. No historical holds are invented.",
+    "Any later source schema change stops export until the transfer manifest is refreshed.",
+    "Local accounts must be provisioned against preserved profiles only after the historical import. Storage/PDF binaries are a separate transfer."
+  ]
+}

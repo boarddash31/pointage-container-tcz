@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/pointage_repository.dart';
+import '../data/sqlserver_api.dart';
 import '../domain/transport_order.dart';
 
 class TransportOrdersScreen extends StatefulWidget {
@@ -311,6 +312,8 @@ class _CreateTransportOrderScreenState
   TransportOrder? order, duplicate;
   late String kind;
   bool busy = false, conflict = false;
+  bool operatorsLoading = true;
+  String? operatorsError;
   String? error;
   @override
   void initState() {
@@ -347,6 +350,12 @@ class _CreateTransportOrderScreenState
   }
 
   Future<void> loadOperators() async {
+    if (mounted) {
+      setState(() {
+        operatorsLoading = true;
+        operatorsError = null;
+      });
+    }
     try {
       final result = await widget.repository.operators();
       if (mounted) {
@@ -369,7 +378,9 @@ class _CreateTransportOrderScreenState
         });
       }
     } catch (e) {
-      if (mounted) setState(() => error = e.toString());
+      if (mounted) setState(() => operatorsError = e.toString());
+    } finally {
+      if (mounted) setState(() => operatorsLoading = false);
     }
   }
 
@@ -468,7 +479,10 @@ class _CreateTransportOrderScreenState
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (e.toString().contains('23505') && order == null) {
+      final duplicateError =
+          e.toString().contains('23505') ||
+          e is SqlApiException && e.code == 'duplicate_reference';
+      if (duplicateError && order == null) {
         try {
           duplicate = await existingOrder();
         } catch (_) {
@@ -477,10 +491,12 @@ class _CreateTransportOrderScreenState
       }
       if (mounted) {
         setState(() {
-          conflict = e.toString().contains('40001');
+          conflict =
+              e.toString().contains('40001') ||
+              e is SqlApiException && e.code == 'conflict_refresh_required';
           error = conflict
               ? 'Ordre modifié par un autre utilisateur. Actualisez avant de réappliquer vos changements.'
-              : e.toString().contains('23505')
+              : duplicateError
               ? 'Cette référence existe déjà. Ouvrez l’ordre existant.'
               : e.toString();
         });
@@ -549,6 +565,34 @@ class _CreateTransportOrderScreenState
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
+            if (operatorsLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: LinearProgressIndicator(
+                  semanticsLabel: 'Chargement des armateurs',
+                ),
+              )
+            else if (operatorsError != null || operators.isEmpty)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        operatorsError != null
+                            ? 'Impossible de charger les armateurs. Vérifiez la connexion puis réessayez.'
+                            : 'Aucun armateur configuré. L’administrateur doit initialiser le catalogue avant de créer un ordre.',
+                      ),
+                      TextButton.icon(
+                        onPressed: loadOperators,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Actualiser les armateurs'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             for (var index = 0; index < rows.length; index++)
               itemForm(rows[index], index),
             if (rows.length < 50)
@@ -582,7 +626,14 @@ class _CreateTransportOrderScreenState
               ),
             const SizedBox(height: 20),
             FilledButton(
-              onPressed: busy || conflict ? null : save,
+              onPressed:
+                  busy ||
+                      conflict ||
+                      operatorsLoading ||
+                      operatorsError != null ||
+                      operators.isEmpty
+                  ? null
+                  : save,
               child: Text(
                 busy
                     ? 'Enregistrement…'
@@ -609,14 +660,18 @@ class _CreateTransportOrderScreenState
             Row(
               children: [
                 Expanded(child: Text('Article ${index + 1}')),
-                if (rows.length > 1 && !r.used)
+                if (rows.length > 1)
                   IconButton(
-                    tooltip: 'Supprimer l’article',
+                    tooltip: r.used
+                        ? 'Conservé pour l’historique : cet article est déjà lié à une visite.'
+                        : 'Supprimer l’article',
                     icon: const Icon(Icons.delete_outline),
-                    onPressed: () => setState(() {
-                      rows.remove(r);
-                      r.dispose();
-                    }),
+                    onPressed: r.used
+                        ? null
+                        : () => setState(() {
+                            rows.remove(r);
+                            r.dispose();
+                          }),
                   ),
               ],
             ),
@@ -624,7 +679,11 @@ class _CreateTransportOrderScreenState
             DropdownMenuFormField<String>(
               controller: r.armateurText,
               initialSelection: r.armateur,
-              enabled: !r.used,
+              enabled:
+                  !r.used &&
+                  !operatorsLoading &&
+                  operatorsError == null &&
+                  choices.isNotEmpty,
               expandedInsets: EdgeInsets.zero,
               menuHeight: 280,
               enableFilter: true,
@@ -682,7 +741,9 @@ class _CreateTransportOrderScreenState
               ],
             ),
             if (r.used)
-              Text('Article utilisé · Quantité engagée : ${r.allocated}'),
+              Text(
+                'Article lié à une visite · Quantité engagée : ${r.allocated}. Suppression indisponible pour conserver l’historique ; la quantité totale reste modifiable.',
+              ),
           ],
         ),
       ),

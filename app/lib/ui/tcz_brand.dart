@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// TCZ's own port-gate and sea mark, shared with the launcher and web icons.
+/// ZPS mark supplied by operations in APPLICATION ZENATA.docx.
 class TczBrand extends StatelessWidget {
   const TczBrand({super.key, this.width = 200, this.onDark = false});
   final double width;
@@ -8,12 +8,12 @@ class TczBrand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Semantics(
-    label: 'TCZ · Terminal à conteneurs',
+    label: 'ZPS · Zenata Port Sec',
     image: true,
     child: Image.asset(
-      onDark ? 'assets/brand/tcz-logo-light.png' : 'assets/brand/tcz-logo.png',
+      'assets/brand/zps-logo.jpeg',
       width: width,
-      height: width / 3.5,
+      height: width * 112 / 192,
       fit: BoxFit.contain,
       excludeFromSemantics: true,
     ),

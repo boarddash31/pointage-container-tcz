@@ -1,5 +1,10 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
+import 'dart:math';
 import '../domain/transport_order.dart';
+import 'sqlserver_api.dart';
+import 'document_service.dart';
+part 'sql_pointage_repository.dart';
 
 class OperatorRecord {
   const OperatorRecord(this.id, this.name, this.bic);
@@ -18,7 +23,9 @@ class TruckVisit {
     required this.entryKind, required this.iso, required this.armateur,
     required this.enteredAt, this.container, this.booking, this.enginAt,
     this.exitedAt, this.canceledAt, this.isTwin = false,
-    this.container2, this.iso2, this.armateur2, this.booking2});
+    this.container2, this.iso2, this.armateur2, this.booking2,
+    this.operationalDetails = const {}});
+  final Map<String,dynamic> operationalDetails;
   final String id, plate, cin, entryKind, iso, armateur;
   final String? container, booking, enginAt, exitedAt, canceledAt;
   final DateTime enteredAt;
@@ -45,12 +52,44 @@ class TruckVisit {
     iso2: j['iso_code_2'] as String?,
     armateur2: j['armateur_id_2'] as String?,
     booking2: j['booking_reference_2'] as String?,
+    operationalDetails: Map<String,dynamic>.from(j['operational_details'] as Map? ?? {}),
   );
 }
 
 class PointageRepository {
-  PointageRepository(this.client);
-  final SupabaseClient client;
+  PointageRepository(SupabaseClient client) : _client=client;
+  PointageRepository.detached() : _client = null;
+  final SupabaseClient? _client;
+  SupabaseClient get client => _client ?? (throw StateError('Cette version utilise le backend SQL.'));
+  factory PointageRepository.sql(SqlServerApi api) = SqlPointageRepository;
+  bool get usesSql => false;
+  DocumentService get documentService => DocumentService(client);
+  Future<void> signOut() => client.auth.signOut();
+  Future<dynamic> read(String operation,[Map<String,dynamic> p=const {}]) async {
+    switch(operation){
+      case 'hourly': return await client.rpc('hourly_activity',params:{'p_day':p['day']});
+      case 'profiles': return await client.from('profiles').select('id,display_name,first_name,last_name,phone,avatar_url,active,created_at,user_roles(role)').order('created_at',ascending:false);
+      case 'clients': return await client.from('clients').select('id,code,name,active').order('name');
+      case 'operators': return await client.from('armateurs').select('id,name,active').order('name');
+      case 'audit': return await client.from('audit_logs').select('entity,entity_id,action,actor_id,occurred_at,reason').order('occurred_at',ascending:false).limit(100);
+      case 'visits':
+        var q=client.from('truck_visits').select('*,bookings(reference)');
+        if(p['id']!=null)q=q.eq('id',p['id']);
+        if(p['plate']!=null)q=q.eq('plate',p['plate']);
+        return await q.order('entered_at',ascending:false).limit(p['limit']??100);
+      case 'freepool': return await client.rpc('freepool_rows',params:{'p_day':p['day'],'p_client':p['clientId'],'p_any_time':p['anyTime']??false});
+      default: throw StateError('Lecture inconnue.');
+    }
+  }
+  Future<void> settings(String operation,Map<String,dynamic> p) async {
+    final rpc=switch(operation){'role'=>'set_user_role','client'=>'create_client','assignment'=>'assign_client_armateur','container'=>'register_observed_container',_=>throw StateError('Opération inconnue.')};
+    await client.rpc(rpc,params:p);
+  }
+  Future<List<Map<String,dynamic>>> visitRows({String? id,String? plate,int limit=100}) async =>
+    List<Map<String,dynamic>>.from(await read('visits',{'id':id,'plate':plate,'limit':limit}));
+  Future<Map<String,dynamic>?> visitData({String? id,String? plate}) async {
+    final rows=await visitRows(id:id,plate:plate,limit:1);return rows.isEmpty?null:rows.first;
+  }
 
   Future<List<TransportOrderItem>> transportOrderItems() async {
     final rows=await client.rpc('transport_order_items_status');
@@ -96,12 +135,21 @@ class PointageRepository {
       .from('containers').select('number,iso_code,armateur_id').eq('number', number)
       .maybeSingle();
 
+  Future<List<Map<String,dynamic>>> containerBlocks() async =>
+    List<Map<String,dynamic>>.from(await client.rpc('container_blocks_status'));
+
+  Future<void> setContainerBlock(String number, bool blocked, String reason, {required int expectedVersion}) async {
+    await client.rpc('set_container_block', params: {'p_container':number,'p_blocked':blocked,
+      'p_reason':reason,'p_expected_version':expectedVersion});
+  }
+
   Future<String> enter({required String plate, required String cin,
       required String kind, required String iso, required String armateur,
       String? containerNumber, String? booking, bool isTwin = false,
       String? containerNumber2, String? iso2, String? armateur2, String? booking2,
-      String? orderItemId, String? orderItemId2}) async {
-    final result = await client.rpc('enter_transport_visit', params: {
+      String? orderItemId, String? orderItemId2,
+      Map<String,dynamic> operationalDetails = const {}}) async {
+    final result = await client.rpc('enter_operational_visit', params: {
       'p_plate': plate, 'p_cin': cin, 'p_entry_kind': kind,
       'p_container': containerNumber, 'p_order_item':orderItemId,
       'p_iso': iso, 'p_armateur': armateur,
@@ -110,16 +158,13 @@ class PointageRepository {
       'p_iso_2': iso2,
       'p_armateur_2': armateur2,
       'p_order_item_2':orderItemId2,
+      'p_operational_details':operationalDetails,
     });
     return result as String;
   }
 
   Future<List<TruckVisit>> visits({bool insideOnly = true}) async {
-    var query = client.from('truck_visits').select(
-      'id,plate,driver_cin,entry_kind,container_number,iso_code,armateur_id,'
-      'entered_at,engin_at,exited_at,canceled_at,is_twin,container_number_2,'
-      'iso_code_2,armateur_id_2,booking_reference_2,carrier_booking_reference,bookings(reference)',
-    );
+    var query = client.from('truck_visits').select('*,bookings(reference)');
     if (insideOnly) query = query.isFilter('exited_at', null).isFilter('canceled_at', null);
     final rows = await query.order('entered_at', ascending: true).limit(500);
     return [for (final row in rows) TruckVisit.fromJson(row)];
@@ -178,8 +223,9 @@ class PointageRepository {
     String? pickupIso2,
     String? pickupArmateur2,
     bool emptyExitWithoutPickup = false,
+    Map<String,dynamic> operationalDetails = const {},
   }) async {
-    await client.rpc('exit_truck_with_details', params: {
+    await client.rpc('exit_operational_visit', params: {
       'p_visit': visitId,
       'p_pickup_container': pickupContainer,
       'p_pickup_iso': pickupIso,
@@ -189,6 +235,7 @@ class PointageRepository {
       'p_pickup_iso_2': pickupIso2,
       'p_pickup_armateur_2': pickupArmateur2,
       'p_empty_exit_without_pickup': emptyExitWithoutPickup,
+      'p_operational_details':operationalDetails,
     });
   }
 

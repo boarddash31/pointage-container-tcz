@@ -2,6 +2,10 @@
 
 Target confirmed by the owner: **SQL Server 2025 on Windows Server**. Branch: `migration/sql-server`.
 
+Latest state (2026-11-21): the owner reports Gate schema4 installed in `toszps` and a successful .NET authentication/metadata diagnostic with an unverified certificate. Source metadata now also includes `profiles.username`, absent from the original schema. The additive version5 transfer preparation, explicit `--manifest v5`, current source catalog and no-database fixture check are documented in [the transfer guide](deployment/TRANSFERT-V5.md). No real export/import or application cutover has occurred. Earlier legacy transfer commands below still use the original manifest and intentionally refuse the changed source or a Gate destination; do not use them for the current migration.
+
+Deployment topology: application server **172.17.18.208**, separate SQL Server host **172.17.18.209**. On 2026-11-21, IT confirmed **PRD-DB-ZENATA\MMSQL01**, fixed TCP **54013**, database **toszps**, deployment user **toszps** (`db_owner`). The owner now reports successful .NET SQL authentication and metadata reads from208 in explicitly unverified-certificate diagnostic mode; trusted-certificate production connectivity is still pending. See [the first database deployment guide](deployment/LISEZ-MOI.md) and [the two-server deployment plan](../../deployment/windows/README.md). Browser clients connect to the application API, never directly to SQL Server.
+
 This branch starts the replacement backend. Flutter v3.1.0 still connects to the existing Supabase project. There is no production cutover in this phase.
 
 ## Included

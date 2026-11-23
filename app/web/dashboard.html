@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TCZ · Tableau de Bord Administration & Flux</title>
+  <title>Gestion des flux · Zenata Port Sec</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -93,13 +93,10 @@
       <div class="flex items-center space-x-4">
         <!-- TCZ Logo Badge -->
         <div class="bg-white/10 hover:bg-white/15 transition p-2 rounded-xl flex items-center space-x-2 border border-white/20">
-          <svg class="w-7 h-7 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-          </svg>
+          <img src="brand/zps-logo.jpeg" width="68" height="40" alt="ZPS · Zenata Port Sec">
           <div class="leading-tight">
-            <span class="font-extrabold text-base tracking-wider text-white">TCZ</span>
-            <span class="text-[10px] block text-emerald-300 font-semibold uppercase tracking-wider">Zenata Terminal</span>
+            <span class="font-extrabold text-base tracking-wider text-white">Gestion des flux</span>
+            <span class="text-[10px] block text-emerald-300 font-semibold uppercase tracking-wider">Zenata Port Sec</span>
           </div>
         </div>
         <div class="hidden md:block h-6 w-px bg-white/20"></div>
@@ -1212,7 +1209,7 @@ Voici vos identifiants d'accès au système de Pointage Container TCZ :
 📱 *Téléphone :* ${phone}
 🔑 *Mot de passe :* ${pwd}
 🏢 *Poste affecté :* ${role}
-🌐 *Lien d'accès :* http://localhost:8085 (ou https://pointage-tcz-test.netlify.app)
+🌐 *Lien d'accès :* ${window.location.origin}
 
 Connectez-vous directement avec votre numéro de téléphone et votre mot de passe.`
           );
@@ -1398,7 +1395,7 @@ Voici vos identifiants d'accès au système de Pointage Container TCZ :
 📱 *Téléphone :* ${result.phone}
 🔑 *Mot de passe :* ${result.password}
 🏢 *Poste affecté :* ${roleLabel}
-🌐 *Lien d'accès :* http://localhost:8085 (ou https://pointage-tcz-test.netlify.app)
+🌐 *Lien d'accès :* ${window.location.origin}
 
 Connectez-vous directement avec votre numéro de téléphone et votre mot de passe.`
         );

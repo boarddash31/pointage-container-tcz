@@ -22,6 +22,13 @@ public sealed class PointageDb(string connectionString)
     public async Task<string> Json(string procedure, Guid actor, CancellationToken cancellation, params SqlParameter[] parameters)
     {
         var all = new[] { Uuid("@ActorId", actor) }.Concat(parameters).ToArray();
+        if(procedure=="api.app_read"&&parameters.Any(p=>p.ParameterName=="@Operation"&&p.Value is string s&&s is "report-snapshot" or "codeco")){
+            await using var connection=new SqlConnection(connectionString);await connection.OpenAsync(cancellation);
+            await using var transaction=(SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable,cancellation);
+            await using var command=new SqlCommand(procedure,connection,transaction){CommandType=CommandType.StoredProcedure,CommandTimeout=30};command.Parameters.AddRange(all);
+            var result=await command.ExecuteScalarAsync(cancellation);
+            await transaction.CommitAsync(cancellation);return result as string??"[]";
+        }
         return (await Scalar(procedure, cancellation, all)) as string ?? "[]";
     }
 }

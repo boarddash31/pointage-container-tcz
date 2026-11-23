@@ -5,21 +5,17 @@ class TerminalSlip {
   final String title,date,visit,plate,cin,agent;
   final List<List<String>> rows;
   final List<String> references;
-  static const columns=['VOIE','Hnd','P/V','Conteneur','Ligne','ISO','Lg','Ht','Tp'];
-  static const footer=[
-    "Société d'Exploitation des Ports SA, au capital de 733.956.000,00 DH -",
-    "Angle boulevard Route d'El Jadida et Rue les Papillons, Casablanca - Maroc",
-    'Tél (00 212) 522 23 23 24 (L.G) Fax (00 212) 522 23 23 35 - RC :',
-    'Casablanca 156717 - CNSS : 7374804 - Taxe Professionnelle : 34770868 -',
-    'IF : 1104763 - ICE : 000028283000040 - www.marsamaroc.co.ma',
-  ];
+  static const columns=['VOIE','Hnd','Statut','Conteneur','Ligne','ISO'];
+  static const footer=['Zenata Port Sec'];
+  String get orderKind => title=='Bon Décharge'?'ERO':'EDO';
   static bool supports(String kind)=>['ENTREE','DEPOSE','PRISE','SORTIE'].contains(kind.toUpperCase());
   static Map<String,dynamic> _map(dynamic value)=>value is Map?Map<String,dynamic>.from(value):{};
   static String _text(dynamic value)=>value?.toString().trim()??'';
   factory TerminalSlip.fromDocument(Map<String,dynamic> document,{Map<String,dynamic>? visitData}){
     final snapshot=_map(document['snapshot']);
     // A later visit state must never rewrite a historical entry or movement.
-    final v={...?visitData,...snapshot};
+    final v={...?visitData,...snapshot,
+      ..._map(snapshot.isNotEmpty?snapshot['operational_details']:visitData?['operational_details'])};
     final event=_map(snapshot['event']);
     final context=_map(document['print_context']);
     final kind=_text(document['kind']).toUpperCase();
@@ -30,9 +26,8 @@ class TerminalSlip {
       final container=(kind=='PRISE'||kind=='DEPOSE')&&_text(movementContainer).isNotEmpty
         ?movementContainer:v['container_number$suffix'];
       rows.add([
-        _text(v['lane$suffix']),receiving?'In':'Out',_text(v['load_status$suffix']),_text(container),
+        _text(v['lane$suffix']),receiving?'IN':'OUT',_text(v['load_status$suffix']).isEmpty?'Vide':_text(v['load_status$suffix']),_text(container),
         _text(v['armateur_id$suffix']),_text(v['iso_code$suffix']),
-        _text(v['length$suffix']),_text(v['height$suffix']),_text(v['type$suffix']),
       ]);
     }
     final references=<String>{

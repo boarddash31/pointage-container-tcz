@@ -15,8 +15,12 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        db_collation: ['French_CI_AS', 'Latin1_General_100_BIN2']
     timeout-minutes: 20
     env:
+      DB_COLLATION: ${{ matrix.db_collation }}
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       DOTNET_NOLOGO: '1'
     steps:
@@ -68,7 +72,7 @@ jobs:
       - name: Execute SQL Server schema and rollback-only smoke checks
         shell: bash
         run: |
-          docker exec pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q "CREATE DATABASE TCZ_Pointage_Test COLLATE Latin1_General_100_BIN2"'
+          docker exec -e DB_COLLATION="$DB_COLLATION" pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q "CREATE DATABASE TCZ_Pointage_Test COLLATE $DB_COLLATION"'
           for file in migration/sqlserver/001_schema.sql migration/sqlserver/002_order_api.sql migration/sqlserver/003_smoke_test.sql migration/sqlserver/005_application_accounts.sql migration/sqlserver/006_account_smoke_test.sql; do
             docker exec -i pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -d TCZ_Pointage_Test' < "$file"
           done
@@ -94,6 +98,16 @@ jobs:
           for i in $(seq 1 30); do curl --silent --fail https://localhost:5443/health/live && break; sleep 1; done
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' https://localhost:5443/api/orders/items)" = 401
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"kind":"ERO","reference":"forged","actor_id":"11111111-1111-4111-8111-111111111111","items":[]}' https://localhost:5443/api/orders)" = 401
+      - name: Gate upgrade and rollback-only scenarios on a separate empty test database
+        shell: bash
+        run: |
+          docker exec -e DB_COLLATION="$DB_COLLATION" pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q "CREATE DATABASE TCZ_Gate_Test COLLATE $DB_COLLATION"'
+          for file in migration/sqlserver/001_schema.sql migration/sqlserver/002_order_api.sql migration/sqlserver/005_application_accounts.sql; do
+            docker exec -i pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -d TCZ_Gate_Test' < "$file"
+          done
+          { printf 'BEGIN TRANSACTION;\nGO\n'; cat migration/sqlserver/008_gate_operations.sql migration/sqlserver/009_gate_lifecycle.sql; printf '\nCOMMIT TRANSACTION;\nGO\n'; } > .ci/gate-upgrade.sql
+          docker exec -i pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -d TCZ_Gate_Test' < .ci/gate-upgrade.sql
+          docker exec -i pointage-sql bash -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -d TCZ_Gate_Test' < migration/sqlserver/010_gate_smoke_test.sql
       - name: Diagnostic logs on failure
         if: failure()
         run: |

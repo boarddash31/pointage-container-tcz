@@ -1,0 +1,44 @@
+ZENATA - DOSSIER AUTONOME POUR LE SERVEUR208
+
+1. Fermer l'ancienne fenetre de lancement avec Ctrl+C.
+2. Copier le dossier ZENATA-RUNTIME-AUTONOME entier sur208, a son emplacement
+   definitif, par exemple C:\ZENATA-RUNTIME-AUTONOME.
+3. Double-cliquer sur DEMARRER-ZENATA.cmd.
+
+Au premier lancement, le SDK .NET10 deja installe sur208 compile
+automatiquement les composants. Garder la fenetre ouverte et patienter.
+Garder le compte SQL propose toszps puis saisir son mot de passe dans
+la console masquee. Ne pas transmettre ce mot de passe dans le chat.
+
+Le lanceur prepare la connexion SQL, initialise uniquement les armateurs
+manquants, conserve les comptes applicatifs deja presents dans SQL Server,
+cree la configuration de CE dossier puis demarre l'application.
+Aucun autre lanceur ou script SQL a executer manuellement.
+Les scripts SQL deja executes ne sont pas a rejouer.
+
+Ouvrir : http://172.17.18.208:9091/
+Faire Ctrl+F5 une fois apres la mise a jour puis se connecter avec
+l'Admin deja cree. Les rafraichissements suivants gardent la session
+dans le meme onglet, jusqu'a expiration ou deconnexion.
+
+Les lancements suivants utilisent le meme DEMARRER-ZENATA.cmd et
+reutilisent la connexion protegee. Conserver le meme dossier et le
+meme compte Windows pour acceder a cette protection.
+Ctrl+C arrete le runtime. Aucun service Windows n'est installe ici.
+
+Le dossier integre les corrections des armateurs, des pictogrammes
+restitution/livraison et de la session apres rafraichissement.
+Les comptes, ordres et donnees deja presents dans SQL restent conserves.
+Aucune reprise de donnees Supabase, suppression ou recreation de tables.
+Le chiffrement SQL reste actif avec la verification du certificat
+desactivee selon votre choix. Aucun certificat a fournir.
+
+Les parametres SMTP/rapports locaux sont propres a ce nouveau dossier
+et peuvent etre renseignes dans l'application si necessaire.
+Le pilote SMTP Nodemailer approuve reste a fournir pour envoyer des mails.
+Le connecteur CODECO/JMS reste a configurer avant activation.
+
+Si le port9091 est occupe, fermer l'ancien lanceur avant de relancer.
+Si une etape echoue, garder son message et le journal indique.
+La compilation de ce lanceur automatique reste a effectuer sur208.
+L'interface web fournie a passe72 tests Flutter et l'analyse Dart.

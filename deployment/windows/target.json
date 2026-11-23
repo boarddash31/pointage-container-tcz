@@ -1,0 +1,26 @@
+{
+  "status": "preparation-only-not-deployed",
+  "applicationServer": {
+    "address": "172.17.18.208",
+    "plannedOrigin": "http://172.17.18.208:9091",
+    "httpPort": 9091,
+    "httpsPort": null,
+    "dnsName": null
+  },
+  "databaseServer": {
+    "address": "172.17.18.209",
+    "engine": "SQL Server 2025",
+    "dnsName": "PRD-DB-ZENATA",
+    "instance": "MMSQL01",
+    "tcpPort": 54013,
+    "databaseName": "toszps",
+    "deploymentUser": "toszps",
+    "tcpDataSource": "tcp:PRD-DB-ZENATA,54013",
+    "connectionDetailsConfirmedOn": "2026-11-21",
+    "encrypt": true,
+    "trustServerCertificate": false
+  },
+  "applicationAccounts": "local-accounts-created-by-admin",
+  "databaseConnectionConfigured": false,
+  "sqlServerMigrationComplete": false
+}

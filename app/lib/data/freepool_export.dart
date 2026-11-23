@@ -2,15 +2,21 @@ import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'pointage_repository.dart';
 
 class FreepoolExport {
-  FreepoolExport(this.client);
-  final SupabaseClient client;
+  FreepoolExport(SupabaseClient client):_client=client,repository=null;
+  FreepoolExport.repository(this.repository):_client=null;
+  final SupabaseClient? _client;
+  SupabaseClient get client=>_client!;
+  final PointageRepository? repository;
   static const categories = ['20 DV','40 DV ST','40 DV HC','45 DV',
     'FRIGO 20','FRIGO 40','OT&FL&HP&CT','UNCLASSIFIED'];
 
   Future<List<Map<String,dynamic>>> rows(DateTime day,{String? clientId,bool anyTime=false}) async {
     final date='${day.year}-${day.month.toString().padLeft(2,'0')}-${day.day.toString().padLeft(2,'0')}';
+    if(repository?.usesSql==true)return List<Map<String,dynamic>>.from(await repository!.read('freepool',{'day':date,'clientId':clientId,'anyTime':anyTime}));
+    if(repository!=null)return FreepoolExport(repository!.client).rows(day,clientId:clientId,anyTime:anyTime);
     final result=<Map<String,dynamic>>[];
     var offset=0;
     while(true){

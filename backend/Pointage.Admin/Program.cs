@@ -10,8 +10,9 @@ if (Console.IsInputRedirected) throw new InvalidOperationException("Use an inter
 var connection = Environment.GetEnvironmentVariable("POINTAGE_TARGET_CONNECTION");
 if (string.IsNullOrWhiteSpace(connection)) throw new InvalidOperationException("Configure POINTAGE_TARGET_CONNECTION securely using a DBA deployment identity.");
 var sql = new SqlConnectionStringBuilder(connection);
-if (sql.TrustServerCertificate || !(SqlConnectionEncryptOption.Mandatory.Equals(sql.Encrypt) || SqlConnectionEncryptOption.Strict.Equals(sql.Encrypt)))
-    throw new InvalidOperationException("SQL Server encryption and certificate verification are required.");
+if (!SqlTransportPolicy.Allows(sql,Environment.GetEnvironmentVariable("POINTAGE_ALLOW_UNVERIFIED_SQL_CERTIFICATE")=="1"))
+    throw new InvalidOperationException("SQL encryption is required; skipping certificate validation requires the explicit internal deployment option.");
+if(sql.TrustServerCertificate)Console.WriteLine("SQL Admin : connexion chiffree, certificat serveur non verifie (option explicite du deploiement).");
 string ReadPassword(string prompt)
 {
     Console.Write(prompt);

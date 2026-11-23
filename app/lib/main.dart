@@ -5,10 +5,19 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'data/pointage_repository.dart';
+import 'data/sqlserver_api.dart';
+import 'data/reports_api.dart';
+import 'ui/sql_dashboard.dart';
 import 'ui/pointage_screens.dart';
 import 'ui/admin_screen.dart';
 import 'ui/tcz_brand.dart';
+import 'ui/operational_screens.dart';
+import 'ui/reports_screen.dart';
 import 'utils/fullscreen_helper.dart';
+import 'utils/sql_session_storage.dart';
+
+part 'ui/sql_auth_gate.dart';
+const usesSqlBackend=String.fromEnvironment('POINTAGE_BACKEND',defaultValue:'supabase')=='sqlserver';
 
 const supabaseUrl = String.fromEnvironment(
   'SUPABASE_URL',
@@ -25,7 +34,7 @@ const authSiteUrl = String.fromEnvironment(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (supabaseUrl.isNotEmpty && supabasePublishableKey.isNotEmpty) {
+  if (!usesSqlBackend && supabaseUrl.isNotEmpty && supabasePublishableKey.isNotEmpty) {
     await Supabase.initialize(url: supabaseUrl, publishableKey: supabasePublishableKey);
   }
   runApp(const PointageApp());
@@ -35,7 +44,7 @@ class PointageApp extends StatelessWidget {
   const PointageApp({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'Pointage Container · TCZ',
+    title: 'Gestion des flux · Zenata Port Sec',
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       useMaterial3: true,
@@ -48,7 +57,7 @@ class PointageApp extends StatelessWidget {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(11)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14)),
     ),
-    home: supabaseUrl.isEmpty || supabasePublishableKey.isEmpty
+    home: usesSqlBackend ? const SqlAuthGate() : supabaseUrl.isEmpty || supabasePublishableKey.isEmpty
       ? const Scaffold(body: Center(child: Padding(padding: EdgeInsets.all(24),
           child: Text('Configuration Supabase manquante. Fournissez SUPABASE_URL et '
             'SUPABASE_PUBLISHABLE_KEY via --dart-define.'))))
@@ -142,29 +151,10 @@ class LoginScreen extends StatefulWidget {
   @override State<LoginScreen> createState() => _LoginScreenState();
 }
 class _LoginScreenState extends State<LoginScreen> {
-  final email = TextEditingController(text: 'dahhaknouamane@gmail.com'), password = TextEditingController();
+  final email = TextEditingController(), password = TextEditingController();
   final passwordFocus = FocusNode();
-  String? selectedProfile = 'Admin';
   bool obscurePassword = true;
   bool busy = false; String? error, notice;
-  static const quickProfiles = [
-    ('Admin', 'dahhaknouamane@gmail.com', Icons.admin_panel_settings_outlined),
-    ('Entrée', 'dahhaknouamane+tcz-entree@gmail.com', Icons.login_rounded),
-    ('Sortie', 'dahhaknouamane+tcz-sortie@gmail.com', Icons.logout_rounded),
-  ];
-  void chooseProfile(String label, String address) {
-    setState(() {
-      selectedProfile = label;
-      email.value = TextEditingValue(
-        text: address,
-        selection: TextSelection.collapsed(offset: address.length),
-      );
-      password.clear();
-      error = null;
-      notice = null;
-    });
-    passwordFocus.requestFocus();
-  }
 
   @override void dispose() { email.dispose(); password.dispose(); passwordFocus.dispose(); super.dispose(); }
   Future<void> signIn() async {
@@ -215,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> requestRecovery() async {
     final address=email.text.trim();
     if(!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(address)) {
-      setState(()=>error='Saisissez votre e-mail professionnel pour recevoir le lien.');
+      setState(()=>error='Saisissez votre adresse e-mail pour recevoir le lien.');
       return;
     }
     setState(() { busy=true; error=null; notice=null; });
@@ -236,35 +226,21 @@ class _LoginScreenState extends State<LoginScreen> {
       mainAxisSize: MainAxisSize.min,crossAxisAlignment: CrossAxisAlignment.stretch,children: [
       const Center(child:TczBrand(width:220)),
       const SizedBox(height:14),
-      Text('Pointage Container',textAlign:TextAlign.center,style:Theme.of(context).textTheme.headlineMedium),
-      const Text('Terminal TCZ · Connexion agent',textAlign:TextAlign.center),
+      Text('Gestion des flux',textAlign:TextAlign.center,style:Theme.of(context).textTheme.headlineMedium),
+      const Text('Zenata Port Sec · Connexion',textAlign:TextAlign.center),
       const SizedBox(height:20),
 
-      const Text('Accès rapide',textAlign:TextAlign.center,
-        style:TextStyle(fontWeight:FontWeight.w700,color:Color(0xff17324d), fontSize:13)),
-      const SizedBox(height:8),
-      Wrap(alignment:WrapAlignment.center,spacing:8,runSpacing:8,children:[
-        for(final profile in quickProfiles)
-          ChoiceChip(
-            label:Text(profile.$1),avatar:Icon(profile.$3,size:18),
-            selected:selectedProfile==profile.$1,
-            onSelected:busy?null:(_)=>chooseProfile(profile.$1,profile.$2)),
-      ]),
-      const SizedBox(height:14),
       Column(children:[
         TextField(controller:email,keyboardType:TextInputType.text,
-          onChanged:(_){if(selectedProfile!=null)setState(()=>selectedProfile=null);},
           decoration:const InputDecoration(
-            labelText:'Numéro de téléphone ou e-mail',
+            labelText:'Identifiant',
             hintText:'Ex: 0661998877 ou agent@tcz.ma',
-            prefixIcon:Icon(Icons.person_pin_rounded,size:20),
           )),
         const SizedBox(height:12),
         TextField(controller:password,
           obscureText:obscurePassword,onSubmitted:(_)=>signIn(),
           decoration:InputDecoration(
             labelText:'Mot de passe',
-            prefixIcon:const Icon(Icons.lock_outline,size:20),
             suffixIcon:IconButton(
               tooltip: obscurePassword ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
               icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility, size: 20),
@@ -281,28 +257,8 @@ class _LoginScreenState extends State<LoginScreen> {
       TextButton(onPressed:busy?null:requestRecovery,
         child:const Text('Mot de passe oublié ?')),
       const SizedBox(height:8),
-      if(kIsWeb) Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: OutlinedButton.icon(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xff063e66),
-            side: const BorderSide(color: Color(0xffc5d9e8)),
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          onPressed: () => launchUrl(Uri.base.resolve('dashboard.html'), mode: LaunchMode.platformDefault),
-          icon: const Icon(Icons.dashboard_customize_rounded, size: 18),
-          label: const Text('Tableau de Bord Superviseur (Web)',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-        ),
-      ),
-      const Text('Saisissez votre numéro de téléphone (ou email) et votre mot de passe attribué.',
+      const Text('Utilisez le compte attribué par votre administrateur.',
         textAlign:TextAlign.center,style:TextStyle(fontSize:12,color:Color(0xff49677e))),
-      if(kIsWeb) Padding(padding:const EdgeInsets.only(top:10),
-        child:TextButton.icon(onPressed:()=>launchUrl(
-          Uri.base.resolve('downloads/pointage-tcz.apk'),
-          mode:LaunchMode.externalApplication),
-          icon:const Icon(Icons.android),label:const Text('Télécharger l’APK Android'))),
     ])))))));
 }
 
@@ -335,13 +291,13 @@ class _PointageShellState extends State<PointageShell> {
         return Scaffold(
           appBar: AppBar(title: const Text('Accès indisponible'), actions: [
             IconButton(tooltip: 'Déconnexion', icon: const Icon(Icons.logout),
-              onPressed: () => Supabase.instance.client.auth.signOut()),
+              onPressed: () => widget.repository.signOut()),
           ]),
           body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Padding(padding: EdgeInsets.symmetric(horizontal: 24),
               child: Text('Ce compte est désactivé ou n’a aucun rôle actif.', textAlign: TextAlign.center)),
             const SizedBox(height: 12),
-            FilledButton.icon(onPressed: () => Supabase.instance.client.auth.signOut(),
+            FilledButton.icon(onPressed: () => widget.repository.signOut(),
               icon: const Icon(Icons.logout), label: const Text('Se déconnecter')),
           ])),
         );
@@ -380,8 +336,10 @@ class _PointageShellState extends State<PointageShell> {
               )
               : const PermissionScreen(role: 'Sortie'),
         },
-        DataScreen(repository: repo),
+        DataScreen(repository: repo, canManageBlocks: admin),
         BonsScreen(repository: repo),
+        HistoryScreen(repository: repo),
+        if (admin && kIsWeb) ReportsScreen(api:repo is SqlPointageRepository?ReportsApi.sql(repo.api):null),
       ];
 
       final currentScreen = KeyedSubtree(
@@ -389,10 +347,12 @@ class _PointageShellState extends State<PointageShell> {
         child: screens[section],
       );
 
-      final destinations = const [
-        NavigationDestination(icon: Icon(Icons.rule), label: 'Pointage'),
+      final destinations = [
+        NavigationDestination(icon: Icon(Icons.local_shipping_outlined), label: 'Flux'),
         NavigationDestination(icon: Icon(Icons.dataset), label: 'Data'),
         NavigationDestination(icon: Icon(Icons.description), label: 'Bons'),
+        NavigationDestination(icon: Icon(Icons.history), label: 'Historique'),
+        if (admin && kIsWeb) const NavigationDestination(icon: Icon(Icons.schedule_send), label: 'Rapports'),
       ];
 
       Widget content;
@@ -503,14 +463,14 @@ class _PointageShellState extends State<PointageShell> {
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                         icon: const Icon(Icons.dashboard_customize_rounded, size: 19, color: Colors.white),
-                        onPressed: () => launchUrl(Uri.base.resolve('dashboard.html'), mode: LaunchMode.platformDefault),
+                        onPressed: () => repo.usesSql ? Navigator.of(context).push(MaterialPageRoute(builder:(_)=>SqlDashboard(repository:repo))) : launchUrl(Uri.base.resolve('dashboard.html'), mode: LaunchMode.platformDefault),
                       ),
                     IconButton(
                       tooltip: 'Se déconnecter',
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       icon: const Icon(Icons.logout, size: 20, color: Colors.white70),
-                      onPressed: () => Supabase.instance.client.auth.signOut(),
+                      onPressed: () => widget.repository.signOut(),
                     ),
                   ],
                 ),
@@ -528,10 +488,12 @@ class _PointageShellState extends State<PointageShell> {
               selectedIndex: section,
               onDestinationSelected: (i) => setState(() => section = i),
               labelType: NavigationRailLabelType.all,
-              destinations: const [
-                NavigationRailDestination(icon: Icon(Icons.rule), label: Text('Pointage')),
+              destinations: [
+                NavigationRailDestination(icon: Icon(Icons.local_shipping_outlined), label: Text('Flux')),
                 NavigationRailDestination(icon: Icon(Icons.dataset), label: Text('Data')),
                 NavigationRailDestination(icon: Icon(Icons.description), label: Text('Bons')),
+                NavigationRailDestination(icon: Icon(Icons.history), label: Text('Historique')),
+                if (admin && kIsWeb) const NavigationRailDestination(icon: Icon(Icons.schedule_send), label: Text('Rapports')),
               ],
             ),
             const VerticalDivider(width: 1),
@@ -617,7 +579,7 @@ class _PointageShellState extends State<PointageShell> {
                   ),
                 ],
               )
-            : Text(section == 1 ? 'Data · Référentiel' : 'Bons · Documents'),
+            : Text(switch(section) { 1 => 'Data · Référentiel', 2 => 'Bons · Documents', 3 => 'Historique', _ => 'Rapports programmés' }),
           backgroundColor: const Color(0xff063e66),
           foregroundColor: Colors.white,
           actions: [
@@ -626,7 +588,7 @@ class _PointageShellState extends State<PointageShell> {
                 IconButton(
                   tooltip: 'Tableau de Bord Superviseur (Web)',
                   icon: const Icon(Icons.dashboard_customize_rounded),
-                  onPressed: () => launchUrl(Uri.base.resolve('dashboard.html'), mode: LaunchMode.platformDefault),
+                  onPressed: () => repo.usesSql ? Navigator.of(context).push(MaterialPageRoute(builder:(_)=>SqlDashboard(repository:repo))) : launchUrl(Uri.base.resolve('dashboard.html'), mode: LaunchMode.platformDefault),
                 ),
               if (!isMobile)
                 IconButton(
@@ -638,7 +600,7 @@ class _PointageShellState extends State<PointageShell> {
             IconButton(
               tooltip: 'Déconnexion',
               icon: const Icon(Icons.logout),
-              onPressed: () => Supabase.instance.client.auth.signOut(),
+              onPressed: () => widget.repository.signOut(),
             ),
           ],
         ),

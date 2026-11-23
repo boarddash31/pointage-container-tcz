@@ -1,7 +1,6 @@
 'use strict';
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {CodecoService,FileCache}=require('./service.cjs');
-const {PostgresSource}=require('./postgres-source.cjs');
 const {CodecoError}=require('./core.cjs');
 const digest=value=>crypto.createHash('sha256').update(value).digest();
 function createServer(service,token,log=()=>{}){
@@ -35,7 +34,7 @@ function createServer(service,token,log=()=>{}){
 if(require.main===module){
   try{
     const config=JSON.parse(fs.readFileSync(process.env.CODECO_CONFIG_FILE??path.join(__dirname,'config.local.json'),'utf8'));
-    const source=new PostgresSource(process.env.CODECO_PG_CONNECTION,process.env.CODECO_PG_CA_FILE);
+    const source=process.env.POINTAGE_BACKEND==='sqlserver'?new (require('./sql-source.cjs').SqlCodecoSource)():new (require('./postgres-source.cjs').PostgresSource)(process.env.CODECO_PG_CONNECTION,process.env.CODECO_PG_CA_FILE);
     const state=path.resolve(process.env.CODECO_STATE_DIR??path.join(__dirname,'.state'));
     for(const relative of ['../../site','../../app/web','../../app/build/web']){
       const publicRoot=path.resolve(__dirname,relative);

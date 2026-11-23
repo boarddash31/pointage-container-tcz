@@ -1,0 +1,75 @@
+const fs=require('node:fs');
+const assert=require('node:assert/strict');
+module.exports=async(db,admin)=>{
+  await db.exec('reset role');
+  await db.exec(fs.readFileSync('changes/ops-20261116/schema.sql.in','utf8'));
+  const as=async id=>db.exec(`reset role; set request.jwt.claim.sub='${id}'`);
+  await as(admin);
+  const number=async prefix=>(await db.query(`select $1||'123456'||d::text as number from generate_series(0,9) d
+    where public.valid_container_number($1||'123456'||d::text) limit 1`,[prefix])).rows[0].number;
+  const c1=await number('OPAU'),c2=await number('OPBU');
+  const order=async(kind,ref,quantity)=>{
+    const id=(await db.query('select public.create_transport_order($1,$2,$3,$4,$5::jsonb) id',
+      [kind,kind==='ERO'?'RESTITUTION':'LIVRAISON',ref,'MAE',JSON.stringify([{iso_code:'22G1',quantity}])])).rows[0].id;
+    return (await db.query('select id from public.transport_order_items where order_id=$1',[id])).rows[0].id;
+  };
+  const ero=await order('ERO','OPS-ERO-TEST',4);
+  const details={haulier:'Transport fictif',lane:'V1',damage_reservations:'Rayure porte TC1',damage_reservations_2:'Porte TC2'};
+  const enter=(plate,container,twin=false,extra=details)=>db.query(`select public.enter_operational_visit(
+    $1,'AB12345','loaded',$2,'22G1','MAE',$3,$4,$5,$6,$7,$8,$9::jsonb) id`,
+    [plate,container,ero,twin,twin?c2:null,twin?'22G1':null,twin?'MAE':null,twin?ero:null,JSON.stringify(extra)]);
+  const twin=(await enter('OPS-TWIN',c1,true)).rows[0].id;
+  let snapshot=(await db.query("select snapshot from public.generated_documents where visit_id=$1 and kind='ENTREE'",[twin])).rows[0].snapshot;
+  assert.deepEqual(snapshot.operational_details,details);
+  assert.equal((await db.query('select exited_at from public.truck_visits where id=$1',[twin])).rows[0].exited_at,null,'entry must not close a loaded truck before actual deposit');
+  const engin='77777777-7777-4777-8777-777777777777';
+  await db.query("insert into auth.users(id,raw_user_meta_data) values($1,'{}')",[engin]);
+  await db.query("insert into public.user_roles(user_id,role) values($1,'engin')",[engin]);
+  await as(engin);await db.exec('set role authenticated');
+  await db.query('select public.perform_engin($1,null,$2)',[twin,'OPS-A1']);
+  await db.exec('reset role');
+  const closed=(await db.query('select engin_at,exited_at from public.truck_visits where id=$1',[twin])).rows[0];
+  assert.ok(closed.exited_at);assert.equal(String(closed.exited_at),String(closed.engin_at));
+  assert.equal(Number((await db.query('select count(*) n from public.container_stock_intervals where start_visit_id=$1 and departed_at is null',[twin])).rows[0].n),2);
+  assert.equal(Number((await db.query("select count(*) n from public.visit_events where visit_id=$1 and action='SORTIE'",[twin])).rows[0].n),1);
+  assert.equal((await db.query("select details->>'automatic' flag from public.visit_events where visit_id=$1 and action='SORTIE'",[twin])).rows[0].flag,'true');
+  await assert.rejects(db.query('select public.perform_engin($1)',[twin]),/visit unavailable/);
+  await as(admin);
+  await db.query('select public.set_container_block($1,true,$2,0)',[c2,'Dommage à contrôler']);
+  await assert.rejects(db.query('select public.set_container_block($1,false,$2,0)',[c2,'Obsolete version']),e=>e.code==='40001');
+  const viewer='22222222-2222-4222-8222-222222222222';await as(viewer);
+  await assert.rejects(db.query('select public.set_container_block($1,false,$2,1)',[c2,'Forbidden']),e=>e.code==='42501');
+  await assert.rejects(db.query('select public.container_blocks_status()'),e=>e.code==='42501');
+  await db.exec('set role authenticated');
+  await assert.rejects(db.query('select * from public.container_blocks'),e=>e.code==='42501');
+  await as(admin);
+  await db.query("update public.truck_visits set entered_at=now()-interval '25 hours' where id=$1",[twin]);
+  const edo=await order('EDO','OPS-EDO-TEST',4);
+  const pickup=(await db.query("select public.enter_transport_visit('OPS-PICKUP','AB12345','empty',null,'22G1','MAE',$1,true,null,'22G1','MAE',$1) id",[edo])).rows[0].id;
+  await assert.rejects(db.query('select public.exit_truck_with_details($1,$2,$3,null,true,$4,$3)',[pickup,c1,'22G1',c2]),e=>e.code==='23514'&&/bloqu/.test(e.message));
+  assert.equal(Number((await db.query('select count(*) n from public.container_stock_intervals where start_visit_id=$1 and departed_at is null',[twin])).rows[0].n),2,'second blocked container must roll back the first pickup');
+  assert.equal((await db.query('select exited_at from public.truck_visits where id=$1',[pickup])).rows[0].exited_at,null);
+  await db.query('select public.set_container_block($1,false,$2,1)',[c2,'Contrôle terminé']);
+  const outgoing={seal_number:'SEAL-1',seal_number_2:'SEAL-2',haulier:'Transport test'};
+  await db.query('select public.exit_operational_visit($1,$2,$3,null,true,$4,$3,null,false,$5::jsonb)',[pickup,c1,'22G1',c2,JSON.stringify(outgoing)]);
+  snapshot=(await db.query("select snapshot from public.generated_documents where visit_id=$1 and kind='SORTIE'",[pickup])).rows[0].snapshot;
+  assert.deepEqual(snapshot.operational_details,outgoing);
+  assert.equal(Number((await db.query("select count(*) n from public.audit_logs where entity='container_block' and entity_id=$1",[c2])).rows[0].n),2);
+  const count=Number((await db.query('select count(*) n from public.truck_visits')).rows[0].n);
+  await assert.rejects(enter('OPS-INVALID',await number('OPCU'),false,{role:'admin'}),e=>e.code==='23514');
+  assert.equal(Number((await db.query('select count(*) n from public.truck_visits')).rows[0].n),count);
+  const mono=(await enter('OPS-MONO',await number('OPCU'),false,{damage_reservations:'Test mono'})).rows[0].id;
+  await db.query('select public.perform_engin($1)',[mono]);
+  assert.ok((await db.query('select exited_at from public.truck_visits where id=$1',[mono])).rows[0].exited_at);
+  const young=(await db.query("select public.enter_transport_visit('OPS-YOUNG','AB12345','empty',null,'22G1','MAE',$1) id",[edo])).rows[0].id;
+  const monoContainer=(await db.query('select container_number from public.truck_visits where id=$1',[mono])).rows[0].container_number;
+  await assert.rejects(db.query('select public.exit_operational_visit($1,$2,$3)',[young,monoContainer,'22G1']),/24/);
+  assert.equal((await db.query('select exited_at from public.truck_visits where id=$1',[young])).rows[0].exited_at,null);
+  await as(viewer);
+  await assert.rejects(enter('OPS-DENIED',await number('OPDU')),e=>e.code==='42501');
+  await assert.rejects(db.query('select public.exit_operational_visit($1)',[young]),e=>e.code==='42501');
+  await as(admin);
+  assert.equal((await db.query("select snapshot->'operational_details' details from public.generated_documents where visit_id=$1 and kind='ENTREE'",[twin])).rows[0].details.damage_reservations,'Rayure porte TC1');
+  await db.exec('reset role');
+  console.log('PASS: ops archived damage/seals, strict fields, actual twin deposit, automatic closure by engin, no duplicate closure, Admin-only versioned holds, atomic blocked pickup and release audit');
+};

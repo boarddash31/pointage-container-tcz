@@ -136,7 +136,7 @@ class BonPdfBuilder {
     pw.MemoryImage? truckLoadedImg;
 
     try {
-      final logoBytes = await rootBundle.load('assets/brand/tcz-logo.png');
+      final logoBytes = await rootBundle.load('assets/brand/zps-logo.jpeg');
       logoImg = pw.MemoryImage(logoBytes.buffer.asUint8List());
     } catch (_) {}
 
@@ -175,7 +175,7 @@ class BonPdfBuilder {
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         if (logoImg != null)
-                          pw.Image(logoImg, width: 88, height: 26, fit: pw.BoxFit.contain)
+                          pw.Image(logoImg, width: 88, height: 51, fit: pw.BoxFit.contain)
                         else
                           pw.Text('TCZ',
                               style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: navy)),
@@ -717,11 +717,11 @@ class BonPdfBuilder {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text(
-                    'Document operationnel officiel TCZ Zenata - Valable pour une seule rotation.',
+                    'Zenata Port Sec',
                     style: pw.TextStyle(fontSize: 5.5, color: muted),
                   ),
                   pw.Text(
-                    'Terminal Conteneurs Zenata - Pointage Securise',
+                    '',
                     style: pw.TextStyle(fontSize: 5.5, fontWeight: pw.FontWeight.bold, color: navy),
                   ),
                 ],

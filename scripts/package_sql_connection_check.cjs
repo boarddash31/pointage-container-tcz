@@ -1,0 +1,23 @@
+'use strict';
+const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
+async function main(){
+ const root=path.resolve(__dirname,'..'),stage=await fs.mkdtemp(path.join(root,'.qa/sql-dotnet-check-'));
+ const packageRoot=path.join(stage,'ZENATA-CONNEXION-SQL');
+ const project=path.join(packageRoot,'backend/Pointage.ConnectionCheck');await fs.mkdir(project,{recursive:true});
+ for(const file of ['Program.cs','Pointage.ConnectionCheck.csproj'])await fs.copyFile(path.join(root,'backend/Pointage.ConnectionCheck',file),path.join(project,file));
+ await fs.copyFile(path.join(root,'backend/global.json'),path.join(packageRoot,'backend/global.json'));
+ const cmd=(await fs.readFile(path.join(root,'deployment/windows/TESTER-CONNEXION-SQL.cmd'),'utf8')).replace(/\r?\n/g,'\r\n');
+ await fs.writeFile(path.join(packageRoot,'TESTER-CONNEXION-SQL.cmd'),cmd);
+ const diagnostic=(await fs.readFile(path.join(root,'deployment/windows/TESTER-SQL-SANS-VALIDATION-CERTIFICAT.cmd'),'utf8')).replace(/\r?\n/g,'\r\n');
+ await fs.writeFile(path.join(packageRoot,'TESTER-SQL-SANS-VALIDATION-CERTIFICAT.cmd'),diagnostic);
+ const guide=`Controle de connexion SQL depuis .NET sur208\n\nExtraire dans un nouveau dossier de C:\\Temp sur208, puis lancer TESTER-CONNEXION-SQL.cmd.\nLe SDK10.0.404 et les dependances deja valides seront reutilises. Le programme demande le mot de passe SQL du compte toszps dans la console, sans affichage ni fichier. Ne pas transmettre ce mot de passe dans le chat.\n\nSeuls le nom de la base, la machine, l'instance et la version du schema sont lus. Aucune table metier n'est lue ou modifiee. Aucun fichier SQL, importeur, API ou outil de creation de compte n'est lance. Aucune base Test n'est requise. Le compte proprietaire sert ici au diagnostic interactif uniquement, pas comme compte d'execution definitif de l'application.\n\nResultat attendu : CONNEXION SQL .NET VALIDEE - TOSZPS VERSION4\n\nLe chiffrement SQL et la verification du certificat sont obligatoires. Une erreur de certificat doit etre corrigee avec le certificat/nom SQL approuve par l'IT, sans desactivation des controles. Le diagnostic affiche le detail du pilote mais jamais la chaine de connexion ni le mot de passe. Sa compilation et son execution restent a realiser sur208. Il ne prouve pas que les procedures metier ni le raccordement de l'interface sont termines.\n\nConserver le chemin de la sauvegarde precedente sur209. Ne pas rejouer l'initialisation ou la mise a jour Gate4 deja declaree reussie. L'application actuelle reste sur Supabase.\n`;
+ const modeGuide=`MODE OPTIONNEL v2, DEMANDE PAR LE PROPRIETAIRE\n\nPour avancer sans installer la CA lors du diagnostic, lancer TESTER-SQL-SANS-VALIDATION-CERTIFICAT.cmd. Ce lanceur demande explicitement Encrypt=Mandatory et TrustServerCertificate=true pour cette seule lecture de metadonnees. Le trafic reste chiffre, mais le certificat et l'identite du serveur ne sont pas verifies : ce mode ne protege pas contre un serveur qui se ferait passer pour le vrai SQL.\n\nResultat distinct : CONNEXION SQL DIAGNOSTIC REUSSIE - CERTIFICAT NON VERIFIE. Ce resultat ne doit jamais etre presente comme une validation de la chaine de confiance. Aucun changement n'est applique a l'API, l'importeur, l'outil Admin ou la base. Le mode normal TESTER-CONNEXION-SQL.cmd garde la verification active. Il reste preferable de resoudre la confiance du certificat avant le raccordement de production.\n\nLe mot de passe SQL est saisi uniquement dans la console, masque, non enregistre. Ne pas le coller dans le chat. La compilation et l'execution de cette nouvelle version restent a faire sur208.\n\n`;
+ await fs.writeFile(path.join(packageRoot,'LIRE-MOI.txt'),modeGuide+guide.replace('Le chiffrement SQL et la verification du certificat sont obligatoires.','Dans le mode normal, le chiffrement SQL et la verification du certificat sont obligatoires.'));
+ const files=[];
+ async function collect(dir){for(const e of await fs.readdir(dir,{withFileTypes:true})){
+  const p=path.join(dir,e.name);if(e.isDirectory())await collect(p);else files.push({path:path.relative(packageRoot,p).split(path.sep).join('/'),sha256:crypto.createHash('sha256').update(await fs.readFile(p)).digest('hex')});
+ }}await collect(packageRoot);
+ await fs.writeFile(path.join(packageRoot,'INTEGRITE.json'),JSON.stringify({purpose:'interactive-read-only-sql-dotnet-connection-check',files},null,2));
+ await fs.writeFile(path.join(root,'.qa/sql-connection-check-stage.json'),JSON.stringify({stage,packageRoot},null,2));
+ console.log(JSON.stringify({stage,packageRoot,files:files.length+1}));
+}main().catch(e=>{console.error(e.message);process.exitCode=1;});

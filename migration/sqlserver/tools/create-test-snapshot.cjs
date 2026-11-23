@@ -1,13 +1,14 @@
 'use strict';
 // Synthetic fixture only. Never reads Supabase or any environment credential.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const manifest=require('../manifest.json'),source=require('../source-schema.json');
+const source=require('../source-schema.json');
+const {loadManifest}=require('./transfer-manifest.cjs');
 const {validateRow,fileHash,manifestHash}=require('./row-validation.cjs');
 const root=path.resolve(__dirname,'../../..');
-const args=process.argv.slice(2);
-if(args.length!==0&&(args.length!==2||args[0]!=='--out'))throw Error('Usage: create-test-snapshot.cjs [--out .migration-data/new-fixture]');
+function createFixture(outPath='.migration-data/ci-safe',profile='legacy') {
+const {manifest,text:manifestText}=loadManifest(profile);
 const privateRoot=path.join(root,'.migration-data');
-const out=path.resolve(root,args[1]??'.migration-data/ci-safe');
+const out=path.resolve(root,outPath);
 if(!out.startsWith(privateRoot+path.sep))throw Error('Synthetic fixtures must remain inside ignored .migration-data.');
 if(fs.existsSync(out))throw Error('Synthetic snapshot exists; use a clean workspace.');
 fs.mkdirSync(out,{recursive:true});
@@ -17,7 +18,7 @@ const actor='11111111-1111-4111-8111-111111111111',order='22222222-2222-4222-822
 const time='2026-10-27T12:34:56.123456+00:00',large='9007199254740993';
 const rows={
   armateurs:[{id:'MAE',name:'Synthetic Maersk',bic:'MAEU'}],
-  profiles:[{id:actor,display_name:'Synthetic Clerk',phone:'0600000000',first_name:'Synthetic',last_name:'Clerk'}],
+  profiles:[{id:actor,display_name:'Synthetic Clerk',phone:'0600000000',first_name:'Synthetic',last_name:'Clerk',username:'synthetic.clerk'}],
   user_roles:[{user_id:actor,role:'entree'}],
   containers:[{number:'CSQU3054383',iso_code:'22G1',armateur_id:'MAE'}],
   transport_orders:[{id:order,kind:'ERO',direction:'RESTITUTION',reference:'QA-MIGRATION',armateur_id:'MAE',created_by:actor,updated_by:actor}],
@@ -47,7 +48,7 @@ function complete(table,input){
   return validateRow(table,result);
 }
 const snapshot={format:1,created_at_utc:time,source_project:manifest.source_project,
-  manifest_sha256:manifestHash(fs.readFileSync(path.join(__dirname,'../manifest.json'),'utf8')),files:[]};
+  manifest_sha256:manifestHash(manifestText),files:[]};
 for(const table of manifest.tables){
   const name=table.source_schema+'.'+table.source_table+'.ndjson';
   const content=(rows[table.source_table]??[]).map(row=>JSON.stringify(complete(table,row))+'\n').join('');
@@ -56,3 +57,12 @@ for(const table of manifest.tables){
 }
 fs.writeFileSync(path.join(out,'snapshot.json'),JSON.stringify(snapshot,null,2)+'\n');
 console.log('Synthetic snapshot created: exact bigint, microseconds, JSON and decimal fixtures; no source access.');
+return out;
+}
+if(require.main===module){
+  const args=process.argv.slice(2);
+  if(args.length!==0&&(![2,4].includes(args.length)||args[0]!=='--out'||args.length===4&&args[2]!=='--manifest'))
+    throw Error('Usage: create-test-snapshot.cjs [--out .migration-data/new-fixture [--manifest legacy|v5]]');
+  createFixture(args[1],args.length===4?args[3]:'legacy');
+}
+module.exports={createFixture};

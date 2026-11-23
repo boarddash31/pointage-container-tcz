@@ -1,0 +1,64 @@
+ZENATA - MISE A JOUR ARMATEURS, PICTOGRAMMES ET SESSION
+22 novembre 2026 - Serveur applicatif208 / SQL209
+
+Cette archive complete integre les trois corrections. Aucun ancien jeu
+de test Supabase n'est repris. Le schema SQL reste en version6.
+
+1. INITIALISER LE CATALOGUE ARMATEURS
+Dans DBeaver, utiliser la connexion SQL de deploiement toszps vers
+PRD-DB-ZENATA / MMSQL01, port54013, base toszps.
+Ouvrir SQL\17_INITIALISER_ARMATEURS_DBEAVER.sql dans une nouvelle session
+auto-commit, selectionner tout puis Ctrl+Entree.
+Attendre : CATALOGUE ARMATEURS INITIALISE.
+Le script ajoute seulement les codes manquants du catalogue fourni avec
+l'application :92 armateurs nommes, dont ZIMAG, MSC et CMA CGM.
+Les codes, noms, etats actifs/inactifs deja configures sont conserves.
+Aucun client, compte, mouvement, stock ou ordre n'est efface ou importe.
+Le script peut etre rejoue : les codes deja presents ne sont pas reinseres.
+
+2. METTRE A JOUR LE RUNTIME EXISTANT SUR208
+Arreter sa console avec Ctrl+C. Conserver une copie du dossier actuel.
+Copier TOUT LE CONTENU de ZENATA-RUNTIME-SQL dans le dossier du runtime
+actuel, en acceptant le remplacement des fichiers de l'application.
+Conserver a leur emplacement les dossiers .state et logs ainsi que
+api\appsettings.Local.json. Ces fichiers prives ne sont pas dans l'archive.
+Ils contiennent votre configuration SQL, la protection Windows et les
+parametres de rapports. Utiliser le meme compte Windows et le meme chemin.
+
+3. COMPILER L'API ACTUALISEE
+Dans le dossier actuel du runtime, lancer COMPILER-RUNTIME-SQL.cmd.
+Attendre : RUNTIME SQL COMPILE ET PRET A CONFIGURER.
+L'interface web corrigee est deja compilee ; cette commande compile
+l'API .NET et les outils sur208. Elle ne modifie pas les bases.
+Cette nouvelle compilation C# reste a effectuer sur208.
+En cas d'echec, conserver compilation-sql-....log avant de poursuivre.
+
+4. RELANCER
+Verifier que api\appsettings.Local.json et .state\sqlserver\runtime.secret
+sont toujours presents, puis lancer LANCER-SQL-9091.cmd.
+Ouvrir http://172.17.18.208:9091/ et faire Ctrl+F5 une fois pour charger
+la nouvelle interface. Se connecter avec votre Admin existant.
+Ne pas recreer l'Admin ni relancer les scripts SQL15/16 ou un import.
+Si le runtime demande une configuration absente, arreter et verifier que
+les fichiers ont bien ete copies dans le dossier ACTUEL du runtime.
+
+5. VERIFIER LES CORRECTIONS
+- EDO/ERO : saisir ZI dans Armateur puis selectionner ZIMAG dans la liste.
+  Un catalogue vide et une erreur reseau affichent des messages distincts.
+- Entree : deux pictogrammes Restitution/Livraison avec un badge1 ou2.
+  Les quatre choix de mission et les regles de traitement sont conserves.
+- Session : apres connexion, F5 conserve la session dans le meme onglet.
+  Le serveur revalide le jeton, l'expiration et le compte actif.
+  La duree de la session n'est pas prolongee par le rafraichissement.
+  Deconnexion, changement de mot de passe ou session revoquee effacent
+  la session locale. Les mots de passe ne sont pas enregistres.
+  Si le stockage de l'onglet est bloque par le navigateur, la connexion
+  fonctionne encore mais ne peut pas etre conservee au rafraichissement.
+
+Les clients et leurs affectations aux armateurs restent a parametrer
+avec les vraies valeurs avant les premieres visites. Aucun jeu d'essai
+n'est cree. Rapports SMTP et CODECO/JMS gardent leur configuration propre.
+
+Tests locaux :72 tests Flutter passes, analyse Dart sans probleme,
+generation du catalogue verifiee. L'API et le script
+SQL doivent encore etre compiles/verifies sur les serveurs cibles.

@@ -3,17 +3,20 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '../app/build/web');
-const prefix = '/marsa-bons-v1/';
+const prefix = '/zps-ops-20261116/';
+const port=Number(process.env.PREVIEW_PORT??8787);
+if(!Number.isInteger(port)||port<1024||port>65535)throw Error('Invalid preview port.');
 const mime = {'.html':'text/html; charset=utf-8','.js':'application/javascript',
   '.json':'application/json','.css':'text/css','.wasm':'application/wasm',
-  '.png':'image/png','.svg':'image/svg+xml','.ttf':'font/ttf',
+  '.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.svg':'image/svg+xml','.ttf':'font/ttf',
   '.woff2':'font/woff2','.ico':'image/x-icon','.pdf':'application/pdf'};
 http.createServer((req,res) => {
   let route,file;
   try {
     route=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
-    if(route==='/'||route===prefix.slice(0,-1)){
-      res.writeHead(302,{'Location':prefix,'Cache-Control':'no-store'}).end();return;
+    if(route==='/'||route===prefix.slice(0,-1)||route==='/marsa-bons-v1/'||route==='/marsa-bons-v1'){
+      const search=new URL(req.url,'http://localhost').search;
+      res.writeHead(302,{'Location':prefix+search,'Cache-Control':'no-store'}).end();return;
     }
     const relative=route.startsWith(prefix)?route.slice(prefix.length):route.slice(1);
     file=path.resolve(root,relative||'index.html');
@@ -26,4 +29,4 @@ http.createServer((req,res) => {
     res.end(fs.readFileSync(file,'utf8').replace('<base href="/">',`<base href="${prefix}">`));return;
   }
   fs.createReadStream(file).pipe(res);
-}).listen(8787,'127.0.0.1',()=>console.log(`TCZ preview: http://localhost:8787${prefix}`));
+}).listen(port,'127.0.0.1',()=>console.log(`ZPS preview: http://localhost:${port}${prefix}`));

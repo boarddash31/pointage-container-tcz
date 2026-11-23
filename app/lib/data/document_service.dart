@@ -6,12 +6,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'bon_pdf_builder.dart';
 import '../domain/terminal_slip.dart';
+import 'sqlserver_api.dart';
 
 typedef PdfRenderer=Future<Uint8List> Function({required Map<String,dynamic> document,Map<String,dynamic>? visitData});
 
 class DocumentService {
-  DocumentService(this.client,{this.renderPdf=BonPdfBuilder.buildA5});
-  final SupabaseClient client;
+  DocumentService(SupabaseClient client,{this.renderPdf=BonPdfBuilder.buildA5}):_client=client,sql=null;
+  DocumentService.sql(this.sql,{this.renderPdf=BonPdfBuilder.buildA5}):_client=null;
+  final SupabaseClient? _client;
+  SupabaseClient get client=>_client!;
+  final SqlServerApi? sql;
   final PdfRenderer renderPdf;
   static const bridgeUrl=String.fromEnvironment('PDF_BRIDGE_URL');
   static const bridgeAutoPrint=bool.fromEnvironment('PDF_BRIDGE_AUTO_PRINT');
@@ -19,6 +23,7 @@ class DocumentService {
   Future<Map<String,dynamic>?> archiveWithBridge(Map<String,dynamic> document,
       {bool print=false}) async {
     if(bridgeUrl.isEmpty)return null;
+    if(sql!=null)return null;
     final token=client.auth.currentSession?.accessToken;
     if(token==null)throw StateError('Session Supabase requise pour le pont PDF.');
     final base=Uri.parse(bridgeUrl);
@@ -66,12 +71,18 @@ class DocumentService {
     );
   }
 
-  Future<Map<String,dynamic>?> latest(String visitId,String kind) async =>
-    client.from('generated_documents').select('id,visit_id,event_id,kind,status,storage_path,snapshot,created_at')
+  Future<Map<String,dynamic>?> latest(String visitId,String kind) async {
+    if(sql!=null){final rows=await sql!.request('GET','api/data/documents',query:{'visitId':visitId,'kind':kind,'limit':'1'}) as List;return rows.isEmpty?null:Map<String,dynamic>.from(rows.first as Map);}
+    return client.from('generated_documents').select('id,visit_id,event_id,kind,status,storage_path,snapshot,created_at')
       .eq('visit_id',visitId).eq('kind',kind).order('created_at',ascending:false)
       .limit(1).maybeSingle();
+  }
 
   Future<Uint8List> prepare(Map<String,dynamic> document) async {
+    if(sql!=null){
+      final context=await sql!.request('GET','api/data/document-context',query:{'documentId':document['id'] as String});
+      return renderPdf(document:{...document,'print_context':context},visitData:null);
+    }
     // Use the archived movement and its author when reprinting the terminal form.
     try {
       Map<String,dynamic> printDocument=document;
@@ -98,7 +109,7 @@ class DocumentService {
       // Fallback to storage download if builder fails
       var path = document['storage_path'] as String?;
       final terminalForm=TerminalSlip.supports((document['kind']??'').toString());
-      final expectedTemplate=document['kind']?.toString().toUpperCase()=='SORTIE'?'gate-out-v1':'marsa-v1';
+      final expectedTemplate=document['kind']?.toString().toUpperCase()=='SORTIE'?'zps-gate-out-v2':'zps-terminal-v2';
       if (terminalForm||path == null || path.isEmpty) {
         final response = await client.functions.invoke('generate-bon', body: {
           'document_id': document['id'],
@@ -125,6 +136,7 @@ class DocumentService {
 
   Future<void> recordAction(Map<String,dynamic> document,String action) async {
     try {
+      if(sql!=null){await sql!.request('POST','api/settings/document-action',body:{'id':document['id'],'action':action});return;}
       await client.rpc('record_document_action',params:{
         'p_document':document['id'],'p_action':action,
       });

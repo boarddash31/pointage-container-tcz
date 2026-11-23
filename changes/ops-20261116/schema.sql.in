@@ -1,0 +1,189 @@
+-- SQL template for IT review and isolated tests. Generate the actual migration
+-- with `supabase migration new operations_review` before copying this template.
+-- No historical visit is automatically closed by installing these functions.
+alter table public.truck_visits add column if not exists operational_details jsonb not null default '{}'::jsonb;
+
+create or replace function private.validate_operational_details(p_details jsonb) returns jsonb
+language plpgsql immutable set search_path=public,pg_temp as $$
+declare k text; v jsonb; max_length integer;
+begin
+  if p_details is null or jsonb_typeof(p_details)<>'object' then
+    raise exception 'Invalid operational details' using errcode='23514'; end if;
+  for k,v in select * from jsonb_each(p_details) loop
+    max_length:=case k when 'haulier' then 100 when 'lane' then 40 when 'lane_2' then 40
+      when 'seal_number' then 60 when 'seal_number_2' then 60
+      when 'damage_reservations' then 1000 when 'damage_reservations_2' then 1000 else 0 end;
+    if max_length=0 or jsonb_typeof(v)<>'string' or length(v#>>'{}')>max_length then
+      raise exception 'Invalid operational field: %',k using errcode='23514'; end if;
+  end loop;
+  return p_details;
+end; $$;
+revoke all on function private.validate_operational_details(jsonb) from public,anon,authenticated;
+
+create table if not exists public.container_blocks (
+  container_number text primary key references public.containers(number),
+  blocked boolean not null,
+  reason text not null check(length(btrim(reason)) between 3 and 1000),
+  changed_by uuid not null references public.profiles(id),
+  changed_at timestamptz not null default now(),
+  version integer not null default 1 check(version>0)
+);
+alter table public.container_blocks enable row level security;
+revoke all on public.container_blocks from public,anon,authenticated;
+
+create or replace function public.container_blocks_status() returns setof public.container_blocks
+language plpgsql stable security definer set search_path=public,pg_temp as $$
+begin
+  if not public.can_do('admin') then raise exception 'admin required' using errcode='42501'; end if;
+  return query select * from public.container_blocks order by changed_at desc limit 500;
+end; $$;
+revoke all on function public.container_blocks_status() from public,anon;
+grant execute on function public.container_blocks_status() to authenticated;
+
+create or replace function public.set_container_block(p_container text,p_blocked boolean,p_reason text,p_expected_version integer)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare current_row public.container_blocks; next_row public.container_blocks; v_number text:=upper(btrim(p_container));
+begin
+  if not public.can_do('admin') then raise exception 'admin required' using errcode='42501'; end if;
+  if p_blocked is null or p_expected_version is null or p_expected_version<0
+    or length(btrim(coalesce(p_reason,''))) not between 3 and 1000 then
+    raise exception 'Container and reason required' using errcode='23514'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('ops-container:'||v_number,0));
+  if not exists(select 1 from public.containers where number=v_number) then
+    raise exception 'Container unavailable' using errcode='P0002'; end if;
+  select * into current_row from public.container_blocks where container_number=v_number for update;
+  if coalesce(current_row.version,0)<>p_expected_version then
+    raise exception 'Block changed; refresh first' using errcode='40001'; end if;
+  insert into public.container_blocks(container_number,blocked,reason,changed_by)
+    values(v_number,p_blocked,btrim(p_reason),auth.uid())
+    on conflict(container_number) do update set blocked=excluded.blocked,reason=excluded.reason,
+      changed_by=excluded.changed_by,changed_at=now(),version=container_blocks.version+1 returning * into next_row;
+  insert into public.audit_logs(entity,entity_id,action,actor_id,before_data,after_data)
+    values('container_block',v_number,case when p_blocked then 'BLOCK' else 'UNBLOCK' end,auth.uid(),to_jsonb(current_row),to_jsonb(next_row));
+end; $$;
+revoke all on function public.set_container_block(text,boolean,text,integer) from public,anon;
+grant execute on function public.set_container_block(text,boolean,text,integer) to authenticated;
+
+create or replace function private.assert_container_not_blocked(p_container text) returns void
+language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+  if p_container is null then return; end if;
+  perform pg_advisory_xact_lock(hashtextextended('ops-container:'||p_container,0));
+  if exists(select 1 from public.container_blocks where container_number=p_container and blocked) then
+    raise exception 'Conteneur % bloqué : livraison interdite',p_container using errcode='23514'; end if;
+end; $$;
+revoke all on function private.assert_container_not_blocked(text) from public,anon,authenticated;
+
+create or replace function private.guard_stock_block() returns trigger
+language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+  if new.departed_at is not null and old.departed_at is null then
+    perform private.assert_container_not_blocked(new.container_number);
+  end if;
+  return new;
+end; $$;
+revoke all on function private.guard_stock_block() from public,anon,authenticated;
+create trigger ops_stock_block before update on public.container_stock_intervals
+for each row execute function private.guard_stock_block();
+
+create or replace function private.guard_pickup_block() returns trigger
+language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+  if new.entry_kind='empty' and new.canceled_at is null
+    and (new.engin_at is not null or new.exited_at is not null)
+    and (new.container_number is distinct from old.container_number
+      or new.container_number_2 is distinct from old.container_number_2
+      or new.engin_at is distinct from old.engin_at or new.exited_at is distinct from old.exited_at) then
+    perform private.assert_container_not_blocked(new.container_number);
+    if new.is_twin then perform private.assert_container_not_blocked(new.container_number_2); end if;
+  end if;
+  return new;
+end; $$;
+revoke all on function private.guard_pickup_block() from public,anon,authenticated;
+create trigger ops_pickup_block before update on public.truck_visits
+for each row execute function private.guard_pickup_block();
+
+create or replace function public.enter_operational_visit(p_plate text,p_cin text,p_entry_kind text,p_container text,
+  p_iso text,p_armateur text,p_order_item uuid,p_is_twin boolean default false,
+  p_container_2 text default null,p_iso_2 text default null,p_armateur_2 text default null,p_order_item_2 uuid default null,
+  p_operational_details jsonb default '{}'::jsonb)
+returns uuid language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_visit_id uuid; details jsonb;
+begin
+  if not public.can_do('entree') then raise exception 'permission denied' using errcode='42501'; end if;
+  details:=private.validate_operational_details(p_operational_details);
+  v_visit_id:=public.enter_transport_visit(p_plate,p_cin,p_entry_kind,p_container,p_iso,p_armateur,p_order_item,
+    p_is_twin,p_container_2,p_iso_2,p_armateur_2,p_order_item_2);
+  update public.truck_visits set operational_details=details where id=v_visit_id;
+  -- The ENTREE snapshot is completed in the same transaction, before any reader can see it.
+  update public.generated_documents set snapshot=snapshot||jsonb_build_object('operational_details',details)
+    where generated_documents.visit_id=v_visit_id and kind='ENTREE';
+  insert into public.audit_logs(entity,entity_id,action,actor_id,after_data)
+    values('truck_visit',v_visit_id::text,'OPERATIONAL_DETAILS',auth.uid(),details);
+  return v_visit_id;
+end; $$;
+revoke all on function public.enter_operational_visit(text,text,text,text,text,text,uuid,boolean,text,text,text,uuid,jsonb) from public,anon;
+grant execute on function public.enter_operational_visit(text,text,text,text,text,text,uuid,boolean,text,text,text,uuid,jsonb) to authenticated;
+
+create or replace function public.exit_operational_visit(p_visit uuid,p_pickup_container text default null,
+  p_pickup_iso text default null,p_pickup_armateur text default null,p_is_twin boolean default false,
+  p_pickup_container_2 text default null,p_pickup_iso_2 text default null,p_pickup_armateur_2 text default null,
+  p_empty_exit_without_pickup boolean default false,p_operational_details jsonb default '{}'::jsonb)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare v public.truck_visits; details jsonb;
+begin
+  if not public.can_do('sortie') then raise exception 'permission denied' using errcode='42501'; end if;
+  details:=private.validate_operational_details(p_operational_details);
+  select * into v from public.truck_visits where id=p_visit for update;
+  if not found or v.exited_at is not null or v.canceled_at is not null then
+    raise exception 'visit unavailable for Exit' using errcode='23514'; end if;
+  update public.truck_visits set operational_details=operational_details||details where id=p_visit;
+  perform public.exit_truck_with_details(p_visit,p_pickup_container,p_pickup_iso,p_pickup_armateur,p_is_twin,
+    p_pickup_container_2,p_pickup_iso_2,p_pickup_armateur_2,p_empty_exit_without_pickup);
+end; $$;
+revoke all on function public.exit_operational_visit(uuid,text,text,text,boolean,text,text,text,boolean,jsonb) from public,anon;
+grant execute on function public.exit_operational_visit(uuid,text,text,text,boolean,text,text,text,boolean,jsonb) to authenticated;
+
+-- Preserve the proven pickup implementation; only the loaded-truck deposit flow changes.
+alter function public.perform_engin(uuid,text,text) rename to ops_perform_engin_base;
+alter function public.ops_perform_engin_base(uuid,text,text) set schema private;
+revoke all on function private.ops_perform_engin_base(uuid,text,text) from public,anon,authenticated;
+
+create function public.perform_engin(p_visit uuid,p_container text default null,p_position text default null)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+declare v public.truck_visits; previous jsonb; slot record;
+begin
+  if not (public.can_do('engin') or public.can_do('sortie')) then raise exception 'permission denied' using errcode='42501'; end if;
+  select * into v from public.truck_visits where id=p_visit for update;
+  if not found or v.engin_at is not null or v.exited_at is not null or v.canceled_at is not null then
+    raise exception 'visit unavailable for Engin' using errcode='23514'; end if;
+  if v.entry_kind='empty' then
+    perform private.ops_perform_engin_base(p_visit,p_container,p_position); return;
+  end if;
+  previous:=to_jsonb(v);
+  for slot in select * from (values (v.container_number,v.iso_code,v.armateur_id),
+    (case when v.is_twin then v.container_number_2 end,v.iso_code_2,v.armateur_id_2)) as s(number,iso,line)
+    where s.number is not null order by s.number loop
+    perform 1 from public.containers where number=slot.number for update;
+    insert into public.container_stock_intervals(container_number,client_id,armateur_id,iso_code,start_visit_id,arrived_at,position)
+      values(slot.number,v.client_id,slot.line,slot.iso,v.id,now(),case when slot.number=v.container_number then nullif(btrim(p_position),'') end);
+  end loop;
+  if v.container_number is null or (v.is_twin and v.container_number_2 is null) then
+    raise exception 'Incomplete deposit' using errcode='23514'; end if;
+  -- One yard operation per visit is the existing model; the DEPOSE event and
+  -- the two stock intervals retain both container identities.
+  insert into public.yard_operations(visit_id,kind,container_number,position,performed_by)
+    values(v.id,'depose',v.container_number,nullif(btrim(p_position),''),auth.uid());
+  update public.truck_visits set engin_at=now(),engin_by=auth.uid(),version=version+1 where id=p_visit returning * into v;
+  perform public.record_event(v,'DEPOSE',auth.uid(),jsonb_build_object('container',v.container_number,'container_2',v.container_number_2,'position',p_position));
+  insert into public.audit_logs(entity,entity_id,action,actor_id,before_data,after_data)
+    values('truck_visit',v.id::text,'DEPOSE',auth.uid(),previous,to_jsonb(v));
+  previous:=to_jsonb(v);
+  update public.truck_visits set exited_at=engin_at,exited_by=auth.uid(),version=version+1 where id=p_visit returning * into v;
+  perform public.record_event(v,'SORTIE',auth.uid(),jsonb_build_object('automatic',true,'reason','Clôture après restitution','physical_exit_observed',false));
+  insert into public.audit_logs(entity,entity_id,action,actor_id,before_data,after_data)
+    values('truck_visit',v.id::text,'AUTO_CLOSE_AFTER_DEPOSIT',auth.uid(),previous,to_jsonb(v));
+end; $$;
+revoke all on function public.perform_engin(uuid,text,text) from public,anon;
+grant execute on function public.perform_engin(uuid,text,text) to authenticated;
+notify pgrst, 'reload schema';

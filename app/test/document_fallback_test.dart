@@ -8,7 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   for (final kind in ['ENTREE', 'SORTIE']) {
-    final template = kind == 'SORTIE' ? 'gate-out-v1' : 'marsa-v1';
+    final template = kind == 'SORTIE' ? 'zps-gate-out-v2' : 'zps-terminal-v2';
     for (final current in [true, false]) {
       test(
         '$kind local render failure ${current ? 'downloads the current form' : 'rejects a stale server PDF'}',
@@ -32,9 +32,9 @@ void main() {
                     'path': current
                         ? 'visit/doc-$template.pdf'
                         : kind == 'SORTIE'
-                        ? 'visit/doc-marsa-v1.pdf'
+                        ? 'visit/doc-zps-terminal-v2.pdf'
                         : 'visit/doc.pdf',
-                    'template_version': current ? template : 'marsa-v1',
+                    'template_version': current ? template : 'zps-terminal-v2',
                   }),
                   200,
                   headers: {'content-type': 'application/json'},

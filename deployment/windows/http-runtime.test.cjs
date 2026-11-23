@@ -1,0 +1,20 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path');
+const {createServer}=require('./http-runtime.cjs');
+test('portable HTTP runtime serves only web files, supports HEAD and refuses writes/private paths',async t=>{
+  const root=await fs.mkdtemp(path.resolve(__dirname,'../../.qa/http-runtime-test-'));
+  await fs.writeFile(path.join(root,'index.html'),'<html>Gestion des flux</html>');
+  await fs.writeFile(path.join(root,'secret.cjs'),'must not be served');
+  await fs.writeFile(path.join(root,'web.config'),'must not be served');
+  await fs.writeFile(path.join(root,'renderer.wasm'),Buffer.from([0,97,115,109]));
+  const server=createServer(root);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  t.after(()=>new Promise(resolve=>server.close(resolve)));
+  const base='http://127.0.0.1:'+server.address().port;
+  const page=await fetch(base+'/?auth=recovery');assert.equal(page.status,200);assert.match(await page.text(),/Gestion des flux/);
+  assert.equal(page.headers.get('cache-control'),'no-store');
+  const head=await fetch(base+'/',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
+  const wasm=await fetch(base+'/renderer.wasm');assert.equal(wasm.headers.get('content-type'),'application/wasm');
+  for(const name of ['/.env','/%2eqa/file.json','/index.html%3Astream','/a%5cb.html'])assert.equal((await fetch(base+name)).status,403);
+  for(const name of ['/secret.cjs','/web.config','/missing.js'])assert.equal((await fetch(base+name)).status,404);
+  assert.equal((await fetch(base+'/',{method:'POST',body:'test'})).status,405);
+});

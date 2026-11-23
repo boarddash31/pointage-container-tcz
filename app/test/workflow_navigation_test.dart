@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pointage_container/data/pointage_repository.dart';
 import 'package:pointage_container/main.dart';
 import 'package:pointage_container/ui/pointage_screens.dart';
-import 'package:pointage_container/ui/truck_diagram.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class QueueFixture extends PointageRepository {
@@ -118,7 +117,7 @@ void main() {
     expect(find.text('CSQU3054383'), findsOneWidget);
     expect(find.text('45G1'), findsOneWidget);
     expect(find.text('MAE'), findsOneWidget);
-    expect(find.text('Valider la sortie du camion'), findsOneWidget);
+    expect(find.text('Confirmer la restitution · Clôture automatique'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -184,40 +183,29 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('twin-tab-0')));
       await tester.pumpAndSettle();
     }
-    expect(find.text('Booking Conteneur 1 *'), findsOneWidget);
+    expect(find.text('EDO Conteneur 1 *'), findsOneWidget);
     if (find.byKey(const ValueKey('twin-tab-1')).evaluate().isNotEmpty) {
       await tester.tap(find.byKey(const ValueKey('twin-tab-1')));
       await tester.pumpAndSettle();
     }
-    expect(find.text('Booking Conteneur 2 *'), findsOneWidget);
+    expect(find.text('EDO Conteneur 2 *'), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('truck picture takes the operator to the plate and container fields', (tester) async {
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: EntryScreen(
-      repository: QueueFixture(), canCorrect: false))));
+  testWidgets('entry form follows order, truck then container sections', (tester) async {
+    tester.view.devicePixelRatio = 1; tester.view.physicalSize = const Size(1200, 1000);
+    addTearDown(() { tester.view.resetPhysicalSize(); tester.view.resetDevicePixelRatio(); });
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: EntryScreen(repository: QueueFixture(), canCorrect: false))));
     await tester.pumpAndSettle();
-    final preview = find.byWidgetPredicate((widget) =>
-      widget is TruckScene && widget.onContainerTap != null);
-    Future<void> touch(double x, double y) async {
-      await tester.ensureVisible(preview);
-      await tester.pumpAndSettle();
-      final size = tester.getSize(preview);
-      final origin = tester.getTopLeft(preview);
-      final scale = size.width / 300 < size.height / 120
-        ? size.width / 300 : size.height / 120;
-      await tester.tapAt(origin + Offset((size.width - 300 * scale) / 2 + x * scale,
-        (size.height - 120 * scale) / 2 + y * scale));
-      await tester.pump();
-    }
-    await touch(35, 82);
-    final plateField = tester.widget<TextField>(find.descendant(
-      of: find.widgetWithText(TextFormField, 'Plaque camion *'),
-      matching: find.byType(TextField)));
-    expect(plateField.focusNode!.hasFocus, isTrue);
-    await touch(130, 50);
-    expect(plateField.focusNode!.hasFocus, isFalse);
-    expect(tester.binding.focusManager.primaryFocus?.hasFocus, isTrue);
+    final order = find.text('1 · Informations ERO · Restitution');
+    final truck = find.text('2 · Camion et chauffeur');
+    final container = find.text('3 · Informations conteneur');
+    expect(tester.getTopLeft(order).dy,lessThan(tester.getTopLeft(truck).dy));
+    expect(tester.getTopLeft(truck).dy,lessThan(tester.getTopLeft(container).dy));
+    final plate = find.widgetWithText(TextFormField, 'Plaque camion *');
+    await tester.ensureVisible(plate); await tester.tap(plate); await tester.pump();
+    await tester.enterText(plate, '12345-A-1');
+    expect(find.text('12345-A-1'),findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

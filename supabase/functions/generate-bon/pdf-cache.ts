@@ -1,5 +1,5 @@
-export const terminalTemplateVersion = 'marsa-v1';
-export const gateOutTemplateVersion = 'gate-out-v1';
+export const terminalTemplateVersion = 'zps-terminal-v2';
+export const gateOutTemplateVersion = 'zps-gate-out-v2';
 export function documentTemplateVersion(kind: string): string {
   return kind.toUpperCase()==='SORTIE'?gateOutTemplateVersion:isTerminalForm(kind)?terminalTemplateVersion:'legacy';
 }

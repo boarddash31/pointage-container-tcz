@@ -1,0 +1,40 @@
+ZENATA - ACTIVATION DU CONNECTEUR SMTP SUR208
+
+Le runtime affiche des boutons grises car Nodemailer n'est pas installe.
+Le telechargement du composant a ete bloque par le filtre File Transfer
+de l'entreprise lors de la preparation. Ce kit ne telecharge rien et ne
+contient pas Nodemailer. L'IT doit fournir le paquet approuve au prealable.
+
+A TRANSMETTRE A L'IT
+Merci de mettre a disposition via le processus d'approvisionnement approuve
+le paquet npm nodemailer-10.6.1.tgz pour l'application ZENATA sur208.
+La version est verrouillee dans reports/package-lock.json. L'installateur
+compare l'empreinte SHA512 du paquet a ce verrou avant de l'extraire.
+Node est deja fourni avec le runtime. Aucun mot de passe SMTP necessaire.
+
+UNE FOIS LE PAQUET DISPONIBLE
+1. Placer installer-connecteur-smtp.cjs et INSTALLER-CONNECTEUR-SMTP.cmd
+   dans le dossier ACTUEL du runtime, celui qui contient node.exe et reports.
+2. Lancer INSTALLER-CONNECTEUR-SMTP.cmd et indiquer le paquet approuve.
+   Attendre CONNECTEUR SMTP INSTALLE. Aucune base, compte, configuration
+   ou programmation n'est modifie. Aucun e-mail n'est envoye.
+3. Fermer le lanceur applicatif avec Ctrl+C puis relancer DEMARRER-ZENATA.cmd.
+4. Actualiser Rapports : le message de connecteur manquant doit disparaitre.
+   Les boutons deviennent actifs si les parametres SMTP sont enregistres.
+
+CONFIGURATION DEJA COMMUNIQUEE
+Serveur :172.17.18.43 ; port25 ; expediteur e-services@marsamaroc.co.ma.
+Securite :STARTTLS. Identifiant et mot de passe :vides.
+Ne pas choisir Relais interne, qui desactive STARTTLS dans cette version.
+
+TEST
+Verifier le SMTP teste la connexion sans envoyer d'e-mail.
+Puis utiliser Envoyer maintenant sur le rapport de test adresse uniquement
+a votre propre boite. L'historique confirme l'acceptation par le relais,
+et la reception du classeur Excel se verifie dans la boite destinataire.
+Pour tester la planification, choisir Une seule fois a une heure future,
+activer le rapport puis laisser le runtime allume.
+
+Si l'installateur indique un paquet different, un connecteur deja present
+ou une erreur d'extraction, conserver le message et contacter l'IT.
+L'installateur ne contourne aucun filtre et ne desactive aucun controle TLS.

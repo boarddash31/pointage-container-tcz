@@ -1,0 +1,41 @@
+-- TEMPLATE for a Supabase migration, to install only when the SQL runtime has been validated on208.
+-- Installing this guard leaves the application writable. Activation is a separate operator action.
+BEGIN;
+SET LOCAL lock_timeout='10s';
+CREATE SCHEMA IF NOT EXISTS migration_control;
+REVOKE ALL ON SCHEMA migration_control FROM PUBLIC;
+GRANT USAGE ON SCHEMA migration_control TO anon,authenticated;
+CREATE TABLE IF NOT EXISTS migration_control.freeze_state(
+ singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),
+ frozen boolean NOT NULL DEFAULT false,
+ freeze_id uuid NOT NULL DEFAULT gen_random_uuid(),
+ changed_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO migration_control.freeze_state(singleton) VALUES(true) ON CONFLICT DO NOTHING;
+ALTER TABLE migration_control.freeze_state ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON migration_control.freeze_state FROM PUBLIC,anon,authenticated;
+GRANT SELECT ON migration_control.freeze_state TO anon,authenticated;
+DROP POLICY IF EXISTS read_freeze_state ON migration_control.freeze_state;
+CREATE POLICY read_freeze_state ON migration_control.freeze_state FOR SELECT TO anon,authenticated USING(true);
+CREATE OR REPLACE FUNCTION migration_control.check_writable() RETURNS trigger
+ LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,migration_control AS $$
+BEGIN
+ -- Statement-level shared lock lives until the business transaction ends.
+ -- Activation takes the exclusive lock and drains earlier writes before setting frozen=true.
+ PERFORM pg_catalog.pg_advisory_xact_lock_shared(628921411964637::bigint);
+ IF (SELECT frozen FROM migration_control.freeze_state WHERE singleton) THEN
+  RAISE EXCEPTION 'Application en maintenance pour migration SQL Server' USING ERRCODE='55000';
+ END IF;
+ RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION migration_control.check_writable() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION migration_control.check_writable() TO anon,authenticated;
+DO $$ DECLARE item record; BEGIN
+ FOR item IN SELECT table_schema,table_name FROM information_schema.tables
+  WHERE table_type='BASE TABLE' AND table_schema IN('public','private') ORDER BY table_schema,table_name LOOP
+  EXECUTE format('DROP TRIGGER IF EXISTS zenata_migration_guard ON %I.%I',item.table_schema,item.table_name);
+  EXECUTE format('CREATE TRIGGER zenata_migration_guard BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON %I.%I FOR EACH STATEMENT EXECUTE FUNCTION migration_control.check_writable()',item.table_schema,item.table_name);
+ END LOOP;
+END $$;
+COMMIT;
+SELECT frozen,freeze_id FROM migration_control.freeze_state WHERE singleton;

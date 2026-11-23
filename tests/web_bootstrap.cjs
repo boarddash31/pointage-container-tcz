@@ -2,6 +2,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const assert=require('node:assert/strict');
 const source=fs.readFileSync('app/web/flutter_bootstrap.js','utf8').replace('{{flutter_js}}','').replace('{{flutter_build_config}}','');
+const release=source.match(/const release = '([^']+)'/)[1];
 (async()=>{
   const events=[];
   const context={window:{},document:{baseURI:'http://localhost:8787/marsa-bons-v1/'},URL,console,
@@ -13,7 +14,8 @@ const source=fs.readFileSync('app/web/flutter_bootstrap.js','utf8').replace('{{f
   context.window.caches=context.caches;
   vm.runInNewContext(source,context);await context.window.tczBootReady;
   assert.deepEqual(events,['unregister','delete:flutter-app-cache','load']);
-  assert.match(context._flutter.buildConfig.builds[0].mainJsPath,/tcz_release=marsa-bons-v1/);
+  assert.equal(context._flutter.buildConfig.builds[0].mainJsPath,'main.dart.js?tcz_release='+release);
+  assert.ok(fs.readFileSync('app/web/index.html','utf8').includes('flutter_bootstrap.js?tcz_release='+release));
   const unavailable={window:{},navigator:{},document:{baseURI:'http://localhost:8787/'},console,
     _flutter:{buildConfig:{builds:[]},loader:{load:()=>true}}};
   vm.runInNewContext(source,unavailable);assert.equal(await unavailable.window.tczBootReady,true);

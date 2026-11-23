@@ -10,6 +10,10 @@ public static class AccountEndpoints
     public static void Map(WebApplication app)
     {
         var auth = app.MapGroup("/api/auth");
+        auth.MapGet("/session", (ClaimsPrincipal user, HttpContext context) => {
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(new { user_id=User(user), must_change_password=user.FindFirstValue("must_change_password")=="true" });
+        }).RequireAuthorization();
         auth.MapPost("/login", async (LoginInput input, AccountStore accounts, HttpContext context, CancellationToken ct) => {
             context.Response.Headers.CacheControl = "no-store";
             var result = await accounts.Login(input, ct);
